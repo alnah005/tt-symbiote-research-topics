@@ -27,10 +27,10 @@ This chapter dissects the router computation into its constituent operations, an
 
 | File | Description |
 |---|---|
-| `router_forward_pass.md` | End-to-end router forward pass: linear projection, sigmoid vs. softmax, top-k selection, auxiliary loss at training time, and numerical precision in BF16 |
-| `topk_selection_efficiency.md` | Algorithmic and hardware analysis of top-k selection for $E=256$, $k=8$; partial selection vs. full sort; batched and tile-parallel strategies |
-| `weight_normalization.md` | Why sigmoid routing requires explicit weight renormalization; timing options (before vs. after dispatch); recommended deferred approach for T3K |
-| `router_kernel_fusion.md` | Kernel fusion opportunities: projection + top-k + index extraction; normalization + scatter metadata; double-buffering for latency hiding; INT8 quantization of $W_r$ |
+| [`router_forward_pass.md`](./router_forward_pass.md) | End-to-end router forward pass: linear projection, sigmoid vs. softmax, top-k selection, auxiliary loss at training time, and numerical precision in BF16 |
+| [`topk_selection_efficiency.md`](./topk_selection_efficiency.md) | Algorithmic and hardware analysis of top-k selection for $E=256$, $k=8$; partial selection vs. full sort; batched and tile-parallel strategies |
+| [`weight_normalization.md`](./weight_normalization.md) | Why sigmoid routing requires explicit weight renormalization; timing options (before vs. after dispatch); recommended deferred approach for T3K |
+| [`router_kernel_fusion.md`](./router_kernel_fusion.md) | Kernel fusion opportunities: projection + top-k + index extraction; normalization + scatter metadata; double-buffering for latency hiding; INT8 quantization of $W_r$ |
 
 ## Qwen3.5-35B Router at a Glance
 
@@ -57,10 +57,10 @@ followed by per-expert sigmoid activation, top-8 selection, and (for sigmoid rou
 
 Read the files in order for a complete picture, or jump directly to a specific topic:
 
-- For the full algorithmic walkthrough of the router: start with `router_forward_pass.md`.
-- For hardware-level analysis of top-k cost: go to `topk_selection_efficiency.md`.
-- For normalization timing and payload implications: see `weight_normalization.md`.
-- For fusion and latency-hiding strategies: see `router_kernel_fusion.md`.
+- For the full algorithmic walkthrough of the router: start with [`router_forward_pass.md`](./router_forward_pass.md).
+- For hardware-level analysis of top-k cost: go to [`topk_selection_efficiency.md`](./topk_selection_efficiency.md).
+- For normalization timing and payload implications: see [`weight_normalization.md`](./weight_normalization.md).
+- For fusion and latency-hiding strategies: see [`router_kernel_fusion.md`](./router_kernel_fusion.md).
 
 ## References
 

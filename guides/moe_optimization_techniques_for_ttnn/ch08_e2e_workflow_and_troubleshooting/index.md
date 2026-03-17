@@ -36,9 +36,9 @@ coherent workflow.
 
 | Section | File | Description |
 |---|---|---|
-| 8.1 Model Loading and Weight Placement | `model_loading_and_weight_placement.md` | Checkpoint conversion, expert sharding across 8 devices, DRAM vs. L1 placement decisions |
-| 8.2 Inference Loop Structure | `inference_loop_structure.md` | Full decode and prefill step breakdown, MoE layer internals, key TTNN API calls |
-| 8.3 Troubleshooting Guide | `troubleshooting_guide.md` | Six common errors with diagnosis and fix procedures |
+| 8.1 Model Loading and Weight Placement | [`model_loading_and_weight_placement.md`](./model_loading_and_weight_placement.md) | Checkpoint conversion, expert sharding across 8 devices, DRAM vs. L1 placement decisions |
+| 8.2 Inference Loop Structure | [`inference_loop_structure.md`](./inference_loop_structure.md) | Full decode and prefill step breakdown, MoE layer internals, key TTNN API calls |
+| 8.3 Troubleshooting Guide | [`troubleshooting_guide.md`](./troubleshooting_guide.md) | Six common errors with diagnosis and fix procedures |
 
 ## Chapter Constants (Qwen3.5-35B on T3K)
 

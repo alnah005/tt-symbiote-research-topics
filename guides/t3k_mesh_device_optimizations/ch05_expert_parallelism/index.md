@@ -66,15 +66,15 @@ All quantitative analysis in this chapter uses Qwen3.5-35B parameters on an 8-de
 
 | File | Description |
 |---|---|
-| `expert_placement_strategies.md` | Four placement strategies — naive uniform, load-balanced, locality-aware, and expert replication — with memory and load-balance analysis for each |
-| `token_routing_and_dispatch.md` | On-device router output, send buffer construction, capacity padding, all-to-all dispatch mechanics, and latency estimates by batch size |
-| `combine_and_accumulation.md` | Reverse all-to-all structure, weighted combination of $k=8$ expert outputs, in-place accumulation strategies, and overlap opportunities |
+| [`expert_placement_strategies.md`](./expert_placement_strategies.md) | Four placement strategies — naive uniform, load-balanced, locality-aware, and expert replication — with memory and load-balance analysis for each |
+| [`token_routing_and_dispatch.md`](./token_routing_and_dispatch.md) | On-device router output, send buffer construction, capacity padding, all-to-all dispatch mechanics, and latency estimates by batch size |
+| [`combine_and_accumulation.md`](./combine_and_accumulation.md) | Reverse all-to-all structure, weighted combination of $k=8$ expert outputs, in-place accumulation strategies, and overlap opportunities |
 
 ### Recommended Reading Order
 
-1. Start with `expert_placement_strategies.md` to decide on an assignment strategy before implementing dispatch logic. The placement decision affects the dispatch-to-device mapping and the need for replication metadata.
-2. Read `token_routing_and_dispatch.md` to implement the dispatch path: router integration, send buffer construction, and the `ttnn.all_to_all` dispatch call with the correct `memory_config` for your phase (decode vs. prefill).
-3. Read `combine_and_accumulation.md` last, as it depends on the dispatch metadata structures introduced in step 2.
+1. Start with [`expert_placement_strategies.md`](./expert_placement_strategies.md) to decide on an assignment strategy before implementing dispatch logic. The placement decision affects the dispatch-to-device mapping and the need for replication metadata.
+2. Read [`token_routing_and_dispatch.md`](./token_routing_and_dispatch.md) to implement the dispatch path: router integration, send buffer construction, and the `ttnn.all_to_all` dispatch call with the correct `memory_config` for your phase (decode vs. prefill).
+3. Read [`combine_and_accumulation.md`](./combine_and_accumulation.md) last, as it depends on the dispatch metadata structures introduced in step 2.
 
 ---
 
@@ -82,12 +82,12 @@ All quantitative analysis in this chapter uses Qwen3.5-35B parameters on an 8-de
 
 | Scenario | Recommended File |
 |---|---|
-| Choosing expert assignment for a new deployment | `expert_placement_strategies.md` |
-| Debugging token drop events at runtime | `token_routing_and_dispatch.md` Section 3 |
-| Implementing or tuning the router dispatch kernel | `token_routing_and_dispatch.md` Section 5 |
-| Verifying numerical accuracy of combine output | `combine_and_accumulation.md` Section 4 |
-| Reducing prefill MoE layer latency through overlap | `combine_and_accumulation.md` Section 5 |
-| Understanding `num_links` interaction with batch size | `token_routing_and_dispatch.md` Section 4, then `ch03_all_to_all_num_links/num_links_parameter.md` |
+| Choosing expert assignment for a new deployment | [`expert_placement_strategies.md`](./expert_placement_strategies.md) |
+| Debugging token drop events at runtime | [`token_routing_and_dispatch.md`](./token_routing_and_dispatch.md) Section 3 |
+| Implementing or tuning the router dispatch kernel | [`token_routing_and_dispatch.md`](./token_routing_and_dispatch.md) Section 5 |
+| Verifying numerical accuracy of combine output | [`combine_and_accumulation.md`](./combine_and_accumulation.md) Section 4 |
+| Reducing prefill MoE layer latency through overlap | [`combine_and_accumulation.md`](./combine_and_accumulation.md) Section 5 |
+| Understanding `num_links` interaction with batch size | [`token_routing_and_dispatch.md`](./token_routing_and_dispatch.md) Section 4, then [`ch03_all_to_all_num_links/num_links_parameter.md`](../ch03_all_to_all_num_links/num_links_parameter.md) |
 
 ---
 

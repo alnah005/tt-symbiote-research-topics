@@ -14,10 +14,10 @@ This chapter frames all-to-all as the **baseline** and characterizes three alter
 
 | File | Topic | First used in later chapters |
 |---|---|---|
-| `expert_sharding.md` | Static assignment of experts to devices; all-gather-before-routing pattern; communication volume comparison between all-gather and all-to-all; when expert sharding wins | Chapter 4, `uniform_partitioning.md`; Chapter 8, `recommended_configuration.md` |
-| `pipeline_expert_parallelism.md` | Pipeline arrangement of devices for sequential expert execution; bubble analysis; comparison with all-to-all latency; applicability to Qwen3.5-35B | Chapter 6, `pipeline_design.md` |
-| `hierarchical_routing.md` | Two-level coarse/fine routing; communication reduction from group confinement; load-balance challenges at inference time; training dependency | Chapter 4, `load_aware_assignment.md`; Chapter 7, `auxiliary_loss_free_inference.md` |
-| `scheme_comparison_matrix.md` | Summary table of all four schemes; ASCII decision flowchart; recommendation for Qwen3.5-35B on T3K | Chapter 8, `recommended_configuration.md` |
+| [`expert_sharding.md`](./expert_sharding.md) | Static assignment of experts to devices; all-gather-before-routing pattern; communication volume comparison between all-gather and all-to-all; when expert sharding wins | Chapter 4, `uniform_partitioning.md`; Chapter 8, `recommended_configuration.md` |
+| [`pipeline_expert_parallelism.md`](./pipeline_expert_parallelism.md) | Pipeline arrangement of devices for sequential expert execution; bubble analysis; comparison with all-to-all latency; applicability to Qwen3.5-35B | Chapter 6, `pipeline_design.md` |
+| [`hierarchical_routing.md`](./hierarchical_routing.md) | Two-level coarse/fine routing; communication reduction from group confinement; load-balance challenges at inference time; training dependency | Chapter 4, `load_aware_assignment.md`; Chapter 7, `auxiliary_loss_free_inference.md` |
+| [`scheme_comparison_matrix.md`](./scheme_comparison_matrix.md) | Summary table of all four schemes; ASCII decision flowchart; recommendation for Qwen3.5-35B on T3K | Chapter 8, `recommended_configuration.md` |
 
 ---
 
@@ -45,13 +45,13 @@ The following symbols extend the notation established in Chapters 1 and 2. Symbo
 
 ## Reading Order
 
-1. **`expert_sharding.md`** — The simplest alternative to all-to-all. Read this first because it introduces the all-gather volume formula that reappears in the comparison matrix.
+1. **[`expert_sharding.md`](./expert_sharding.md)** — The simplest alternative to all-to-all. Read this first because it introduces the all-gather volume formula that reappears in the comparison matrix.
 
-2. **`pipeline_expert_parallelism.md`** — A fundamentally different execution model. Read after `expert_sharding.md` because the pipeline discussion references all-to-all and all-gather as counterpoints.
+2. **[`pipeline_expert_parallelism.md`](./pipeline_expert_parallelism.md)** — A fundamentally different execution model. Read after [`expert_sharding.md`](./expert_sharding.md) because the pipeline discussion references all-to-all and all-gather as counterpoints.
 
-3. **`hierarchical_routing.md`** — The most complex alternative; requires understanding flat routing (Chapter 1) and all-to-all (Chapter 2) as contrasts.
+3. **[`hierarchical_routing.md`](./hierarchical_routing.md)** — The most complex alternative; requires understanding flat routing (Chapter 1) and all-to-all (Chapter 2) as contrasts.
 
-4. **`scheme_comparison_matrix.md`** — Synthesis file. Read last; it references all prior files in this chapter.
+4. **[`scheme_comparison_matrix.md`](./scheme_comparison_matrix.md)** — Synthesis file. Read last; it references all prior files in this chapter.
 
 ---
 

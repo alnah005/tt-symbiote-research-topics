@@ -91,10 +91,10 @@ buffers per direction, totaling 7.0 MB across all buffers — well within the ag
 
 | File | Contents |
 |---|---|
-| `pipeline_design.md` | Six-stage dependency graph, micro-batch pipelining scheme, buffer sizing |
-| `expert_ffn_tiling.md` | Parallel expert execution on 80 Tensix cores, L1 weight streaming, sparsity exploitation |
-| `combine_accumulation.md` | Weighted scatter-add algorithm, race condition avoidance, L1 vs. DRAM strategy |
-| `end_to_end_latency_model.md` | Parameterized latency formula, regime identification, calibration procedure |
+| [`pipeline_design.md`](./pipeline_design.md) | Six-stage dependency graph, micro-batch pipelining scheme, buffer sizing |
+| [`expert_ffn_tiling.md`](./expert_ffn_tiling.md) | Parallel expert execution on 80 Tensix cores, L1 weight streaming, sparsity exploitation |
+| [`combine_accumulation.md`](./combine_accumulation.md) | Weighted scatter-add algorithm, race condition avoidance, L1 vs. DRAM strategy |
+| [`end_to_end_latency_model.md`](./end_to_end_latency_model.md) | Parameterized latency formula, regime identification, calibration procedure |
 
 ## Scope and Known Limitations
 

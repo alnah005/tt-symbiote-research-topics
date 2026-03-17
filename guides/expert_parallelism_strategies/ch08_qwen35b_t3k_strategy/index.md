@@ -23,9 +23,9 @@ This chapter is a synthesis and decision record. It does not introduce new conce
 
 | File | Description |
 |---|---|
-| `architecture_summary.md` | Qwen3.5-35B and T3K parameters; derived constraints under uniform EP |
-| `recommended_configuration.md` | Concrete recommended config with justification for each decision |
-| `open_questions.md` | Unresolved questions and future investigation areas |
+| [`architecture_summary.md`](./architecture_summary.md) | Qwen3.5-35B and T3K parameters; derived constraints under uniform EP |
+| [`recommended_configuration.md`](./recommended_configuration.md) | Concrete recommended config with justification for each decision |
+| [`open_questions.md`](./open_questions.md) | Unresolved questions and future investigation areas |
 
 ---
 
@@ -44,9 +44,9 @@ All recommendations in this chapter flow from this regime. Readers familiar with
 
 For a practitioner implementing this system for the first time:
 
-1. `architecture_summary.md` — confirm your hardware and model match the assumptions
-2. `recommended_configuration.md` — adopt the configuration; read justifications for any choice you need to tune
-3. `open_questions.md` — track which decisions may need revisiting as the system matures
+1. [`architecture_summary.md`](./architecture_summary.md) — confirm your hardware and model match the assumptions
+2. [`recommended_configuration.md`](./recommended_configuration.md) — adopt the configuration; read justifications for any choice you need to tune
+3. [`open_questions.md`](./open_questions.md) — track which decisions may need revisiting as the system matures
 
 ---
 

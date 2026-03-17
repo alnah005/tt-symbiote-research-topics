@@ -82,9 +82,9 @@ For Qwen3.5-35B: $\rho = 3.1\%$ at decode — this is well below the 0.1 thresho
 
 | File | Description |
 |------|-------------|
-| `performance_comparison_matrix.md` | Quantitative comparison across four canonical scenarios (prefill/decode × large/small batch); model-dimension interaction analysis; non-monotonic latency curve |
-| `memory_and_bandwidth_tradeoffs.md` | DRAM bandwidth pressure, L1 footprint analysis, T3K multi-chip considerations, sparsity tensor construction overhead |
-| `decision_guide.md` | Structured decision rules, runtime sparsity measurement, hybrid strategy implementation, anti-patterns to avoid |
+| [`performance_comparison_matrix.md`](./performance_comparison_matrix.md) | Quantitative comparison across four canonical scenarios (prefill/decode × large/small batch); model-dimension interaction analysis; non-monotonic latency curve |
+| [`memory_and_bandwidth_tradeoffs.md`](./memory_and_bandwidth_tradeoffs.md) | DRAM bandwidth pressure, L1 footprint analysis, T3K multi-chip considerations, sparsity tensor construction overhead |
+| [`decision_guide.md`](./decision_guide.md) | Structured decision rules, runtime sparsity measurement, hybrid strategy implementation, anti-patterns to avoid |
 
 ---
 
@@ -112,12 +112,12 @@ For Qwen3.5-35B: $\rho = 3.1\%$ at decode — this is well below the 0.1 thresho
 
 ## References
 
-- `ch03_batched_matmul_for_moe/performance_profile_batched.md` — batched matmul throughput and gather cost analysis
-- `ch04_sparse_matmul_for_moe/when_sparse_matmul_wins.md` — sparsity ratio threshold derivation ($\rho < 0.5$)
-- `ch04_sparse_matmul_for_moe/sparse_matmul_internals.md` — tile-skip mechanics and metadata overhead
-- `ch05_sparsity_tensor_construction/sparsity_tensor_placement.md` — L1 placement and sizing
-- `ch05_sparsity_tensor_construction/constructing_from_router_output.md` — per-step construction requirements
+- [`ch03_batched_matmul_for_moe/performance_profile_batched.md`](../ch03_batched_matmul_for_moe/performance_profile_batched.md) — batched matmul throughput and gather cost analysis
+- [`ch04_sparse_matmul_for_moe/when_sparse_matmul_wins.md`](../ch04_sparse_matmul_for_moe/when_sparse_matmul_wins.md) — sparsity ratio threshold derivation ($\rho < 0.5$)
+- [`ch04_sparse_matmul_for_moe/sparse_matmul_internals.md`](../ch04_sparse_matmul_for_moe/sparse_matmul_internals.md) — tile-skip mechanics and metadata overhead
+- [`ch05_sparsity_tensor_construction/sparsity_tensor_placement.md`](../ch05_sparsity_tensor_construction/sparsity_tensor_placement.md) — L1 placement and sizing
+- [`ch05_sparsity_tensor_construction/constructing_from_router_output.md`](../ch05_sparsity_tensor_construction/constructing_from_router_output.md) — per-step construction requirements
 
 ## Next Steps
 
-Proceed to `performance_comparison_matrix.md` for a quantitative breakdown of all four canonical inference scenarios, including worked expert-capacity calculations and the non-monotonic latency analysis for sparse matmul.
+Proceed to [`performance_comparison_matrix.md`](./performance_comparison_matrix.md) for a quantitative breakdown of all four canonical inference scenarios, including worked expert-capacity calculations and the non-monotonic latency analysis for sparse matmul.

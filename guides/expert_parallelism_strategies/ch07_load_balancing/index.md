@@ -64,19 +64,19 @@ This chapter consists of three files, each addressing one aspect of load balanci
 
 | File | Topic | What it covers |
 |---|---|---|
-| `load_imbalance_detection.md` | Quantifying and monitoring imbalance | Definition of $f_e$ and $CV$; hot-expert threshold; per-step overflow rate; routing metadata monitoring; expert utilization metric |
-| `capacity_overflow_handling.md` | What happens when capacity is exceeded | Hard-drop and reassign policies; output weight renormalization; Poisson token-drop model; worked example at $B=32$ |
-| `dynamic_routing_strategies.md` | Inference-time and training-time mitigation | Load-aware routing adjustment; temperature scaling; expert replication via $r_e$; auxiliary load-balancing loss; online vs. offline trade-offs; Qwen3.5-35B recommendation |
+| [`load_imbalance_detection.md`](./load_imbalance_detection.md) | Quantifying and monitoring imbalance | Definition of $f_e$ and $CV$; hot-expert threshold; per-step overflow rate; routing metadata monitoring; expert utilization metric |
+| [`capacity_overflow_handling.md`](./capacity_overflow_handling.md) | What happens when capacity is exceeded | Hard-drop and reassign policies; output weight renormalization; Poisson token-drop model; worked example at $B=32$ |
+| [`dynamic_routing_strategies.md`](./dynamic_routing_strategies.md) | Inference-time and training-time mitigation | Load-aware routing adjustment; temperature scaling; expert replication via $r_e$; auxiliary load-balancing loss; online vs. offline trade-offs; Qwen3.5-35B recommendation |
 
 ---
 
 ## Recommended Reading Order
 
-1. **`load_imbalance_detection.md`** — Read first. Establishes the measurement framework ($f_e$, $CV$, hot-expert threshold, utilization metric) that the remaining two files depend on. Without this file, the quantitative claims in `capacity_overflow_handling.md` and `dynamic_routing_strategies.md` lack grounding.
+1. **[`load_imbalance_detection.md`](./load_imbalance_detection.md)** — Read first. Establishes the measurement framework ($f_e$, $CV$, hot-expert threshold, utilization metric) that the remaining two files depend on. Without this file, the quantitative claims in [`capacity_overflow_handling.md`](./capacity_overflow_handling.md) and [`dynamic_routing_strategies.md`](./dynamic_routing_strategies.md) lack grounding.
 
-2. **`capacity_overflow_handling.md`** — Read second. Uses the $f_e$ and $C$ definitions from the detection file to derive the token-drop mechanism, the two handling policies, the Poisson drop-rate model, and the worked example at $B = 32$.
+2. **[`capacity_overflow_handling.md`](./capacity_overflow_handling.md)** — Read second. Uses the $f_e$ and $C$ definitions from the detection file to derive the token-drop mechanism, the two handling policies, the Poisson drop-rate model, and the worked example at $B = 32$.
 
-3. **`dynamic_routing_strategies.md`** — Read last. Uses the overflow model from the previous file to motivate each mitigation strategy and quantifies the overhead of each approach. The $r_e$ formula here builds directly on Chapter 4, `ch04_expert_device_assignment/expert_replication.md`.
+3. **[`dynamic_routing_strategies.md`](./dynamic_routing_strategies.md)** — Read last. Uses the overflow model from the previous file to motivate each mitigation strategy and quantifies the overhead of each approach. The $r_e$ formula here builds directly on Chapter 4, `ch04_expert_device_assignment/expert_replication.md`.
 
 ---
 

@@ -74,13 +74,13 @@ Device indices are 0-based: devices $0$ through $N-1 = 7$. Expert indices are 0-
 
 Read the four files in the following order:
 
-1. **`uniform_partitioning.md`** — The baseline strategy. Establishes the memory footprint per device, defines the load imbalance metric $L$, and explains why round-robin assignment is the natural TTNN default. Read this first; all later files compare against it.
+1. **[`uniform_partitioning.md`](./uniform_partitioning.md)** — The baseline strategy. Establishes the memory footprint per device, defines the load imbalance metric $L$, and explains why round-robin assignment is the natural TTNN default. Read this first; all later files compare against it.
 
-2. **`load_aware_assignment.md`** — Expert popularity profiling and the bin-packing formulation. Introduces the greedy decreasing first (GDF) algorithm for near-optimal assignment without an integer linear program (ILP) solver. Requires understanding of the load imbalance metric defined in `uniform_partitioning.md`.
+2. **[`load_aware_assignment.md`](./load_aware_assignment.md)** — Expert popularity profiling and the bin-packing formulation. Introduces the greedy decreasing first (GDF) algorithm for near-optimal assignment without an integer linear program (ILP) solver. Requires understanding of the load imbalance metric defined in [`uniform_partitioning.md`](./uniform_partitioning.md).
 
-3. **`expert_replication.md`** — Replicating hot experts across multiple devices to absorb load spikes. Requires the replication factor formula and dispatch interaction discussion, both of which build on the load model from `load_aware_assignment.md`.
+3. **[`expert_replication.md`](./expert_replication.md)** — Replicating hot experts across multiple devices to absorb load spikes. Requires the replication factor formula and dispatch interaction discussion, both of which build on the load model from [`load_aware_assignment.md`](./load_aware_assignment.md).
 
-4. **`mesh_topology_constraints.md`** — T3K-specific placement considerations: locality-aware assignment to minimize inter-device hop counts given the 1×8 linear topology. Read last; it synthesizes all three prior strategies and adds the co-activation graph partitioning layer.
+4. **[`mesh_topology_constraints.md`](./mesh_topology_constraints.md)** — T3K-specific placement considerations: locality-aware assignment to minimize inter-device hop counts given the 1×8 linear topology. Read last; it synthesizes all three prior strategies and adds the co-activation graph partitioning layer.
 
 ---
 

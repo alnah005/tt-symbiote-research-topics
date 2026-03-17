@@ -92,18 +92,18 @@ These constants are unchanged from Chapters 5 and 6.
 
 | File | Description |
 |---|---|
-| `complete_moe_layer_impl.md` | Full `moe_layer_t3k` pseudocode: router, pack, dispatch A2A, expert FFN, combine A2A, weighted accumulation, residual add; `num_links` selection table; program config choices; error guards |
-| `decode_loop_integration.md` | Autoregressive decode loop with MoE layer calls; memory lifecycle; KV cache integration; batch padding to $B=32$; performance targets; profiling discipline |
-| `prefill_considerations.md` | Prefill vs. decode differences: DRAM memory config, `num_links=2`, large capacity $C$; dispatch volume table; compute-vs-communication regime; overlap with next-layer Q/K/V projection |
+| [`complete_moe_layer_impl.md`](./complete_moe_layer_impl.md) | Full `moe_layer_t3k` pseudocode: router, pack, dispatch A2A, expert FFN, combine A2A, weighted accumulation, residual add; `num_links` selection table; program config choices; error guards |
+| [`decode_loop_integration.md`](./decode_loop_integration.md) | Autoregressive decode loop with MoE layer calls; memory lifecycle; KV cache integration; batch padding to $B=32$; performance targets; profiling discipline |
+| [`prefill_considerations.md`](./prefill_considerations.md) | Prefill vs. decode differences: DRAM memory config, `num_links=2`, large capacity $C$; dispatch volume table; compute-vs-communication regime; overlap with next-layer Q/K/V projection |
 
 ### Recommended Reading Order
 
-1. Read `complete_moe_layer_impl.md` first to understand the canonical forward-pass structure. All
+1. Read [`complete_moe_layer_impl.md`](./complete_moe_layer_impl.md) first to understand the canonical forward-pass structure. All
    parameters chosen in decode and prefill contexts are explained by reference to this implementation.
-2. Read `decode_loop_integration.md` to understand how the MoE layer is called at each generation
+2. Read [`decode_loop_integration.md`](./decode_loop_integration.md) to understand how the MoE layer is called at each generation
    step, how memory configs are managed across steps, and how to handle variable batch sizes.
-3. Read `prefill_considerations.md` last, as it describes the parameter changes relative to
-   `complete_moe_layer_impl.md` that are required for the prefill phase.
+3. Read [`prefill_considerations.md`](./prefill_considerations.md) last, as it describes the parameter changes relative to
+   [`complete_moe_layer_impl.md`](./complete_moe_layer_impl.md) that are required for the prefill phase.
 
 ---
 
@@ -202,14 +202,14 @@ Refer to `ch03_all_to_all_num_links/num_links_parameter.md` for the full bandwid
 
 | Scenario | Recommended File |
 |---|---|
-| First implementation of `moe_layer_t3k` | `complete_moe_layer_impl.md` |
-| Integrating MoE layer into a decode loop | `decode_loop_integration.md` |
-| Adapting decode implementation for prefill | `prefill_considerations.md` |
-| Debugging incorrect output after integration | `complete_moe_layer_impl.md` §6 (error guards) |
-| Diagnosing decode latency regression | `decode_loop_integration.md` §5, then `ch06_profiling/` |
-| Understanding prefill memory OOM errors | `prefill_considerations.md` §2 |
-| Verifying `num_links` choice for a given batch size | `complete_moe_layer_impl.md` §3 table |
-| Understanding KV cache and MoE buffer interaction | `decode_loop_integration.md` §3 |
+| First implementation of `moe_layer_t3k` | [`complete_moe_layer_impl.md`](./complete_moe_layer_impl.md) |
+| Integrating MoE layer into a decode loop | [`decode_loop_integration.md`](./decode_loop_integration.md) |
+| Adapting decode implementation for prefill | [`prefill_considerations.md`](./prefill_considerations.md) |
+| Debugging incorrect output after integration | [`complete_moe_layer_impl.md`](./complete_moe_layer_impl.md) §6 (error guards) |
+| Diagnosing decode latency regression | [`decode_loop_integration.md`](./decode_loop_integration.md) §5, then [`ch06_profiling/`](../ch06_profiling/index.md) |
+| Understanding prefill memory OOM errors | [`prefill_considerations.md`](./prefill_considerations.md) §2 |
+| Verifying `num_links` choice for a given batch size | [`complete_moe_layer_impl.md`](./complete_moe_layer_impl.md) §3 table |
+| Understanding KV cache and MoE buffer interaction | [`decode_loop_integration.md`](./decode_loop_integration.md) §3 |
 
 ---
 

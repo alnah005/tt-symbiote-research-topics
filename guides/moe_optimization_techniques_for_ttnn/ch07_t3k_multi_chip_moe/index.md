@@ -11,7 +11,7 @@ This chapter builds directly on Chapters 1 through 6. Readers should be comforta
 - **Chapter 5** ([sparsity_tensor_placement.md](../ch05_sparsity_tensor_construction/sparsity_tensor_placement.md)): sparsity tensor construction and placement for multi-device contexts
 - **Chapter 6** ([decision_guide.md](../ch06_comparative_analysis/decision_guide.md)): hybrid strategy selection
 
-You should also be familiar with the T3K guide ([ch02_ttnn_mesh_api/collective_primitives.md](../../t3k_guide/ch02_ttnn_mesh_api/collective_primitives.md)) for `ttnn.all_to_all` usage.
+You should also be familiar with the T3K guide ([ch02_ttnn_mesh_api/collective_primitives.md](../../t3k_mesh_device_optimizations/ch02_ttnn_mesh_api/collective_primitives.md)) for `ttnn.all_to_all` usage.
 
 ---
 
@@ -56,9 +56,9 @@ The single-chip strategies from earlier chapters remain valid per-device, but tw
 
 | File | Description |
 |---|---|
-| `expert_parallelism_on_t3k.md` | EP degree, all-to-all dispatch/combine API, latency model, when EP adds overhead vs. when it is forced by memory |
-| `sharding_strategies.md` | Activation tensor distribution, expert weight placement in DRAM, sparsity tensor construction per chip, replicated vs. sharded tensors |
-| `program_configs_t3k.md` | Per-chip program config derivation under EP, grid utilization analysis, worked examples for Qwen3.5-35B and Mixtral 8x7B |
+| [`expert_parallelism_on_t3k.md`](./expert_parallelism_on_t3k.md) | EP degree, all-to-all dispatch/combine API, latency model, when EP adds overhead vs. when it is forced by memory |
+| [`sharding_strategies.md`](./sharding_strategies.md) | Activation tensor distribution, expert weight placement in DRAM, sparsity tensor construction per chip, replicated vs. sharded tensors |
+| [`program_configs_t3k.md`](./program_configs_t3k.md) | Per-chip program config derivation under EP, grid utilization analysis, worked examples for Qwen3.5-35B and Mixtral 8x7B |
 
 ---
 
@@ -79,7 +79,7 @@ Read the files in order:
 - Chapter 1: [routing_and_sparsity.md](../ch01_moe_architecture_fundamentals/routing_and_sparsity.md)
 - Chapter 4: [when_sparse_matmul_wins.md](../ch04_sparse_matmul_for_moe/when_sparse_matmul_wins.md)
 - Chapter 5: [sparsity_tensor_placement.md](../ch05_sparsity_tensor_construction/sparsity_tensor_placement.md)
-- T3K guide: [collective_primitives.md](../../t3k_guide/ch02_ttnn_mesh_api/collective_primitives.md)
+- T3K guide: [collective_primitives.md](../../t3k_mesh_device_optimizations/ch02_ttnn_mesh_api/collective_primitives.md)
 
 ## Next Steps
 

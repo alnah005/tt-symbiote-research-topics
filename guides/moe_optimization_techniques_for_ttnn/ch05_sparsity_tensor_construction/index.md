@@ -46,13 +46,13 @@ Use this checklist before every call to `ttnn.sparse_matmul`. Each item correspo
 
 Read the files in the following order:
 
-1. **`sparsity_tensor_format.md`** — Start here. Establishes the exact contract: shape, dtype, layout, memory placement, and the meaning of each mask entry. All other files assume this contract.
+1. **[`sparsity_tensor_format.md`](./sparsity_tensor_format.md)** — Start here. Establishes the exact contract: shape, dtype, layout, memory placement, and the meaning of each mask entry. All other files assume this contract.
 
-2. **`constructing_from_router_output.md`** — Step-by-step construction pipeline from routing indices to a `ttnn.uint8` TILE_LAYOUT tensor on device. Includes complete Python pseudocode with shapes annotated at every step.
+2. **[`constructing_from_router_output.md`](./constructing_from_router_output.md)** — Step-by-step construction pipeline from routing indices to a `ttnn.uint8` TILE_LAYOUT tensor on device. Includes complete Python pseudocode with shapes annotated at every step.
 
-3. **`sparsity_tensor_placement.md`** — Memory placement decisions: L1 vs. DRAM, sharding for multi-device expert parallelism, and integration with `ttnn.Trace`.
+3. **[`sparsity_tensor_placement.md`](./sparsity_tensor_placement.md)** — Memory placement decisions: L1 vs. DRAM, sharding for multi-device expert parallelism, and integration with `ttnn.Trace`.
 
-4. **`common_pitfalls.md`** — Reference section for debugging. Six failure modes with symptoms, root causes, and fixes. Consult this when something is wrong.
+4. **[`common_pitfalls.md`](./common_pitfalls.md)** — Reference section for debugging. Six failure modes with symptoms, root causes, and fixes. Consult this when something is wrong.
 
 ---
 

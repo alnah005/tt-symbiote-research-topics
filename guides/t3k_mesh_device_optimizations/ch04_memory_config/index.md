@@ -86,13 +86,13 @@ All values above assume Qwen3.5-35B parameters: `E=256`, `k=8`, `H=7168`, `E_d=3
 
 Read the sub-files in this order:
 
-1. **`wormhole_memory_hierarchy.md`** — Hardware foundations: L1 and DRAM capacities, bandwidths, circular buffer allocation, and shard layouts. Read this first to build the mental model that the later files assume.
+1. **[`wormhole_memory_hierarchy.md`](./wormhole_memory_hierarchy.md)** — Hardware foundations: L1 and DRAM capacities, bandwidths, circular buffer allocation, and shard layouts. Read this first to build the mental model that the later files assume.
 
-2. **`memory_config_api.md`** — The `ttnn` API for specifying memory placement: `MemoryConfig`, `TensorMemoryLayout` variants, predefined configs, and how to migrate tensors between L1 and DRAM. Read this second for the vocabulary used in the strategy files.
+2. **[`memory_config_api.md`](./memory_config_api.md)** — The `ttnn` API for specifying memory placement: `MemoryConfig`, `TensorMemoryLayout` variants, predefined configs, and how to migrate tensors between L1 and DRAM. Read this second for the vocabulary used in the strategy files.
 
-3. **`decode_memory_strategy.md`** — Placement recommendations specific to the decode phase. Includes worked L1 budget estimates at B=32, H=7168 and a trade-off table.
+3. **[`decode_memory_strategy.md`](./decode_memory_strategy.md)** — Placement recommendations specific to the decode phase. Includes worked L1 budget estimates at B=32, H=7168 and a trade-off table.
 
-4. **`prefill_memory_strategy.md`** — Placement recommendations for the prefill phase. Covers chunked prefill, all-to-all buffer sizing at scale, and the prefill-to-decode KV cache handoff.
+4. **[`prefill_memory_strategy.md`](./prefill_memory_strategy.md)** — Placement recommendations for the prefill phase. Covers chunked prefill, all-to-all buffer sizing at scale, and the prefill-to-decode KV cache handoff.
 
 ---
 

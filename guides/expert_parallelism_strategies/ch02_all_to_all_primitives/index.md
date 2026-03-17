@@ -12,10 +12,10 @@ This chapter provides a rigorous treatment of the all-to-all collective communic
 
 | File | Operations and Concepts |
 |---|---|
-| `collective_communication_background.md` | Taxonomy of collective operations; precise definition of all-to-all; bandwidth and latency model on an $N$-device mesh; comparison with all-gather + local select |
-| `all_to_all_dispatch.md` | `all_to_all_dispatch` TTNN semantics; pre-dispatch send-count computation; sparse token packing; tile alignment and shard layout; 4-device worked example |
-| `all_to_all_combine.md` | `all_to_all_combine` TTNN semantics; weighted accumulation of expert outputs; ordering constraints; buffer layout symmetry with dispatch; floating-point accumulation considerations |
-| `dispatch_combine_overhead.md` | End-to-end MoE layer latency decomposition; arithmetic intensity of dispatch/combine vs. expert FFN; roofline sketch for T3K Ethernet; batch-size crossover threshold |
+| [`collective_communication_background.md`](./collective_communication_background.md) | Taxonomy of collective operations; precise definition of all-to-all; bandwidth and latency model on an $N$-device mesh; comparison with all-gather + local select |
+| [`all_to_all_dispatch.md`](./all_to_all_dispatch.md) | `all_to_all_dispatch` TTNN semantics; pre-dispatch send-count computation; sparse token packing; tile alignment and shard layout; 4-device worked example |
+| [`all_to_all_combine.md`](./all_to_all_combine.md) | `all_to_all_combine` TTNN semantics; weighted accumulation of expert outputs; ordering constraints; buffer layout symmetry with dispatch; floating-point accumulation considerations |
+| [`dispatch_combine_overhead.md`](./dispatch_combine_overhead.md) | End-to-end MoE layer latency decomposition; arithmetic intensity of dispatch/combine vs. expert FFN; roofline sketch for T3K Ethernet; batch-size crossover threshold |
 
 ---
 
@@ -85,13 +85,13 @@ The following symbols extend the notation established in Chapter 1.
 
 Read the four files in the following order:
 
-1. **`collective_communication_background.md`** — Establishes the collective communication vocabulary and the formal definition of all-to-all before any TTNN specifics are introduced. Readers already fluent in collective communication may skim the taxonomy sections and focus on the bandwidth/latency model.
+1. **[`collective_communication_background.md`](./collective_communication_background.md)** — Establishes the collective communication vocabulary and the formal definition of all-to-all before any TTNN specifics are introduced. Readers already fluent in collective communication may skim the taxonomy sections and focus on the bandwidth/latency model.
 
-2. **`all_to_all_dispatch.md`** — Specifies what `all_to_all_dispatch` does, how its inputs are prepared, and what its outputs look like. The worked example traces a concrete 4-device case end to end.
+2. **[`all_to_all_dispatch.md`](./all_to_all_dispatch.md)** — Specifies what `all_to_all_dispatch` does, how its inputs are prepared, and what its outputs look like. The worked example traces a concrete 4-device case end to end.
 
-3. **`all_to_all_combine.md`** — Specifies `all_to_all_combine` as the inverse operation, covering the ordering constraints and weighted accumulation that transform raw expert outputs into the final MoE layer output.
+3. **[`all_to_all_combine.md`](./all_to_all_combine.md)** — Specifies `all_to_all_combine` as the inverse operation, covering the ordering constraints and weighted accumulation that transform raw expert outputs into the final MoE layer output.
 
-4. **`dispatch_combine_overhead.md`** — Quantifies the performance cost of the two collectives relative to expert FFN computation and identifies the batch-size regime where communication dominates.
+4. **[`dispatch_combine_overhead.md`](./dispatch_combine_overhead.md)** — Quantifies the performance cost of the two collectives relative to expert FFN computation and identifies the batch-size regime where communication dominates.
 
 ---
 

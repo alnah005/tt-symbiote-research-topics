@@ -56,12 +56,12 @@ phases must be profiled separately before any parameter is changed.
 
 | File | Contents |
 |---|---|
-| `ttnn_profiler.md` | Enabling the TTNN profiler; reading op-level timing output; Tracy timeline visualization; comparing prefill vs. decode profiles |
-| `device_perf_counters.md` | Ethernet link utilization, DRAM bandwidth, NOC traffic, and Tensix core utilization counters; detecting link saturation and L1 pressure |
-| `bottleneck_diagnosis_guide.md` | Decision tree for identifying bottleneck category; per-category remediation procedures; common anti-patterns |
+| [`ttnn_profiler.md`](./ttnn_profiler.md) | Enabling the TTNN profiler; reading op-level timing output; Tracy timeline visualization; comparing prefill vs. decode profiles |
+| [`device_perf_counters.md`](./device_perf_counters.md) | Ethernet link utilization, DRAM bandwidth, NOC traffic, and Tensix core utilization counters; detecting link saturation and L1 pressure |
+| [`bottleneck_diagnosis_guide.md`](./bottleneck_diagnosis_guide.md) | Decision tree for identifying bottleneck category; per-category remediation procedures; common anti-patterns |
 
-Read the files in the order listed. `ttnn_profiler.md` introduces the vocabulary used in
-`device_perf_counters.md`, and both are prerequisites for `bottleneck_diagnosis_guide.md`.
+Read the files in the order listed. [`ttnn_profiler.md`](./ttnn_profiler.md) introduces the vocabulary used in
+[`device_perf_counters.md`](./device_perf_counters.md), and both are prerequisites for [`bottleneck_diagnosis_guide.md`](./bottleneck_diagnosis_guide.md).
 
 ---
 
@@ -83,7 +83,7 @@ Set the profiler environment variable [VERIFY environment variable name] and run
 caches and Ethernet link state to reach steady state. Use the batch size and sequence length that
 matches the target deployment scenario; decode and prefill must be profiled separately.
 
-See `ttnn_profiler.md` §1–2 for profiler setup.
+See [`ttnn_profiler.md`](./ttnn_profiler.md) §1–2 for profiler setup.
 
 ### Step 3 — Parse Profiler Output and Identify Top-Latency Operations
 
@@ -91,7 +91,7 @@ Read the CSV output produced by the TTNN profiler. Sort by `device_time_ns` (des
 identify the top-5 most expensive operations. Compute the fraction of total MoE layer time
 attributable to `ttnn.all_to_all` (dispatch + combine) and to the expert FFN `ttnn.matmul`.
 
-See `ttnn_profiler.md` §3 for the Python parsing snippet.
+See [`ttnn_profiler.md`](./ttnn_profiler.md) §3 for the Python parsing snippet.
 
 ### Step 4 — Identify the Bottleneck Category Using Device Counters
 
@@ -102,7 +102,7 @@ Consult the hardware performance counters to confirm which resource is the bindi
 - Tensix core utilization > 80% during expert matmul, DRAM BW moderate → compute-bound
 - Unexpected DRAM BW during operations expected to be L1-resident → L1 spill / L1-pressure
 
-See `device_perf_counters.md` for counter access and interpretation.
+See [`device_perf_counters.md`](./device_perf_counters.md) for counter access and interpretation.
 
 ### Step 5 — Apply Targeted Remediation and Re-Profile
 
@@ -110,7 +110,7 @@ Apply the remediation for the identified bottleneck category, re-run the profili
 Step 2, and compare the new profile against the baseline. A single change should be made between
 each profiling run so that cause and effect remain clear.
 
-See `bottleneck_diagnosis_guide.md` for per-category remediation procedures.
+See [`bottleneck_diagnosis_guide.md`](./bottleneck_diagnosis_guide.md) for per-category remediation procedures.
 
 ---
 

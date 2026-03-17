@@ -12,9 +12,9 @@ No prior chapters are required. Readers need only the background described in th
 
 | File | Topic |
 |---|---|
-| `moe_architecture.md` | The MoE layer structure, mathematical formulation of routing, and Qwen3.5-35B's specific configuration |
-| `routing_problem.md` | Why routing creates inter-device communication, how token imbalance arises, and the dispatch/combine pattern |
-| `qwen35b_config.md` | Concrete architectural constants for Qwen3.5-35B and why 256 experts with top-8 routing creates unique sharding pressure |
+| [`moe_architecture.md`](./moe_architecture.md) | The MoE layer structure, mathematical formulation of routing, and Qwen3.5-35B's specific configuration |
+| [`routing_problem.md`](./routing_problem.md) | Why routing creates inter-device communication, how token imbalance arises, and the dispatch/combine pattern |
+| [`qwen35b_config.md`](./qwen35b_config.md) | Concrete architectural constants for Qwen3.5-35B and why 256 experts with top-8 routing creates unique sharding pressure |
 
 ---
 
@@ -67,11 +67,11 @@ Device indices are 0-based: devices $0$ through $N-1$. Expert indices are 0-base
 
 Read the three files in the following order:
 
-1. **`moe_architecture.md`** — Establishes what an MoE layer is and how the routing math works. This is the prerequisite for everything else in this chapter.
+1. **[`moe_architecture.md`](./moe_architecture.md)** — Establishes what an MoE layer is and how the routing math works. This is the prerequisite for everything else in this chapter.
 
-2. **`routing_problem.md`** — Explains the systems-level consequences of the routing mechanism: why tokens must cross device boundaries, how load imbalance arises, and what the dispatch/combine pattern looks like before we dive into its implementation.
+2. **[`routing_problem.md`](./routing_problem.md)** — Explains the systems-level consequences of the routing mechanism: why tokens must cross device boundaries, how load imbalance arises, and what the dispatch/combine pattern looks like before we dive into its implementation.
 
-3. **`qwen35b_config.md`** — Grounds the abstract architecture in concrete numbers for the specific model this guide targets. Readers who are already deeply familiar with Qwen3.5-35B may read this file first as an orientation, but the notation introduced in `moe_architecture.md` is assumed throughout.
+3. **[`qwen35b_config.md`](./qwen35b_config.md)** — Grounds the abstract architecture in concrete numbers for the specific model this guide targets. Readers who are already deeply familiar with Qwen3.5-35B may read this file first as an orientation, but the notation introduced in [`moe_architecture.md`](./moe_architecture.md) is assumed throughout.
 
 ---
 
