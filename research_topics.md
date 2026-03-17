@@ -39,6 +39,28 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ---
 
+## Ling Model TTNN Numerical Accuracy Investigation
+**Date:** 2026-03-17
+**Status:** In Progress
+**Why Needed:** Ling-mini-2.0 generates incorrect text with TTNN backend. Need to identify root cause of numerical divergence.
+**Questions:**
+- Is the RoPE format conversion (HF doubled-half to TTNN) numerically accurate?
+- Does the `_to_replicated()` averaging introduce numerical drift?
+- Is the paged attention KV cache position tracking correct during decode?
+- Does the MoE router maintain numerical precision through 3-pass topk centering?
+- Are Q/K layernorm weights correctly broadcast in distributed mode?
+
+**Findings:**
+Investigation started 2026-03-17. See plan document at:
+`/home/ttuser/salnahari/tt-metal/models/experimental/tt_symbiote/PLAN_ling_incorrect_text.md`
+
+Key suspects identified:
+1. `_to_replicated()` uses mean() instead of indexing - introduces floating-point noise
+2. Paged attention cache_position may be misaligned with RoPE position_ids
+3. MoE router does multiple float32<->bfloat16 conversions
+
+---
+
 ## T3K Mesh Device Optimizations
 **Date:** 2026-03-16
 **Status:** Pending
