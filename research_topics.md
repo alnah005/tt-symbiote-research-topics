@@ -148,15 +148,6 @@ Findings: [Pending research]
 **Findings:**
 [Pending research - requires profiling on hardware]
 
----
-
-## Target Workload and Latency Requirements
-**Date:** 2026-03-17
-**Status:** Pending
-**Why Needed:** Need user-provided requirements to make optimization trade-offs.
-**Questions:**
-1. What is the target latency and minimum acceptable accuracy?
-2. Are there memory budget constraints (L1 or DRAM)?
 3. Is decode latency or prefill throughput the primary target?
 4. What batch sizes and sequence lengths represent your target workload?
 
