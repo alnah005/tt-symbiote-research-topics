@@ -30,23 +30,30 @@ You are the **Team Lead**. You MUST follow these rules:
 - Writes detailed plans to `PLAN_<task_name>.md`
 - Must be spawned BEFORE any Implementer
 
-#### Research Cache Lookup
+---
 
-Before writing a plan, the Architect MUST check the shared research topics repo:
+## ⚠️ MANDATORY: Research Cache Lookup (NEVER SKIP THIS)
 
+**CRITICAL REQUIREMENT:** The Architect agent MUST perform the research cache lookup as its FIRST action. This is NON-NEGOTIABLE and must be included in every Architect agent prompt.
+
+### Step 1: Pull Latest Research Cache (REQUIRED)
 ```bash
-# First time: clone
-git clone https://github.com/alnah005/tt-symbiote-research-topics.git /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics
-
-# Every time: pull latest
 cd /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics && git pull
 ```
 
-Then read `/home/ttuser/salnahari/research-topics/tt-symbiote-research-topics/research_topics.md` and apply the following logic for **each topic the plan depends on**:
+### Step 2: Read the Cache (REQUIRED)
+```bash
+cat /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics/research_topics.md
+```
 
-- **Cache HIT** — topic exists with `Status: Completed`: read the findings and use them in the plan. Do not re-add the topic.
-- **Cache MISS** — topic is absent OR has `Status: Pending`: proceed using best-effort knowledge. **Do not stall or wait.** Append the topic to `research_topics.md` with `Status: Pending` and push:
+### Step 3: For EACH Topic the Plan Depends On (REQUIRED)
 
+| Cache Status | Action |
+|--------------|--------|
+| **HIT** (Status: Completed) | Read findings. Use them in plan. Do NOT re-add. |
+| **MISS** (absent or Pending) | Add topic with `Status: Pending` and push immediately. |
+
+### Step 4: Push Any New Topics (REQUIRED if cache miss)
 ```bash
 cd /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics
 git add research_topics.md
@@ -54,7 +61,32 @@ git commit -m "team/architect: cache miss — add topic <topic-name>"
 git push
 ```
 
-The Architect continues planning immediately after pushing. The research instance will pick it up asynchronously.
+### Architect Prompt Template (Team Lead MUST include this)
+
+When spawning an Architect agent, the Team Lead MUST include this text in the prompt:
+
+```
+## MANDATORY FIRST STEP: Research Cache Lookup
+
+Before doing ANY analysis or planning, you MUST:
+
+1. Pull latest: `cd /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics && git pull`
+2. Read cache: `cat /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics/research_topics.md`
+3. For each topic your plan depends on:
+   - If Status: Completed → use the findings
+   - If absent or Pending → add the topic and push
+4. Only AFTER completing cache lookup, proceed with your analysis.
+
+This step is NON-NEGOTIABLE. Do not skip it.
+```
+
+### Why This Matters
+- Research findings are computed asynchronously by a dedicated research instance
+- Skipping cache lookup wastes effort re-discovering already-known information
+- Adding pending topics allows the research instance to prioritize work
+- The cache is shared across all team sessions
+
+---
 
 ### Implementer Agent
 - The ONLY agent that can add/modify code
