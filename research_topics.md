@@ -39,38 +39,6 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ---
 
-## RoPE Position Embedding Mesh Handling Bug
-**Date:** 2026-03-17
-**Status:** Completed
-**Why Needed:** Ling model generates repetitive garbage text, indicating position encoding issues.
-**Questions:**
-- How should replicated position embeddings (cos/sin) be extracted from ConcatMeshToTensor?
-- What is the correct shape check for distributed cos/sin tensors?
-
-**Findings:**
-**Root Cause Identified:** In `_prepare_cos_sin_for_rope()` (attention.py:2182-2184), the shape check `cos_t.shape[0] == num_devices` is incorrect.
-
-**The Bug:**
-- cos/sin after unsqueeze have shape `[batch, 1, seq, dim]`
-- After `ConcatMeshToTensor(dim=0)`, shape becomes `[num_devices * batch, 1, seq, dim]`
-- The check `shape[0] == num_devices` only works when `batch=1`
-- For other batch sizes, replicated tensors are NOT properly sliced
-
-**The Fix:**
-```python
-# Replace incorrect check:
-if cos_t.shape[0] == num_devices:  # WRONG
-    cos_t = cos_t[:1]
-
-# With correct slice:
-original_batch = cos_t.shape[0] // num_devices
-cos_t = cos_t[:original_batch]
-```
-
-**Impact:** This bug corrupts position embeddings in distributed mode, causing the model to lose positional information and generate repetitive output patterns.
-
----
-
 ## T3K Mesh Device Optimizations
 **Date:** 2026-03-16
 **Status:** Pending
