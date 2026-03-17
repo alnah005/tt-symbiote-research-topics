@@ -43,18 +43,33 @@ If `output_dir` already exists for a topic, set `skip = true` and advance it dir
 
 ### Dispatch loop
 
-At each iteration of the dispatch loop, you:
+The dispatch loop is **event-driven per topic**, not wave-synchronized across topics. Topics are fully independent — one topic completing a phase never waits on another topic.
 
-1. For every topic that is not `done` and not `skip`, determine which agent to spawn next based on that topic's current `phase`.
-2. Spawn one agent per active topic **in parallel** (all as background agents in the same message). Each agent is a fresh Agent A, B, or C invocation — never reused across spawns.
-3. Wait for all spawned agents to complete.
-4. For each completed agent, read its result and advance that topic's state:
-   - Agent A finishes writing → advance phase to `"review"`
-   - Agent B returns "No feedback — chapter approved" → advance phase to `"compress"`
-   - Agent B returns feedback → set `pending_b_feedback`, keep phase as `"review"`, re-spawn Agent A next
-   - Agent C returns `Crucial updates: no` (validated) → if last chapter, advance to `"finalpass"`; else advance `current_chapter` and reset phase to `"write"`
-   - Agent C returns `Crucial updates: yes` → set `pending_c_feedback`, advance phase back to `"write"` (re-spawn A with CRUCIAL suggestions), then B, then C again
-5. Repeat until all topics are `done`.
+At each step:
+
+1. **As soon as any agent completes**, read its result immediately and advance that topic's state:
+   - Agent A finishes writing → advance phase to `"review"`, spawn Agent B for that topic now
+   - Agent B returns "No feedback — chapter approved" → advance phase to `"compress"`, spawn Agent C for that topic now
+   - Agent B returns feedback → set `pending_b_feedback`, spawn Agent A for that topic now
+   - Agent C returns `Crucial updates: no` (validated) → if last chapter, advance to `"finalpass"`; else advance `current_chapter`, reset phase to `"write"`, spawn Agent A for that topic now
+   - Agent C returns `Crucial updates: yes` → set `pending_c_feedback`, advance phase to `"write"`, spawn Agent A for that topic now
+2. Do not wait for other topics' agents to finish before advancing a topic that is ready. Each topic moves at its own pace.
+3. At any moment, up to one agent per topic may be running in parallel. Spawn each topic's next agent as a background agent immediately when the previous one completes.
+4. **Report the state table** whenever you spawn a new agent (see Reporting format below).
+5. The loop ends when all topics are `done`.
+
+### Reporting format
+
+Before each dispatch wave, print the state table in this format:
+
+```
+**State:**
+<topic_name>:  phase=<phase>, chapter=<N>  → <Agent X> running
+<topic_name>:  phase=<phase>, chapter=<N>  → <Agent X> running
+...
+```
+
+This makes the orchestrator's progress visible at every step. Topics that are further ahead (e.g., already in review) should show a different phase/agent than topics still writing.
 
 ### Per-topic context passing
 
