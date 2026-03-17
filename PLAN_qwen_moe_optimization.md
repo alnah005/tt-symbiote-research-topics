@@ -1,17 +1,31 @@
-# TTNNQwen3MoE Optimization Plan for T3K
+# TTNNQwen3MoE Optimization Plan for T3K (Revised)
 
 **Target:** Qwen3.5-35B-A3B MoE module running on T3K (1x8 mesh)
 **Goal:** Improve decode and prefill throughput without losing accuracy
+**Revision Date:** 2026-03-17
+**Revision Note:** This plan removes previously rejected optimizations and proposes NEW approaches
+
+---
+
+## REJECTED OPTIMIZATIONS (DO NOT IMPLEMENT)
+
+The following optimizations were rejected and should NOT be pursued:
+- Increasing num_links for CCL ops (all_gather, reduce_scatter)
+- Adding num_links to all_to_all_dispatch/combine
+- Async overlap between shared/routed experts
+- L1 sharded memory configs for activations
+- Prefill chunking
+- Fused weight broadcasting (repeat+permute)
+- Single-pass router optimization
 
 ---
 
 ## Table of Contents
 1. [Current Implementation Analysis](#1-current-implementation-analysis)
-2. [Identified Bottlenecks](#2-identified-bottlenecks)
-3. [Proposed Optimizations](#3-proposed-optimizations)
-4. [Step-by-Step Implementation Guide](#4-step-by-step-implementation-guide)
-5. [Accuracy Test Suite Design](#5-accuracy-test-suite-design)
-6. [Success Criteria](#6-success-criteria)
+2. [NEW Proposed Optimizations](#2-new-proposed-optimizations)
+3. [Step-by-Step Implementation Guide](#3-step-by-step-implementation-guide)
+4. [Accuracy Test Suite Design](#4-accuracy-test-suite-design)
+5. [Success Criteria](#5-success-criteria)
 
 ---
 
@@ -23,611 +37,639 @@
 - 256 routed experts total
 - Top-8 routing per token
 - 32 experts per device (256 / 8 devices)
-- Hidden size: configurable (typically 4096)
-- Intermediate size: configurable (typically 14336)
+- Hidden size: 4096 (typical)
+- MoE intermediate size: 18944 (typical for Qwen3)
 - Shared expert with optional gating
 
-### 1.2 Current Data Flow
+### 1.2 Current Implementation Gaps vs DeepSeek-V3
 
-```
-Input (x) [batch, 1, seq, hidden/8]
-    |
-    v
-[All-Gather] -- dim=-1, num_links=1, Topology.Linear
-    |
-    v
-x_gathered [batch, 1, seq, hidden]
-    |
-    ├─────────────────────────────────────┐
-    v                                     v
-[Router/Gate]                      [Shared Expert]
-    |                                     |
-    v                                     v
-topk_indices, topk_weights          shared_output
-    |
-    v
-[TTNNQwenExperts.forward]
-    |
-    ├── [All-to-All Dispatch]  -- cluster_axis=1, no num_links specified
-    │       |
-    │       v
-    │   dispatched_tokens [1, 1, total_tokens, hidden]
-    │       |
-    │       v
-    │   [Expert Computation] -- sparse_matmul or batched_matmul
-    │       |
-    │       v
-    │   expert_output
-    │       |
-    │       v
-    └── [All-to-All Combine] -- cluster_axis=1, no num_links specified
-            |
-            v
-        combined_output
-            |
-            v
-        [Weight & Sum]
-            |
-            v
-        routed_output
-    |
-    v
-[Reduce-Scatter] -- dim=3, num_links=1, Topology.Ring
-    |
-    v
-[Add shared_output]
-    |
-    v
-Output [batch, 1, seq, hidden/8]
-```
-
-### 1.3 Key Components
-
-| Component | File Location | Current Implementation |
-|-----------|---------------|----------------------|
-| Router | `TTNNQwenMoERouterDecode` | Softmax + 3-pass topk for precision |
-| Experts | `TTNNQwenExperts` | sparse_matmul (default) or batched_matmul |
-| MoE Orchestration | `TTNNQwen3MoE` | All-gather -> Route -> Experts -> Reduce-scatter |
-| Shared Expert | `TTNNGlm4MoeMLP` | Inherited from GLM base |
+| Feature | Qwen MoE (Current) | DeepSeek-V3 (Reference) | Opportunity |
+|---------|-------------------|------------------------|-------------|
+| Expert weight dtype | bfloat16 | bfloat4_b/bfloat8_b | 2-4x memory BW reduction |
+| Compute kernel config | None specified | COMPUTE_KERNEL_CONFIG_LOFI | Faster matmuls |
+| Weight memory layout | DRAM interleaved | DRAM sharded | Better prefetch |
+| Fused SiLU activation | Separate ops | mul_experts with input_tensor_a_activations | Kernel fusion |
+| Matmul program config | Auto-generated | Explicit 1D multicast config | Better core utilization |
 
 ---
 
-## 2. Identified Bottlenecks
-
-### 2.1 CRITICAL: Communication Link Underutilization
-
-**Current State:**
-```python
-# qwen_moe.py lines 846-853, 944-956
-num_links=1  # All CCL operations use only 1 link
-```
-
-**Reference (DeepSeek-V3):**
-```python
-# models/demos/deepseek_v3/tt/moe.py lines 127-131
-"all_to_all_dispatch": {"num_links": 4},
-"all_to_all_combine": {"num_links": 4}
-```
-
-**Impact:** T3K supports 4 links per device. Using only 1 link leaves 75% of inter-device bandwidth unused.
-
-**Priority: HIGH** - Estimated 2-4x speedup for communication-bound workloads.
-
----
-
-### 2.2 Missing num_links for All-to-All Operations
-
-**Current State (qwen_moe.py lines 398-404, 525-531):**
-```python
-# all_to_all_dispatch - NO num_links parameter
-all_to_all_dispatch_output, all_to_all_dispatch_metadata = ttnn.all_to_all_dispatch(
-    x_rm,
-    topk_experts_indices_rm,
-    self.expert_mapping_tensors,
-    cluster_axis=1,
-    memory_config=decode_memory_config,
-)
-
-# all_to_all_combine - NO num_links parameter
-combined_output = ttnn.all_to_all_combine(
-    expert_output,
-    all_to_all_dispatch_metadata,
-    self.expert_mapping_tensors,
-    cluster_axis=1,
-    memory_config=decode_memory_config,
-)
-```
-
-**Priority: HIGH** - These are the MoE-specific communication primitives where expert parallelism happens.
-
----
-
-### 2.3 Inefficient Weight Broadcasting
-
-**Current State (qwen_moe.py lines 551-558):**
-```python
-# Convert weights via permute and unsqueeze
-topk_experts_weights_rm = ttnn.to_layout(topk_experts_weights, ttnn.ROW_MAJOR_LAYOUT)
-topk_experts_weights_rm = ttnn.permute(topk_experts_weights_rm, (1, 0))
-topk_experts_weights_rm = ttnn.unsqueeze(topk_experts_weights_rm, 1)
-topk_experts_weights_rm = ttnn.unsqueeze(topk_experts_weights_rm, 3)
-topk_experts_weights_tile = ttnn.to_layout(topk_experts_weights_rm, ttnn.TILE_LAYOUT)
-```
-
-**Issue:** Multiple layout conversions and reshapes create unnecessary memory copies.
-
-**Reference (DeepSeek-V3 moe.py lines 336-344):**
-```python
-# Single repeat + permute operation
-topk_experts_weights_rm = ttnn.to_layout(topk_experts_weights, ttnn.ROW_MAJOR_LAYOUT)
-topk_experts_weights_rm = ttnn.repeat(topk_experts_weights_rm, **cfg["topk_weights_repeat"])
-topk_experts_weights_rm = ttnn.permute(topk_experts_weights_rm, (3, 1, 2, 0))
-topk_experts_weights = ttnn.to_layout(topk_experts_weights_rm, ttnn.TILE_LAYOUT)
-```
-
-**Priority: MEDIUM** - Layout conversions are relatively cheap, but the current approach is suboptimal.
-
----
-
-### 2.4 Synchronous Operations Without Overlap
-
-**Current State:** All operations are sequential:
-1. All-gather waits for completion
-2. Router computation starts
-3. All-to-all dispatch waits
-4. Expert computation starts
-5. All-to-all combine waits
-6. Reduce-scatter waits
-
-**Opportunity:** Overlap shared expert computation with routed expert communication.
-
-**Priority: MEDIUM** - Requires careful dependency analysis but can hide latency.
-
----
-
-### 2.5 No L1 Sharding for Decode Mode Activations
-
-**Current State:** Memory configs use basic L1_MEMORY_CONFIG or DRAM_MEMORY_CONFIG.
-
-**Reference (DeepSeek-V3 moe.py lines 162-166):**
-```python
-input_output_memory_config = ttnn.create_sharded_memory_config(
-    shape=(USERS_PER_ROW, HIDDEN_SIZE // TP_SIZE),
-    core_grid=ttnn.CoreGrid(y=7, x=4),
-    strategy=ttnn.ShardStrategy.WIDTH,
-)
-```
-
-**Priority: LOW-MEDIUM** - May provide additional speedup for decode mode.
-
----
-
-### 2.6 No Prefill Chunking
-
-**Current State:** No chunking for large prefill sequences.
-
-**Reference (DeepSeek-V3 moe.py lines 254-280):**
-```python
-chunk_tokens = int(cfg.get("prefill_chunk_size", 16384))
-if global_tokens > chunk_tokens:
-    return cls._forward_chunked_prefill(x, cfg, chunk_size)
-```
-
-**Priority: LOW** - Only relevant for large prefill batches; prevents OOM.
-
----
-
-### 2.7 Router Precision Overhead
-
-**Current State (qwen_moe.py lines 96-128):**
-The router uses a 3-pass topk algorithm with float32 centering to achieve high precision:
-1. BF16 topk(k+1) for coarse threshold
-2. BF16 topk(k+1) on centered scores for refined threshold
-3. BF16 topk(k) on doubly-centered scores for final indices
-
-**Trade-off:** This is intentional for accuracy but adds compute overhead.
-
-**Priority: LOW** - Only optimize if accuracy testing confirms single-pass is sufficient.
-
----
-
-## 3. Proposed Optimizations
+## 2. NEW Proposed Optimizations
 
 ### Ranked by Impact (High to Low)
 
 | Rank | Optimization | Expected Speedup | Risk | Effort |
 |------|-------------|------------------|------|--------|
-| 1 | Increase num_links to 4 for all CCL ops | 2-4x for CCL | Low | Low |
-| 2 | Add num_links to all_to_all_dispatch/combine | 1.5-2x for dispatch/combine | Low | Low |
-| 3 | Overlap shared expert with routed expert | 10-20% overall | Medium | Medium |
-| 4 | L1 sharded memory config for decode | 5-15% for decode | Low | Medium |
-| 5 | Prefill chunking | N/A (OOM prevention) | Low | Low |
-| 6 | Fused weight broadcasting | 2-5% | Low | Low |
-| 7 | Optional single-pass router | 5-10% router time | High (accuracy) | Low |
+| 1 | Expert weight quantization (bfloat8_b) | 20-40% expert compute | Medium (accuracy) | Medium |
+| 2 | Compute kernel config (LoFi + packer_l1_acc) | 10-20% matmul ops | Low | Low |
+| 3 | Fused SiLU in mul operation | 5-10% expert compute | Low | Low |
+| 4 | DRAM-sharded weight memory config | 10-15% weight loading | Low | Medium |
+| 5 | Explicit matmul program configs | 5-15% matmul ops | Low | Medium |
+| 6 | Router computation optimization | 5-10% routing | Low | Low |
 
 ---
 
-## 4. Step-by-Step Implementation Guide
+### 2.1 Expert Weight Quantization (bfloat8_b)
 
-### Phase 1: CCL Link Optimization (Days 1-2)
-
-#### Step 1.1: Update All-Gather num_links
-
-**File:** `/home/ttuser/salnahari/tt-metal/models/experimental/tt_symbiote/modules/qwen_moe.py`
-
-**Location:** `TTNNQwen3MoE.forward()` around line 846-853
-
-**Change:**
+**Current State (qwen_moe.py preprocess_weights):**
 ```python
-# BEFORE:
-x = ttnn.experimental.all_gather_async(
-    x,
-    dim=-1,
-    multi_device_global_semaphore=...,
-    barrier_semaphore=...,
-    num_links=1,  # <-- CHANGE THIS
-    topology=ttnn.Topology.Linear,
-)
-
-# AFTER:
-x = ttnn.experimental.all_gather_async(
-    x,
-    dim=-1,
-    multi_device_global_semaphore=...,
-    barrier_semaphore=...,
-    num_links=4,  # <-- Utilize all 4 links on T3K
-    topology=ttnn.Topology.Linear,
+# Weights stored as bfloat16
+self.tt_w1_proj = ttnn.from_torch(
+    gate_proj,
+    dtype=ttnn.bfloat16,  # Full precision
+    layout=ttnn.TILE_LAYOUT,
+    memory_config=ttnn.DRAM_MEMORY_CONFIG,
+    device=device,
 )
 ```
 
-#### Step 1.2: Update Reduce-Scatter num_links
-
-**Location:** `TTNNQwen3MoE.forward()` around line 944-956
-
-**Change:**
+**Reference (DeepSeek-V3 experts.py lines 74-77):**
 ```python
-# BEFORE:
-routed_output = ttnn.experimental.reduce_scatter_minimal_async(
-    routed_out,
-    ...,
-    num_links=1,  # <-- CHANGE THIS
-    ...
-)
+# Expert weights use quantization
+dtype=ttnn.bfloat8_b if hf_name == "up_proj" else ttnn.bfloat4_b,
+memory_config=ttnn.DRAM_MEMORY_CONFIG,
+```
 
-# AFTER:
-routed_output = ttnn.experimental.reduce_scatter_minimal_async(
-    routed_out,
-    ...,
-    num_links=4,  # <-- Utilize all 4 links
-    ...
+**Proposed Change:**
+```python
+# Use bfloat8_b for experts (more conservative than bfloat4_b)
+self.tt_w1_proj = ttnn.from_torch(
+    gate_proj,
+    dtype=ttnn.bfloat8_b,  # 8-bit quantization
+    layout=ttnn.TILE_LAYOUT,
+    memory_config=ttnn.DRAM_MEMORY_CONFIG,
+    device=device,
 )
 ```
 
-#### Step 1.3: Add num_links to all_to_all_dispatch
+**Why This Helps:**
+- Reduces weight memory bandwidth by 2x (bfloat8_b vs bfloat16)
+- Expert weights are naturally tolerant to quantization due to averaging across top-8
+- DeepSeek-V3 demonstrates this works in production
 
-**Location:** `TTNNQwenExperts.forward()` around line 398-404
+**Priority: HIGH** - Significant bandwidth reduction with acceptable accuracy trade-off.
 
-**Change:**
+---
+
+### 2.2 Compute Kernel Configuration
+
+**Current State:**
+The sparse_matmul and matmul operations in TTNNQwenExperts don't specify compute_kernel_config.
+
+**Reference (DeepSeek-V3 config_helpers.py lines 30-35):**
 ```python
-# BEFORE:
-all_to_all_dispatch_output, all_to_all_dispatch_metadata = ttnn.all_to_all_dispatch(
-    x_rm,
-    topk_experts_indices_rm,
-    self.expert_mapping_tensors,
-    cluster_axis=1,
+COMPUTE_KERNEL_CONFIG_LOFI = ttnn.WormholeComputeKernelConfig(
+    math_fidelity=ttnn.MathFidelity.LoFi,
+    math_approx_mode=False,
+    fp32_dest_acc_en=False,
+    packer_l1_acc=True,  # Key optimization
+)
+```
+
+**Proposed Change (qwen_moe.py TTNNQwenExperts):**
+```python
+# Add compute kernel config for expert matmuls
+self._expert_compute_cfg = ttnn.WormholeComputeKernelConfig(
+    math_fidelity=ttnn.MathFidelity.LoFi,  # Fastest math mode
+    math_approx_mode=False,                 # Maintain accuracy
+    fp32_dest_acc_en=False,                 # Faster with bf16 accumulation
+    packer_l1_acc=True,                     # Enable L1 accumulation
+)
+
+# Apply to sparse_matmul calls
+w1_out = ttnn.sparse_matmul(
+    post_dispatch,
+    self.tt_w1_proj,
+    sparsity,
+    program_config=self._gate_up_program_config,
+    compute_kernel_config=self._expert_compute_cfg,  # ADD THIS
     memory_config=decode_memory_config,
 )
-
-# AFTER:
-all_to_all_dispatch_output, all_to_all_dispatch_metadata = ttnn.all_to_all_dispatch(
-    x_rm,
-    topk_experts_indices_rm,
-    self.expert_mapping_tensors,
-    cluster_axis=1,
-    memory_config=decode_memory_config,
-    num_links=4,  # <-- ADD THIS
-)
 ```
 
-#### Step 1.4: Add num_links to all_to_all_combine
+**Why This Helps:**
+- LoFi math fidelity is fastest (fewer cycles per multiply)
+- packer_l1_acc reduces DRAM round-trips for partial sums
+- DeepSeek-V3 uses this configuration successfully
 
-**Location:** `TTNNQwenExperts.forward()` around line 525-531
+**Priority: HIGH** - Low risk, immediate speedup.
 
-**Change:**
+---
+
+### 2.3 Fused SiLU Activation
+
+**Current State (qwen_moe.py forward lines 457-459):**
 ```python
-# BEFORE:
-combined_output = ttnn.all_to_all_combine(
-    expert_output,
-    all_to_all_dispatch_metadata,
-    self.expert_mapping_tensors,
-    cluster_axis=1,
-    memory_config=decode_memory_config,
-)
-
-# AFTER:
-combined_output = ttnn.all_to_all_combine(
-    expert_output,
-    all_to_all_dispatch_metadata,
-    self.expert_mapping_tensors,
-    cluster_axis=1,
-    memory_config=decode_memory_config,
-    num_links=4,  # <-- ADD THIS
-)
+w1_activated = ttnn.silu(w1_out, memory_config=decode_memory_config)
+# Then multiply separately
+intermediate = ttnn.mul(w1_activated, w3_out, memory_config=decode_memory_config)
 ```
 
-### Phase 2: Async Overlap (Days 3-4)
-
-#### Step 2.1: Restructure forward() for Overlap
-
-**Goal:** Start shared expert computation while routed tokens are being dispatched.
-
-**Location:** `TTNNQwen3MoE.forward()`
-
-**Approach:**
+**Reference (DeepSeek-V3 experts.py lines 137-140):**
 ```python
-def forward(self, x: ttnn.Tensor) -> ttnn.Tensor:
-    # 1. All-gather (blocking)
-    x_gathered = ttnn.experimental.all_gather_async(x, ...)
-
-    # 2. Router (blocking)
-    topk_indices, topk_weights = self.route_tokens_to_experts(router_logits)
-
-    # 3. START shared expert computation (can overlap with dispatch)
-    shared_output_future = self.shared_experts(x_gathered)  # If async API exists
-
-    # 4. Routed experts with all-to-all
-    routed_output = self.experts(x_gathered, topk_indices, topk_weights)
-
-    # 5. Reduce-scatter
-    routed_output = ttnn.experimental.reduce_scatter_minimal_async(...)
-
-    # 6. WAIT for shared expert and combine
-    output = ttnn.add(routed_output, shared_output_future)
-
-    return output
+"mul_experts": MulConfig(
+    memory_config=output_memory_config,
+    input_tensor_a_activations=[ttnn.UnaryOpType.SILU],  # Fused activation
+),
 ```
 
-**Note:** Check if TTNN supports async execution for MLPs. If not, reorder operations to maximize overlap.
-
-### Phase 3: Memory Config Optimization (Days 5-6)
-
-#### Step 3.1: Create Sharded Memory Configs for Decode
-
-**File:** `qwen_moe.py`
-
-**Add new helper function:**
+**Proposed Change:**
 ```python
-def _create_decode_memory_configs(self):
-    """Create optimized sharded memory configs for decode mode."""
-    USERS_PER_ROW = 32  # Typical decode batch size
-    hidden_size = self.config.hidden_size
-    tp_size = self.device.get_num_devices()
+# Fuse SiLU into the multiply operation
+intermediate = ttnn.mul(
+    w1_out,
+    w3_out,
+    memory_config=decode_memory_config,
+    input_tensor_a_activations=[ttnn.UnaryOpType.SILU],  # Fused activation
+)
+# Remove separate silu call
+```
 
-    self._decode_io_memory_config = ttnn.create_sharded_memory_config(
-        shape=(USERS_PER_ROW, hidden_size // tp_size),
-        core_grid=ttnn.CoreGrid(y=7, x=4),  # Wormhole grid
-        strategy=ttnn.ShardStrategy.WIDTH,
+**Why This Helps:**
+- Eliminates one kernel launch
+- Reduces memory traffic (no intermediate w1_activated tensor)
+- Fused operations execute faster than sequential
+
+**Priority: MEDIUM** - Simple change with measurable impact.
+
+---
+
+### 2.4 DRAM-Sharded Weight Memory Configuration
+
+**Current State:**
+```python
+memory_config=ttnn.DRAM_MEMORY_CONFIG  # Basic interleaved
+```
+
+**Reference (DeepSeek-V3 config_helpers.py dram_sharded_weight_config):**
+```python
+def dram_sharded_weight_config(k, n, dram_grid_size):
+    """Create DRAM-sharded memory config for width-sharded tensors"""
+    dram_cores = dram_grid_size.x  # WH has 12 dram cores
+    shard_spec = ttnn.ShardSpec(
+        dram_weight_grid,
+        (k, ttnn.core.roundup(ttnn.core.divup(n, dram_cores), ttnn.TILE_SIZE)),
+        ttnn.ShardOrientation.ROW_MAJOR,
+    )
+    return ttnn.MemoryConfig(ttnn.TensorMemoryLayout.WIDTH_SHARDED, ttnn.BufferType.DRAM, shard_spec)
+```
+
+**Proposed Change:**
+```python
+def _create_dram_sharded_weight_config(self, k: int, n: int):
+    """Create DRAM-sharded config for expert weights."""
+    dram_grid_size = self.device.dram_grid_size()  # 12 for Wormhole
+    dram_weight_grid = ttnn.CoreRangeSet({
+        ttnn.CoreRange(
+            ttnn.CoreCoord(0, 0),
+            ttnn.CoreCoord(dram_grid_size.x - 1, dram_grid_size.y - 1),
+        )
+    })
+    shard_spec = ttnn.ShardSpec(
+        dram_weight_grid,
+        (k, ttnn.core.roundup(ttnn.core.divup(n, dram_grid_size.x), ttnn.TILE_SIZE)),
+        ttnn.ShardOrientation.ROW_MAJOR,
+    )
+    return ttnn.MemoryConfig(ttnn.TensorMemoryLayout.WIDTH_SHARDED, ttnn.BufferType.DRAM, shard_spec)
+```
+
+**Why This Helps:**
+- DRAM-sharded layout enables parallel reads from multiple DRAM banks
+- Improves weight prefetch patterns for matmuls
+- Better utilization of Wormhole's 12 DRAM channels
+
+**Priority: MEDIUM** - Requires careful dimension alignment but provides sustained benefit.
+
+---
+
+### 2.5 Explicit Matmul Program Configurations
+
+**Current State:**
+The sparse_matmul operations use _make_sparse_matmul_program_config which auto-generates configs.
+
+**Proposed Enhancement:**
+Create optimized 1D multicast program configs based on actual tensor shapes:
+
+```python
+def _create_expert_matmul_config(self, m: int, k: int, n: int, is_decode: bool):
+    """Create optimized matmul config for expert projections.
+
+    Args:
+        m: Batch dimension (num_tokens * num_experts_selected)
+        k: Input features
+        n: Output features
+        is_decode: True for decode mode (small m), False for prefill
+    """
+    grid = ttnn.CoreGrid(x=8, y=8) if not is_decode else ttnn.CoreGrid(x=8, y=4)
+
+    per_core_m = max(1, m // (ttnn.TILE_SIZE * grid.num_cores))
+    per_core_n = ttnn.core.divup(n, ttnn.TILE_SIZE * grid.num_cores)
+    in0_block_w = find_largest_divisor(k // ttnn.TILE_SIZE)
+
+    # Find optimal subblock dimensions
+    out_subblock_w = max([i for i in range(1, 5) if per_core_n % i == 0])
+    out_subblock_h = max([i for i in range(1, 5) if per_core_m % i == 0 and i * out_subblock_w <= 8])
+
+    return ttnn.MatmulMultiCoreReuseMultiCast1DProgramConfig(
+        compute_with_storage_grid_size=(grid.x, grid.y),
+        in0_block_w=in0_block_w,
+        out_subblock_h=out_subblock_h,
+        out_subblock_w=out_subblock_w,
+        per_core_M=per_core_m,
+        per_core_N=per_core_n,
+        fuse_batch=True,
+        fused_activation=None,
+        mcast_in0=True,
     )
 ```
 
-#### Step 3.2: Use Sharded Configs in forward()
+**Why This Helps:**
+- Explicit configs avoid auto-tuning overhead
+- Better subblock dimensions improve register utilization
+- Mode-specific grids (decode vs prefill) optimize core usage
 
-**In decode mode, use the sharded config:**
+**Priority: LOW-MEDIUM** - Requires profiling to validate improvements.
+
+---
+
+### 2.6 Router Computation Optimization
+
+**Current State:**
+The router uses float32 intermediate for precision:
 ```python
-if is_decode_mode:
-    memory_config = self._decode_io_memory_config
-else:
-    memory_config = ttnn.DRAM_MEMORY_CONFIG
+router_logits_f32 = ttnn.linear(
+    x_for_gate,
+    self.router_weights,
+    memory_config=ttnn.DRAM_MEMORY_CONFIG,
+    compute_kernel_config=ttnn.WormholeComputeKernelConfig(
+        math_fidelity=ttnn.MathFidelity.HiFi4,  # High precision
+        fp32_dest_acc_en=True,
+    ),
+)
 ```
 
-### Phase 4: Prefill Chunking (Day 7)
-
-#### Step 4.1: Add Chunked Prefill Support
-
-**Add to `TTNNQwen3MoE`:**
+**Proposed Change:**
+For decode mode (single token), use faster compute config:
 ```python
-def forward(self, x: ttnn.Tensor) -> ttnn.Tensor:
-    seq_len = x.shape[-2]
-    chunk_tokens = 16384  # Configurable
-    num_dispatch_devices = self.device.get_num_devices()
-    global_tokens = seq_len * num_dispatch_devices
+if is_decode_mode:
+    router_compute_config = ttnn.WormholeComputeKernelConfig(
+        math_fidelity=ttnn.MathFidelity.HiFi2,  # Good accuracy, faster
+        math_approx_mode=False,
+        fp32_dest_acc_en=False,  # BF16 accumulation is sufficient for decode
+        packer_l1_acc=True,
+    )
+else:
+    router_compute_config = ttnn.WormholeComputeKernelConfig(
+        math_fidelity=ttnn.MathFidelity.HiFi4,  # Keep high precision for prefill
+        math_approx_mode=False,
+        fp32_dest_acc_en=True,
+        packer_l1_acc=True,
+    )
+```
 
-    if global_tokens > chunk_tokens:
-        chunk_size = max(1, chunk_tokens // max(1, num_dispatch_devices))
-        return self._forward_chunked(x, chunk_size)
+**Why This Helps:**
+- Decode mode processes single tokens where precision is less critical
+- HiFi2 is significantly faster than HiFi4
+- Router selection is robust to small numerical differences
 
-    return self._forward_impl(x)
+**Priority: LOW** - Incremental improvement.
 
-def _forward_chunked(self, x: ttnn.Tensor, chunk_size: int) -> ttnn.Tensor:
-    _, _, seq_len, _ = x.shape
-    output_chunks = []
+---
 
-    for start in range(0, seq_len, chunk_size):
-        end = min(start + chunk_size, seq_len)
-        x_chunk = ttnn.slice(x, [0, 0, start, 0], [x.shape[0], x.shape[1], end, x.shape[3]])
-        output_chunks.append(self._forward_impl(x_chunk))
-        ttnn.deallocate(x_chunk)
+## 3. Step-by-Step Implementation Guide
 
-    if len(output_chunks) == 1:
-        return output_chunks[0]
+### Phase 1: Compute Kernel Configuration (Day 1)
 
-    output = ttnn.concat(output_chunks, dim=2)
-    for chunk in output_chunks:
-        ttnn.deallocate(chunk)
-    return output
+**Step 1.1: Add Compute Kernel Config Constants**
+
+**File:** `/home/ttuser/salnahari/tt-metal/models/experimental/tt_symbiote/modules/qwen_moe.py`
+
+**Add near top of file (after imports):**
+```python
+# Compute kernel configurations for expert matmuls
+EXPERT_COMPUTE_CONFIG_LOFI = ttnn.WormholeComputeKernelConfig(
+    math_fidelity=ttnn.MathFidelity.LoFi,
+    math_approx_mode=False,
+    fp32_dest_acc_en=False,
+    packer_l1_acc=True,
+)
+
+EXPERT_COMPUTE_CONFIG_HIFI2 = ttnn.WormholeComputeKernelConfig(
+    math_fidelity=ttnn.MathFidelity.HiFi2,
+    math_approx_mode=False,
+    fp32_dest_acc_en=False,
+    packer_l1_acc=True,
+)
+```
+
+**Step 1.2: Apply to sparse_matmul Calls**
+
+**Location:** `TTNNQwenExperts.forward()` around lines 432-476
+
+**Add `compute_kernel_config=EXPERT_COMPUTE_CONFIG_LOFI` to all sparse_matmul calls:**
+```python
+w1_out = ttnn.sparse_matmul(
+    post_dispatch,
+    self.tt_w1_proj,
+    sparsity,
+    program_config=self._gate_up_program_config,
+    compute_kernel_config=EXPERT_COMPUTE_CONFIG_LOFI,  # ADD
+    memory_config=decode_memory_config,
+)
+
+w3_out = ttnn.sparse_matmul(
+    post_dispatch,
+    self.tt_w3_proj,
+    sparsity,
+    program_config=self._gate_up_program_config,
+    compute_kernel_config=EXPERT_COMPUTE_CONFIG_LOFI,  # ADD
+    memory_config=decode_memory_config,
+)
+
+expert_output = ttnn.sparse_matmul(
+    intermediate,
+    self.tt_w2_proj,
+    sparsity,
+    program_config=self._down_program_config,
+    compute_kernel_config=EXPERT_COMPUTE_CONFIG_LOFI,  # ADD
+    memory_config=decode_memory_config,
+)
+```
+
+### Phase 2: Fused SiLU Activation (Day 1)
+
+**Step 2.1: Replace Sequential SiLU + Mul with Fused Op**
+
+**Location:** `TTNNQwenExperts.forward()` around lines 457-459
+
+**Before:**
+```python
+w1_activated = ttnn.silu(w1_out, memory_config=decode_memory_config)
+intermediate = ttnn.mul(w1_activated, w3_out, memory_config=decode_memory_config)
+ttnn.deallocate(w1_activated)
+```
+
+**After:**
+```python
+# Fused SiLU + multiply
+intermediate = ttnn.mul(
+    w1_out,
+    w3_out,
+    memory_config=decode_memory_config,
+    input_tensor_a_activations=[ttnn.UnaryOpType.SILU],
+)
+```
+
+**Note:** Also update the non-sparse (batched matmul) path around lines 502-505.
+
+### Phase 3: Weight Quantization (Days 2-3)
+
+**Step 3.1: Add Quantization Option to preprocess_weights**
+
+**Location:** `TTNNQwenExperts.preprocess_weights()`
+
+**Add parameter and implementation:**
+```python
+# Add environment variable check
+TT_QWEN_EXPERT_WEIGHT_DTYPE = os.environ.get("TT_QWEN_EXPERT_WEIGHT_DTYPE", "bfloat16").lower()
+
+def preprocess_weights(self):
+    # ... existing code ...
+
+    # Determine dtype based on config
+    if TT_QWEN_EXPERT_WEIGHT_DTYPE == "bfloat8_b":
+        weight_dtype = ttnn.bfloat8_b
+    elif TT_QWEN_EXPERT_WEIGHT_DTYPE == "bfloat4_b":
+        weight_dtype = ttnn.bfloat4_b
+    else:
+        weight_dtype = ttnn.bfloat16  # Default
+
+    # Apply to all expert weight conversions
+    self.tt_w1_proj = ttnn.from_torch(
+        gate_proj,
+        dtype=weight_dtype,  # Use configurable dtype
+        layout=ttnn.TILE_LAYOUT,
+        memory_config=ttnn.DRAM_MEMORY_CONFIG,
+        device=device,
+    )
+    # ... repeat for w2_proj, w3_proj ...
+```
+
+**Step 3.2: Add Accuracy Tests Before Enabling**
+
+Run accuracy tests with:
+```bash
+TT_QWEN_EXPERT_WEIGHT_DTYPE=bfloat8_b pytest tests/test_qwen3_5_35b_a3b.py -v
+```
+
+Compare PCC values against baseline.
+
+### Phase 4: DRAM-Sharded Weights (Days 4-5)
+
+**Step 4.1: Add Helper Function**
+
+**Location:** `TTNNQwenExperts` class
+
+```python
+def _create_dram_sharded_weight_config(self, k: int, n: int):
+    """Create DRAM-sharded config for expert weights.
+
+    Args:
+        k: Input dimension (rows)
+        n: Output dimension (columns)
+    """
+    # Get device DRAM grid (12 cores for Wormhole)
+    dram_grid_size = self.device.dram_grid_size()
+    dram_cores = dram_grid_size.x
+
+    # Create DRAM core range
+    dram_weight_grid = ttnn.CoreRangeSet({
+        ttnn.CoreRange(
+            ttnn.CoreCoord(0, 0),
+            ttnn.CoreCoord(dram_grid_size.x - 1, dram_grid_size.y - 1),
+        )
+    })
+
+    # Calculate shard shape (width-sharded)
+    padded_n = ttnn.core.roundup(ttnn.core.divup(n, dram_cores), ttnn.TILE_SIZE)
+
+    shard_spec = ttnn.ShardSpec(
+        dram_weight_grid,
+        (k, padded_n),
+        ttnn.ShardOrientation.ROW_MAJOR,
+    )
+
+    return ttnn.MemoryConfig(
+        ttnn.TensorMemoryLayout.WIDTH_SHARDED,
+        ttnn.BufferType.DRAM,
+        shard_spec,
+    )
+```
+
+**Step 4.2: Apply to Weight Storage**
+
+**In preprocess_weights, use DRAM-sharded config when dimensions align:**
+```python
+# Only use DRAM-sharded for weights where n divides evenly
+if n % (dram_cores * ttnn.TILE_SIZE) == 0:
+    weight_mem_config = self._create_dram_sharded_weight_config(k, n)
+else:
+    weight_mem_config = ttnn.DRAM_MEMORY_CONFIG
+
+self.tt_w1_proj = ttnn.from_torch(
+    gate_proj,
+    dtype=weight_dtype,
+    layout=ttnn.TILE_LAYOUT,
+    memory_config=weight_mem_config,
+    device=device,
+)
 ```
 
 ---
 
-## 5. Accuracy Test Suite Design
+## 4. Accuracy Test Suite Design
 
-### 5.1 Unit Tests (Per Component)
+### 4.1 Unit Tests for Quantization
 
-#### Router Accuracy Test
 ```python
-def test_router_accuracy():
-    """Verify router produces identical top-k indices and weights vs PyTorch."""
-    # Setup
-    torch_router = load_pytorch_router()
-    ttnn_router = TTNNQwenMoERouterDecode.from_torch(torch_router)
+@pytest.mark.parametrize("weight_dtype", ["bfloat16", "bfloat8_b", "bfloat4_b"])
+def test_expert_weight_quantization_accuracy(weight_dtype, mesh_device):
+    """Verify expert computation accuracy with different weight dtypes."""
+    os.environ["TT_QWEN_EXPERT_WEIGHT_DTYPE"] = weight_dtype
 
-    # Test cases
+    # Load reference PyTorch model
+    torch_experts = load_pytorch_experts()
+    ttnn_experts = TTNNQwenExperts.from_torch(torch_experts)
+    ttnn_experts.preprocess_weights()
+    ttnn_experts.move_weights_to_device()
+
+    # Test with multiple input patterns
     test_inputs = [
-        torch.randn(1, 256),   # Single token
-        torch.randn(32, 256),  # Decode batch
-        torch.randn(128, 256), # Prefill batch
+        torch.randn(32, 4096),   # Decode batch
+        torch.randn(128, 4096),  # Prefill batch
     ]
 
     for x in test_inputs:
-        torch_indices, torch_weights = torch_router(x)
-        ttnn_indices, ttnn_weights = ttnn_router(to_ttnn(x))
-
-        # Verify indices match exactly
-        assert torch.equal(torch_indices, to_torch(ttnn_indices))
-
-        # Verify weights match within tolerance
-        assert torch.allclose(torch_weights, to_torch(ttnn_weights), atol=1e-3)
-```
-
-#### Expert Computation Accuracy Test
-```python
-def test_experts_accuracy():
-    """Verify expert computation matches PyTorch reference."""
-    # Setup
-    torch_experts = load_pytorch_experts()
-    ttnn_experts = TTNNQwenExperts.from_torch(torch_experts)
-
-    # Test with known routing
-    x = torch.randn(32, 4096)  # 32 tokens
-    indices = torch.randint(0, 256, (32, 8))  # top-8 routing
-    weights = torch.softmax(torch.randn(32, 8), dim=-1)
-
-    torch_out = torch_experts(x, indices, weights)
-    ttnn_out = ttnn_experts(to_ttnn(x), to_ttnn(indices), to_ttnn(weights))
-
-    pcc = pearson_correlation(torch_out, to_torch(ttnn_out))
-    assert pcc > 0.99, f"PCC {pcc} below threshold"
-```
-
-#### Full MoE Accuracy Test
-```python
-def test_moe_accuracy():
-    """Verify full MoE layer matches PyTorch reference."""
-    torch_moe = load_pytorch_moe()
-    ttnn_moe = TTNNQwen3MoE.from_torch(torch_moe)
-
-    for seq_len in [1, 32, 128, 512]:
-        x = torch.randn(1, 1, seq_len, 4096)
-
-        torch_out = torch_moe(x)
-        ttnn_out = ttnn_moe(to_ttnn(x))
+        torch_out = torch_experts_forward(torch_experts, x)
+        ttnn_out = ttnn_experts.forward(to_ttnn(x))
 
         pcc = pearson_correlation(torch_out, to_torch(ttnn_out))
-        assert pcc > 0.999, f"PCC {pcc} for seq_len={seq_len}"
+
+        if weight_dtype == "bfloat16":
+            assert pcc > 0.999, f"PCC {pcc} for bfloat16 weights"
+        elif weight_dtype == "bfloat8_b":
+            assert pcc > 0.995, f"PCC {pcc} for bfloat8_b weights"
+        else:  # bfloat4_b
+            assert pcc > 0.990, f"PCC {pcc} for bfloat4_b weights"
 ```
 
-### 5.2 Integration Tests
+### 4.2 Compute Config Validation
 
-#### End-to-End Generation Test
 ```python
-def test_generation_accuracy():
-    """Verify generated text quality before/after optimization."""
+def test_compute_config_accuracy():
+    """Verify LoFi compute config maintains accuracy."""
+    # Run same input with different configs
+    configs = [
+        ("HiFi4", ttnn.MathFidelity.HiFi4),
+        ("HiFi2", ttnn.MathFidelity.HiFi2),
+        ("LoFi", ttnn.MathFidelity.LoFi),
+    ]
+
+    results = {}
+    for name, fidelity in configs:
+        output = run_expert_with_config(fidelity)
+        results[name] = output
+
+    # All should match HiFi4 reference closely
+    hifi4_ref = results["HiFi4"]
+    for name, output in results.items():
+        pcc = pearson_correlation(hifi4_ref, output)
+        assert pcc > 0.999, f"{name} PCC {pcc} vs HiFi4"
+```
+
+### 4.3 End-to-End Generation Test
+
+```python
+def test_generation_with_optimizations():
+    """Verify text generation quality with all optimizations enabled."""
+    os.environ["TT_QWEN_EXPERT_WEIGHT_DTYPE"] = "bfloat8_b"
+
     prompts = [
         "What is machine learning?",
-        "Explain quantum computing in simple terms.",
-        "Write a short poem about AI.",
+        "Explain quantum computing simply.",
     ]
 
     for prompt in prompts:
-        # Generate with baseline
-        baseline_output = generate_baseline(prompt, max_tokens=50)
+        baseline_tokens = generate_baseline(prompt, max_tokens=50)
+        optimized_tokens = generate_optimized(prompt, max_tokens=50)
 
-        # Generate with optimized
-        optimized_output = generate_optimized(prompt, max_tokens=50)
-
-        # Token-level comparison (should be identical or very similar)
-        token_match_rate = compare_tokens(baseline_output, optimized_output)
-        assert token_match_rate > 0.95, f"Token match rate {token_match_rate}"
-```
-
-### 5.3 Performance Regression Tests
-
-```python
-def test_performance_baseline():
-    """Establish and verify performance baselines."""
-    test_configs = [
-        {"mode": "decode", "batch_size": 32, "seq_len": 1},
-        {"mode": "prefill", "batch_size": 1, "seq_len": 128},
-        {"mode": "prefill", "batch_size": 1, "seq_len": 512},
-    ]
-
-    for cfg in test_configs:
-        latency = measure_moe_latency(**cfg)
-
-        # Log for tracking
-        log_metric(f"moe_latency_{cfg['mode']}_{cfg['seq_len']}", latency)
-
-        # Assert against baseline (set after initial measurement)
-        # assert latency < BASELINE_LATENCIES[str(cfg)] * 1.1
+        # Compare token sequences
+        match_rate = sum(a == b for a, b in zip(baseline_tokens, optimized_tokens)) / len(baseline_tokens)
+        assert match_rate > 0.90, f"Token match rate {match_rate}"
 ```
 
 ---
 
-## 6. Success Criteria
+## 5. Success Criteria
 
-### 6.1 Performance Targets
+### 5.1 Performance Targets
 
 | Metric | Baseline | Target | Measurement Method |
 |--------|----------|--------|-------------------|
-| Decode latency (32 users) | TBD ms | -30% | `test_qwen3_5_35b_a3b.py` timing |
-| Prefill throughput (128 seq) | TBD tok/s | +50% | `test_qwen3_5_35b_a3b.py` timing |
-| MoE layer time (decode) | TBD ms | -40% | `DispatchManager` timing |
-| MoE layer time (prefill) | TBD ms | -30% | `DispatchManager` timing |
+| Expert matmul time (decode) | TBD ms | -20% | Kernel profiling |
+| Expert matmul time (prefill) | TBD ms | -15% | Kernel profiling |
+| Weight memory bandwidth | TBD GB/s | +50% | (via quantization) |
+| MoE layer time (decode) | TBD ms | -15% | `DispatchManager` timing |
+| MoE layer time (prefill) | TBD ms | -10% | `DispatchManager` timing |
 
-### 6.2 Accuracy Thresholds
+### 5.2 Accuracy Thresholds
 
 | Metric | Threshold | Test |
 |--------|-----------|------|
-| PCC (MoE output vs PyTorch) | > 0.999 | `test_moe_accuracy` |
-| PCC (Router weights) | > 0.999 | `test_router_accuracy` |
-| Token match rate (generation) | > 95% | `test_generation_accuracy` |
-| Perplexity change | < 0.1% | Eval on benchmark dataset |
+| PCC (bfloat16 baseline) | > 0.999 | test_expert_accuracy |
+| PCC (bfloat8_b weights) | > 0.995 | test_quantization_accuracy |
+| PCC (LoFi compute config) | > 0.999 | test_compute_config_accuracy |
+| Token match rate (generation) | > 90% | test_generation_with_optimizations |
 
-### 6.3 Resource Constraints
+### 5.3 Resource Constraints
 
 | Metric | Constraint |
 |--------|------------|
-| Peak L1 memory (decode) | < 1 MB per core |
-| Peak DRAM usage | < baseline |
-| Compile time | < 2x baseline |
+| Expert weight memory | -50% vs baseline (with bfloat8_b) |
+| Compile time | < 1.5x baseline |
+| Peak L1 memory (decode) | < baseline |
 
 ---
 
-## 7. Risk Mitigation
+## 6. Risk Mitigation
 
-### 7.1 Accuracy Degradation
-- **Mitigation:** Run accuracy tests after each change
-- **Rollback:** Feature flags for each optimization (e.g., `TT_QWEN_MoE_NUM_LINKS`)
+### 6.1 Quantization Accuracy Degradation
+- **Mitigation:** Start with bfloat8_b (conservative), only try bfloat4_b if accuracy passes
+- **Test:** Run full eval suite before committing
+- **Rollback:** Keep TT_QWEN_EXPERT_WEIGHT_DTYPE env var for easy revert
 
-### 7.2 OOM on Large Sequences
-- **Mitigation:** Implement prefill chunking (Phase 4)
-- **Test:** Stress test with seq_len=2048, 4096
+### 6.2 Compute Config Numerical Issues
+- **Mitigation:** Test LoFi on diverse inputs (small/large values)
+- **Test:** Compare against HiFi4 reference
+- **Fallback:** Use HiFi2 if LoFi shows issues
 
-### 7.3 CCL Hangs with num_links=4
-- **Mitigation:** Test on isolated T3K before production
-- **Fallback:** Make num_links configurable via environment variable
+### 6.3 DRAM-Sharded Alignment Issues
+- **Mitigation:** Only enable for perfectly aligned dimensions
+- **Test:** Verify tensor shapes match shard specs
+- **Fallback:** Default to interleaved if alignment fails
 
 ---
 
 ## Appendix A: Files to Modify
 
 1. `/home/ttuser/salnahari/tt-metal/models/experimental/tt_symbiote/modules/qwen_moe.py`
-   - `TTNNQwenExperts.forward()` - Add num_links to all-to-all ops
-   - `TTNNQwen3MoE.forward()` - Update CCL num_links, add chunking
+   - Add compute kernel configs
+   - Add fused SiLU activation
+   - Add weight quantization option
+   - Add DRAM-sharded weight configs
 
 2. `/home/ttuser/salnahari/tt-metal/models/experimental/tt_symbiote/tests/test_qwen3_5_35b_a3b.py`
-   - Add accuracy validation tests
-   - Add performance benchmarks
+   - Add quantization accuracy tests
+   - Add compute config validation tests
 
 ## Appendix B: Environment Variables
 
@@ -635,5 +677,6 @@ def test_performance_baseline():
 |----------|---------|---------|
 | `TT_QWEN_USE_SPARSE_MATMUL` | "1" | Use sparse_matmul vs batched_matmul |
 | `TT_QWEN_CPU_EXPERTS` | "0" | CPU fallback for debugging |
-| `TT_QWEN_MoE_NUM_LINKS` | "4" (new) | CCL link count |
-| `TT_QWEN_PREFILL_CHUNK_SIZE` | "16384" (new) | Prefill chunking threshold |
+| `TT_QWEN_EXPERT_WEIGHT_DTYPE` | "bfloat16" (new) | Expert weight quantization |
+| `TT_QWEN_USE_LOFI_COMPUTE` | "1" (new) | Use LoFi compute config |
+| `TT_QWEN_FUSED_SILU` | "1" (new) | Use fused SiLU activation |

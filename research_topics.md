@@ -64,3 +64,45 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 **Findings:**
 [Pending research]
+
+---
+
+## Weight Quantization for MoE Experts
+**Date:** 2026-03-17
+**Status:** Pending
+**Why Needed:** DeepSeek-V3 uses bfloat4_b/bfloat8_b weight quantization for experts, but Qwen uses full bfloat16. Need to evaluate quantization trade-offs.
+**Questions:**
+- What accuracy loss is expected from bfloat4_b vs bfloat8_b vs bfloat16 for expert weights?
+- How does weight quantization affect compute throughput on Wormhole?
+- Which projections (gate/up/down) are most sensitive to quantization?
+
+**Findings:**
+[Pending research]
+
+---
+
+## Compute Kernel Configuration for MoE
+**Date:** 2026-03-17
+**Status:** Pending
+**Why Needed:** DeepSeek-V3 uses COMPUTE_KERNEL_CONFIG_LOFI with packer_l1_acc, but Qwen MoE doesn't specify compute kernel configs. Need to optimize.
+**Questions:**
+- What is the performance difference between LoFi, HiFi2, and HiFi4 for MoE expert matmuls?
+- How does packer_l1_acc affect throughput for expert computations?
+- What is the accuracy trade-off for using math_approx_mode?
+
+**Findings:**
+[Pending research]
+
+---
+
+## Expert Weight Memory Layout Optimization
+**Date:** 2026-03-17
+**Status:** Pending
+**Why Needed:** Current implementation stores expert weights in DRAM with standard interleaved config. DRAM-sharded layouts may improve memory bandwidth.
+**Questions:**
+- What is the performance gain from DRAM-sharded weight storage?
+- How should expert weights be laid out for optimal prefetch patterns?
+- What are the tile size constraints for expert weight sharding?
+
+**Findings:**
+[Pending research]
