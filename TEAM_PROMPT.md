@@ -72,22 +72,65 @@ git push
 
 ### Architect Prompt Template (Team Lead MUST include this)
 
-When spawning an Architect agent, the Team Lead MUST include this text in the prompt:
+When spawning an Architect agent, the Team Lead MUST include this EXACT text in the prompt:
 
 ```
-## MANDATORY FIRST STEP: Research Cache Lookup
+## MANDATORY FIRST STEP: Research Cache Lookup (EXECUTE THESE COMMANDS)
 
-Before doing ANY analysis or planning, you MUST:
+You MUST execute the following commands using the Bash tool and SHOW their output before doing ANY other work.
 
-1. Pull latest: `cd /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics && git pull`
-2. Read cache: `cat /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics/research_topics.md`
-3. For each topic your plan depends on:
-   - If Status: Completed → use the findings
-   - If absent or Pending → add the topic and push
-4. Only AFTER completing cache lookup, proceed with your analysis.
-
-This step is NON-NEGOTIABLE. Do not skip it.
+### Step 1: Pull latest (USE BASH TOOL)
+Execute this command and show the output:
+```bash
+cd /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics && git pull
 ```
+
+### Step 2: Read cache (USE BASH TOOL)
+Execute this command and show the output:
+```bash
+cat /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics/research_topics.md
+```
+
+### Step 3: Report cache status
+After reading the cache, you MUST report in this format:
+
+**CACHE LOOKUP RESULTS:**
+| Topic | Status | Action |
+|-------|--------|--------|
+| [topic name] | Completed/Pending/Missing | Using findings / Best-effort / Adding |
+
+### Step 4: For topics with Status: Completed
+Copy the **Findings** section into your analysis. Do NOT re-research completed topics.
+
+### Step 5: For missing topics (cache miss)
+Add new topics and push:
+```bash
+cd /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics
+# Edit research_topics.md to add new topic
+git add research_topics.md
+git commit -m "team/architect: cache miss — add topic <topic-name>"
+git push
+```
+
+## VERIFICATION CHECKLIST (Must complete before proceeding)
+- [ ] Executed `git pull` and showed output
+- [ ] Executed `cat research_topics.md` and showed output
+- [ ] Listed all relevant topics with their Status
+- [ ] Used findings from Completed topics
+- [ ] Added and pushed any missing topics
+
+**FAILURE TO SHOW COMMAND OUTPUTS = INVALID RESPONSE. START OVER.**
+```
+
+### Team Lead Verification
+
+After receiving the Architect's response, the Team Lead MUST verify:
+1. The response shows actual `git pull` output (not just "I pulled")
+2. The response shows the contents of `research_topics.md`
+3. The response includes the CACHE LOOKUP RESULTS table
+4. Completed topics' findings are incorporated
+
+**If verification fails, reject the response and re-spawn the Architect.**
 
 ### Why This Matters
 - Research findings are computed asynchronously by a dedicated research instance
