@@ -17,6 +17,10 @@ I want you to solve the following task using the team organization:
 
 You are the **Team Lead**. You MUST follow these rules:
 
+### ⚠️ Git Push Constraints (STRICTLY ENFORCED)
+- **research-topics repo:** ONLY `research_topics.md` may be pushed
+- **tt-metal repo:** NO pushes allowed — strictly prohibited
+
 ### Team Lead (YOU)
 - **NEVER** modify or add code directly
 - **ONLY** spawn agents and coordinate
@@ -148,6 +152,7 @@ After receiving the Architect's response, the Team Lead MUST verify:
 - Can ONLY be spawned AFTER Architect has generated a plan
 - Cannot be spawned twice without an Architect spawn in between
 - Reports what was changed and any issues encountered
+- **⚠️ CANNOT push to tt-metal — all code changes remain local**
 
 ### Verifier Agent
 - Runs tests and reports results
