@@ -165,18 +165,21 @@ The plan is the source of truth for structure. Agents may propose amendments to 
 ### Agent B — Critic
 - A **separate agent invocation** that has never seen this content before. It reads as a cold, independent reviewer.
 - **Reads** chapter files and evaluates them. Never modifies content files.
-- Checks:
-  1. **Correctness** — are all technical facts accurate? Flag any statement that is wrong or unverifiable.
-  2. **Coherence** — does the text flow logically? Are concepts introduced before they are used?
-  3. **Structural alignment** — does the chapter match the plan? Are all planned files present and covering the intended content?
-  4. **Cross-chapter consistency** — do terminology, notation, and examples match across chapters (relevant once multiple chapters exist)?
-- Writes feedback as a numbered list. Each item must state: the file, approximate line or section, the issue, and a concrete fix.
-- When there are no issues, explicitly writes: **"No feedback — chapter approved."**
+- **Scope (strict):** Agent B flags only issues where a downstream reader would (a) get a wrong numerical answer, (b) implement something incorrectly, or (c) be materially misled into a wrong conceptual understanding. Agent B **must NOT flag**: style preferences, sentence structure choices, abbreviation consistency, cross-reference formatting conventions, prose wordiness, or any issue a reader can resolve with basic context. If in doubt, do not flag it.
+- Checks only:
+  1. **Factual correctness** — is a stated fact, formula, or derivation wrong? Would following it produce incorrect code or a wrong result?
+  2. **Critical coherence** — is a concept used before it is defined in a way that blocks comprehension (not just mildly inconvenient)?
+  3. **Critical structural gaps** — is a planned file missing, or does a file omit content that a later chapter explicitly depends on?
+- **Maximum 5 items per pass.** If more than 5 genuine correctness issues exist, list only the 5 most severe.
+- Writes feedback as a numbered list (≤5 items). Each item: file, approximate line, the specific correctness error, and a concrete fix.
+- When there are no correctness issues, writes exactly: **"No feedback — chapter approved."**
+- Writes output to `<chapter_dir>/b_review.md` (append, with pass number heading). Does NOT write to `compression_analysis.md`.
 - Receives from orchestrator: the plan, the list of chapter files to read (by path), and any prior feedback from previous passes.
 
 ### Agent C — Compressor
-- A **separate agent invocation** that has never seen this content before. It reads as an adversarial editor whose sole job is to find and eliminate bloat.
+- A **separate agent invocation** that has never seen this content before. It reads as a pure content editor whose sole job is to find and eliminate redundancy and bloat.
 - **Reads** chapter files and identifies redundancy and bloat. Never modifies content files.
+- **Scope (strict):** Agent C looks ONLY for: duplicate explanations of the same concept across files, restated tables, verbose prose that can be shortened without losing meaning, over-long code comments that restate what the code already shows, repeated examples, and hedging language that adds no value. Agent C **must NOT** flag factual errors, missing information, or correctness issues — that is Agent B's job exclusively.
 - **Must find something to compress.** Agent C is not done until it has read every line and made an honest attempt to identify redundancy. A verdict of `Crucial updates: no` is only valid if Agent C has populated both a `## Load-Bearing Evidence` section (see format below) AND at least one `## MINOR Suggestions` item. A compression_analysis.md with an empty MINOR section and no Load-Bearing Evidence section will be **rejected by the orchestrator** and Agent C will be re-spawned.
 - If a chapter truly has zero CRUCIAL bloat (uncommon), Agent C must:
   1. Populate `## Load-Bearing Evidence` with a bullet per file quoting a specific line or passage and explaining why it cannot be cut.
@@ -325,7 +328,7 @@ Chapter directory names use the format `ch<N>_<short_snake_case_title>`.
 6. Compression analysis files are append-only across passes (each pass adds a new dated section). Never delete a previous pass's analysis.
 7. Keep `index.md` and chapter `index.md` files as pure navigation — no content that belongs in a section file.
 8. All cross-chapter references use relative markdown links.
-9. **Agent B and Agent C are always separate agent invocations.** The orchestrator must never allow B or C to run in the same context as A. This isolation is what makes the review adversarial and trustworthy.
+9. **Agent B and Agent C are always separate agent invocations.** The orchestrator must never allow B or C to run in the same context as A. This isolation is what makes the review adversarial and trustworthy. Agent B writes to `b_review.md`; Agent C writes to `compression_analysis.md`. These are separate files.
 10. **Agent C must produce a Summary section with actual line count estimates.** A verdict of `Crucial updates: no` without a populated Summary section is invalid.
 11. **A `Crucial updates: no` verdict requires both `## Load-Bearing Evidence` (non-empty, one bullet per file with a quoted line) and at least one `## MINOR Suggestions` item.** The orchestrator must reject and re-spawn Agent C if either is absent. There is no such thing as a chapter with zero MINOR issues.
 12. **The orchestrator must never rubber-stamp Agent C's verdict.** It must explicitly verify the two conditions in rule 11 before accepting the verdict and advancing.
