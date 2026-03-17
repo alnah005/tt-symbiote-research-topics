@@ -161,3 +161,28 @@ Findings: [Pending research]
 **Findings:**
 [Pending research - requires profiling on hardware]
 
+---
+
+## Sparse Matmul and W1/W3 Fusion Cleanup for Qwen MoE
+**Date:** 2026-03-17
+**Status:** Completed
+**Why Needed:** The Qwen MoE implementation has environment variable toggles for sparse_matmul vs batched matmul and fused vs unfused w1/w3 projections. These toggles add code complexity and dead code paths that need to be removed.
+**Questions:**
+1. What environment variables control the implementation paths?
+2. Which code paths need to be removed?
+3. What is the impact on tests and behavior?
+
+**Findings:**
+Full cleanup plan written: `PLAN_qwen_moe_cleanup.md`
+
+- **Environment variables to remove:** `TT_QWEN_USE_SPARSE_MATMUL` and `TT_QWEN_FUSED_GATE_UP` (both default to "1" enabled)
+- **File to modify:** `/home/ttuser/salnahari/tt-metal/models/experimental/tt_symbiote/modules/qwen_moe.py`
+- **Code paths to remove:**
+  - Batched matmul path (~25 lines in forward())
+  - Unfused sparse_matmul path (~27 lines in forward())
+  - Conditional weight creation (`tt_w1_proj`, `tt_w3_proj`)
+  - Conditional program config creation (`_gate_up_program_config`)
+- **Net reduction:** ~100+ lines of dead code removed
+- **Behavior change:** None - the default path (sparse_matmul + fused w1/w3) becomes the only path
+- **Testing:** All existing tests should pass unchanged since they already test the default path
+
