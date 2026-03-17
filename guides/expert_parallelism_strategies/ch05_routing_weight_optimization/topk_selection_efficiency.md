@@ -189,3 +189,7 @@ The practical conclusion is that top-k selection is not negligible but is never 
 - Cormen et al., *Introduction to Algorithms*, 4th ed., MIT Press, 2022. (Heap-based selection, Chapter 9.)
 - Tenstorrent, *TTNN Developer Guide*, 2024. (Tile granularity, core topology.)
 - Chapter 5 of this guide: `router_forward_pass.md`, `router_kernel_fusion.md`.
+
+---
+
+**Next:** [weight_normalization.md](./weight_normalization.md)

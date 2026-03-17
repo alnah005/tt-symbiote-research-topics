@@ -400,3 +400,7 @@ max_links = mesh_device.get_num_ethernet_links_per_pair()  # returns 4 on T3K
 | Reconstruct full tensor from reduce-scatter output for a subsequent non-sharded op | `ttnn.all_gather` (after `ttnn.reduce_scatter`) |
 
 For MoE inference, the dominant operations are the two `ttnn.all_to_all` calls per MoE layer (dispatch and combine). The `ttnn.all_reduce` and `ttnn.reduce_scatter` / `ttnn.all_gather` primitives appear in tensor-parallel attention heads and in any weight-sharded MLP layers outside the MoE structure. Chapter 3 provides a detailed analysis of all-to-all performance and `num_links` tuning; Chapter 5 shows how all four primitives compose in a full MoE forward pass.
+
+---
+
+**Next:** [Chapter 3 — All-to-All num_links](../ch03_all_to_all_num_links/index.md)

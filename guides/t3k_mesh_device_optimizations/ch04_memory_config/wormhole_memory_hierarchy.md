@@ -210,3 +210,7 @@ print(f"Fits in L1: {shard_bytes <= L1_PER_CORE}")
 - `tt-metal` source: `ttnn/cpp/ttnn/tensor/types.hpp` — `BufferType`, `TensorMemoryLayout`
 - `tt-metal` source: `ttnn/cpp/ttnn/operations/core/core.hpp` — `to_memory_config`
 - Chapter 4 index: `ch04_memory_config/index.md`
+
+---
+
+**Next:** [memory_config_api.md](./memory_config_api.md)

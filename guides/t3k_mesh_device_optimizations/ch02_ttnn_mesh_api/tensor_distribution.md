@@ -262,3 +262,7 @@ Sharding a tensor across eight devices imposes divisibility constraints:
 - **Non-divided dimensions must also be multiples of 32 for `TILE_LAYOUT`.** The constraints above apply to the divided dimension, but `TILE_LAYOUT` requires that *every* dimension of the per-device shard be a multiple of 32 — including dimensions that sharding does not divide. For example, a tensor of shape `(4097, 8192)` sharded column-wise across 8 devices passes the divided-dimension check (`8192 % 256 == 0`), but each device's shard has shape `(4097, 1024)` — and `4097 % 32 != 0`. The `ttnn.from_torch` call will fail with a tile-alignment error on the non-divided dimension. The correct approach is to pad **all** tensor dimensions to multiples of 32 first, then shard.
 
 Violations of these constraints produce errors from the TTNN memory allocator or the sharding mapper, typically at the point of the `ttnn.from_torch` call rather than during operation dispatch.
+
+---
+
+**Next:** [collective_primitives.md](./collective_primitives.md)

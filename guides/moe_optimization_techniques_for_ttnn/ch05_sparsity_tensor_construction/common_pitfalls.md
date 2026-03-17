@@ -308,3 +308,7 @@ See `sparsity_tensor_format.md`, Section 9.
 - `constructing_from_router_output.md` — tile-active construction logic (P2)
 - `sparsity_tensor_placement.md` — L1 placement (P4), TTNN Trace integration (P3)
 - Chapter 4, `sparse_matmul_internals.md` — how the mask drives tile-skip decisions (context for P1, P2, P3)
+
+---
+
+**Next:** [Chapter 6 — Comparative Analysis](../ch06_comparative_analysis/index.md)

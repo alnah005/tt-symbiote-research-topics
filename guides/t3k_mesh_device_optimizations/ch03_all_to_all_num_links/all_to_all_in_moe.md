@@ -154,3 +154,7 @@ At large batch (prefill), $C$ scales with $B \times S$, and both expert compute 
 - Chapter 2, `collective_primitives.md` — `ttnn.all_to_all` signature, `cluster_axis=1`, `ttnn.Topology.Linear`
 - Chapter 3, `num_links_parameter.md` — bandwidth model and latency formula for `num_links` tuning
 - Chapter 5, `combine_and_accumulation.md` — overlap of combine all-to-all with subsequent operations
+
+---
+
+**Next:** [num_links_parameter.md](./num_links_parameter.md)

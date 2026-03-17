@@ -119,6 +119,6 @@ With Chapter 1 complete, you have the vocabulary and structural understanding ne
 
 ---
 
-## Next Steps
+---
 
-Proceed to [Chapter 2: TTNN and Wormhole Hardware Primer](../ch02_ttnn_wormhole_primer/index.md) to build the hardware and programming model knowledge required before diving into kernel configuration in Chapter 3.
+**Next:** [Chapter 2 — TTNN Wormhole Primer](../ch02_ttnn_wormhole_primer/index.md)

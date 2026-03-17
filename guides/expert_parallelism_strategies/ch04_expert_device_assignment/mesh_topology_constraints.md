@@ -336,3 +336,7 @@ All strategies described in this chapter — uniform partitioning, load-aware bi
 - [Rajbhandari2022] Rajbhandari, S. et al., "DeepSpeed-MoE: Advancing Mixture-of-Experts Inference and Training to Power Next-Generation AI Scale", ICML, 2022.
 - [Qwen3] Qwen Team, Alibaba Group, "Qwen3 Technical Report", 2025.
 - [PlanDoc] Expert Parallelism Strategies — Research Guide Plan, `guides/expert_parallelism_strategies/plan.md`.
+
+---
+
+**Next:** [Chapter 5 — Routing Weight Optimization](../ch05_routing_weight_optimization/index.md)

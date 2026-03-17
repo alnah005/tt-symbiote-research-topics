@@ -222,3 +222,7 @@ print(f"Double-buffer total: {double_buffer_bytes(B) / 1024 / 1024:.2f} MB")
 - Chapter 5 of this guide: `ch05_routing_weight_optimization/router_kernel_fusion.md`
   (double-buffering mechanics).
 - TT-Metalium TTNN documentation: `ttnn.TensorMemoryLayout.HEIGHT_SHARDED`.
+
+---
+
+**Next:** [expert_ffn_tiling.md](./expert_ffn_tiling.md)

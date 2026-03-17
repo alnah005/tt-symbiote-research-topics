@@ -269,3 +269,7 @@ Writing directly to the residual tensor's memory slot avoids a separate allocati
 - `expert_parallelism_strategies/ch04_expert_device_assignment/expert_replication.md` — Routing metadata for replicated expert combine
 - [Fedus2022] Fedus, W., Zoph, B., Shazeer, N., "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity", JMLR, 2022.
 - [Qwen3] Qwen Team, Alibaba Group, "Qwen3 Technical Report", 2025.
+
+---
+
+**Next:** [Chapter 6 — Profiling](../ch06_profiling/index.md)

@@ -196,3 +196,7 @@ The practical hybrid strategy: use `sparse_matmul` for decode ($B \leq 16$) and 
 - Chapter 3, `performance_profile_batched.md` §2.2 — Tile-level FLOP efficiency at decode; motivation for this analysis.
 - Chapter 3, `formulating_batched_matmul.md` §2.2 — Expert capacity formula and FLOP efficiency.
 - Chapter 1, `routing_and_sparsity.md` — Top-K routing and expert activation patterns.
+
+---
+
+**Next:** [program_configs_sparse.md](./program_configs_sparse.md)

@@ -174,3 +174,7 @@ This gated architecture is standard for modern MoE models and is more expressive
 - [Qwen3] Qwen Team, Alibaba Group, "Qwen3 Technical Report", 2025.
 - [Ch1Index] Chapter 1, `index.md` — chapter overview, notation table, and reading order.
 - [Ch5Router] Chapter 5, `ch05_routing_weight_optimization/router_forward_pass.md` — detailed treatment of softmax vs. sigmoid routing and numerical stability.
+
+---
+
+**Next:** [routing_problem.md](./routing_problem.md)

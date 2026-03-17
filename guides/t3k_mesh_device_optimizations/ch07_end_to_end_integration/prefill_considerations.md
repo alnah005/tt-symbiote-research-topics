@@ -349,3 +349,7 @@ def prefill_moe_call(
 - `ch05_expert_parallelism/combine_and_accumulation.md` — Combine A2A volume; overlap with next-layer prefetch §5
 - `ch06_profiling/bottleneck_diagnosis_guide.md` — Regime identification: compute-bound vs. communication-bound for prefill
 - `ch06_profiling/ttnn_profiler.md` — Profiler setup for prefill phase benchmarking
+
+---
+
+**End of guide.** Return to [Guide Index](../index.md)

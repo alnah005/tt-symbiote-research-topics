@@ -168,3 +168,7 @@ On T3K, the most common causes of saturation are:
 | Maximum hop count (bidirectional traversal) | 4 hops | Effective max when simultaneous both-direction routing is used on the open chain; assumes concurrent forward and backward chain passes, not a physical ring closure |
 
 These figures establish the bandwidth ceiling and latency floor against which all collective operation designs in later chapters are measured.
+
+---
+
+**Next:** [topology_implications_for_collectives.md](./topology_implications_for_collectives.md)

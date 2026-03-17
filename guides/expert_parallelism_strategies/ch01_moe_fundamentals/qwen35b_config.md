@@ -275,3 +275,7 @@ This table encapsulates why Qwen3.5-35B on T3K requires the careful expert paral
 - [Ch5TopK] Chapter 5, `ch05_routing_weight_optimization/topk_selection_efficiency.md` — top-k computation efficiency.
 - [Ch6Latency] Chapter 6, `ch06_fused_dispatch_compute_combine/end_to_end_latency_model.md` — parameterized latency model.
 - [Ch7Load] Chapter 7, `ch07_load_balancing/` — load balancing mechanisms.
+
+---
+
+**Next:** [Chapter 2 — All-to-All Communication Primitives](../ch02_all_to_all_primitives/index.md)

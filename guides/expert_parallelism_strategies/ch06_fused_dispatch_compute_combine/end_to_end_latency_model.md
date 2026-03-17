@@ -309,3 +309,7 @@ which term dominates at this operating point.
 - TT-Metalium TTNN profiler documentation.
 - Wormhole B0 datasheet: Ethernet link bandwidth (12.5 GB/s), Tensix FLOP rate
   [UNVERIFIED].
+
+---
+
+**Next:** [Chapter 7 — Load Balancing](../ch07_load_balancing/index.md)

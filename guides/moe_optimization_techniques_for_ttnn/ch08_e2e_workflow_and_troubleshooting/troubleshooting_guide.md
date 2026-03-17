@@ -224,3 +224,7 @@ routing score — producing a deterministic but incorrect output.
    identical to the sort key used to read the receive buffer at combine. Any difference in tie-
    breaking (for example, by token index vs. by sequence in the top-k result) is sufficient to
    produce a mismatch.
+
+---
+
+**End of guide.** Return to [Guide Index](../index.md)

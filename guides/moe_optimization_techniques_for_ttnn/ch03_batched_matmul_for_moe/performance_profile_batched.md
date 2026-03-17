@@ -186,8 +186,6 @@ A detailed comparison — including the sparsity ratio threshold at which `spars
 
 ---
 
-## Next Steps
+---
 
-You have completed Chapter 3. The batched matmul strategy, its tensor shapes, program config selection, and performance profile are now fully characterized.
-
-Proceed to **Chapter 4 — sparse_matmul for MoE** to learn about the alternative kernel strategy that outperforms batched matmul in the decode regime by explicitly skipping zero tiles in the activation tensor.
+**Next:** [Chapter 4 — Sparse Matmul for MoE](../ch04_sparse_matmul_for_moe/index.md)

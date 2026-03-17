@@ -210,3 +210,7 @@ However, if multiple hot experts happen to share the same device (as can occur b
 - [Zoph2022] Zoph, B. et al., "ST-MoE: Designing Stable and Transferable Sparse Expert Models", arXiv:2202.08906, 2022.
 - [Clark2022] Clark, A. et al., "Unified Scaling Laws for Routed Language Models", ICML, 2022.
 - [Qwen3] Qwen Team, Alibaba Group, "Qwen3 Technical Report", 2025.
+
+---
+
+**Next:** [load_aware_assignment.md](./load_aware_assignment.md)

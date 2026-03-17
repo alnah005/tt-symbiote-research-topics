@@ -187,3 +187,7 @@ Alternative approaches — such as gathering all token embeddings to all devices
 - [Ch3Alt] Chapter 3, `ch03_alternative_routing_schemes/scheme_comparison_matrix.md` — alternative routing schemes including all-gather-based approaches.
 - [Ch7Capacity] Chapter 7, `capacity_factor_mechanics.md` — formal capacity factor definition and overflow handling.
 - [Ch7AuxFree] Chapter 7, `auxiliary_loss_free_inference.md` — inference-time load skew behavior.
+
+---
+
+**Next:** [qwen35b_config.md](./qwen35b_config.md)

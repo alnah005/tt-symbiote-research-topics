@@ -234,3 +234,7 @@ The all-to-all approach is preferred for Qwen3.5-35B primarily for buffer effici
 - [Ch2Dispatch] Chapter 2, `all_to_all_dispatch.md` — all-to-all dispatch implementation.
 - [Ch3ExpertSharding] Chapter 3, `ch03_alternative_routing_schemes/expert_sharding.md` — quantitative comparison of all-gather-based expert sharding.
 - [Ch2Overhead] Chapter 2, `dispatch_combine_overhead.md` — roofline analysis and batch-size threshold for T3K.
+
+---
+
+**Next:** [all_to_all_dispatch.md](./all_to_all_dispatch.md)

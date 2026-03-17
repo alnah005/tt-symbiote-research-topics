@@ -159,6 +159,6 @@ The $O(B \times k)$ rebuild cost is negligible compared to the matmul, so the no
 - `ch05_sparsity_tensor_construction/sparsity_tensor_placement.md` — sparsity tensor L1 sizing and placement
 - `ch05_sparsity_tensor_construction/constructing_from_router_output.md` — device-side construction procedure
 
-## Next Steps
+---
 
-Proceed to `decision_guide.md` for structured decision rules, runtime sparsity measurement utilities, the hybrid strategy implementation pattern, and anti-patterns to avoid.
+**Next:** [decision_guide.md](./decision_guide.md)

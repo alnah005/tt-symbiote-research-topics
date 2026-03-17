@@ -178,6 +178,6 @@ At decode ($B = 1$): the all-to-all cost (~0.26 ms × 2) dwarfs the expert compu
 - T3K guide: [collective_primitives.md](../../t3k_guide/ch02_ttnn_mesh_api/collective_primitives.md) — `ttnn.all_to_all` API reference
 - Expert Parallelism guide, Chapter 4 — assignment and load-balancing strategies
 
-## Next Steps
+---
 
-Proceed to [sharding_strategies.md](./sharding_strategies.md) for activation tensor distribution, expert weight placement in DRAM, and per-chip sparsity tensor construction.
+**Next:** [sharding_strategies.md](./sharding_strategies.md)

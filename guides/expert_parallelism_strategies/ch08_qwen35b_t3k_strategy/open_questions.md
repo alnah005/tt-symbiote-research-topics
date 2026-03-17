@@ -161,3 +161,7 @@ per-layer `ffn_type` or similar field. Cross-reference with any published archit
 - Chapter 6, `expert_ffn_tiling.md` — sparse_matmul threshold; INT4 arithmetic intensity (Q4)
 - Chapter 6, `pipeline_design.md` — TP+EP scheduling conflict (Q5)
 - Chapter 1, `qwen35b_config.md` — architectural constants including unverified D (Q6, Q7)
+
+---
+
+**End of guide.** Return to [Guide Index](../index.md)

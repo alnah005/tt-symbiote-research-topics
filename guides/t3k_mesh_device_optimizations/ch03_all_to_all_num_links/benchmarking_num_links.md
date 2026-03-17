@@ -269,3 +269,7 @@ Do not leave the `MeshDevice` open between benchmark runs or across Python sessi
 - Chapter 3, `num_links_parameter.md` — bandwidth model and the $T(n_l, V)$ formula with $\tau_{\text{setup}}$
 - Chapter 3, `all_to_all_in_moe.md` — per-hop volume derivation for Qwen3.5-35B
 - Chapter 6, `ttnn_profiler.md` — TTNN device-side profiler for sub-µs timing accuracy
+
+---
+
+**Next:** [Chapter 4 — Memory Config](../ch04_memory_config/index.md)

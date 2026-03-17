@@ -250,6 +250,6 @@ For MoE workloads, dual-queue dispatch can be used to overlap the next batch's t
 
 ---
 
-## Next Steps
+---
 
-Proceed to [matmul_fundamentals_in_ttnn.md](matmul_fundamentals_in_ttnn.md) to see how M, K, N dimensions are mapped onto the Tensix grid, what the 32×32 tile constraint means for program config parameters, and how to choose between `MatmulMultiCoreReuseMultiCastProgramConfig` and `MatmulMultiCoreProgramConfig` for MoE expert computations.
+**Next:** [matmul_fundamentals_in_ttnn.md](./matmul_fundamentals_in_ttnn.md)

@@ -116,3 +116,7 @@ See Chapter 6, `end_to_end_latency_model.md`.
 - Chapter 6, `expert_ffn_tiling.md` — core utilization and sparse_matmul applicability
 - Chapter 6, `pipeline_design.md` — double-buffer formula
 - Chapter 7, `capacity_factor_mechanics.md` — C formula; CF=1.25 default
+
+---
+
+**Next:** [recommended_configuration.md](./recommended_configuration.md)

@@ -394,6 +394,6 @@ All entries marked [UNVERIFIED] depend on the confirmed value of $D$. [D UNVERIF
 
 ---
 
-## Next Steps
+---
 
-Proceed to [performance_profile_batched.md](performance_profile_batched.md) to understand how the configs derived here translate to measured latency, and to learn when batched matmul is the preferred strategy versus the sparse approach covered in Chapter 4.
+**Next:** [performance_profile_batched.md](./performance_profile_batched.md)

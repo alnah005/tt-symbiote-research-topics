@@ -146,6 +146,6 @@ The non-monotonic property also implies that profiling at one $\rho$ value does 
 - `ch04_sparse_matmul_for_moe/sparse_matmul_internals.md` — tile-skip mechanics, metadata read cost, non-monotonic latency detail
 - `ch05_sparsity_tensor_construction/sparsity_tensor_placement.md` — sparsity tensor shape and sizing
 
-## Next Steps
+---
 
-Proceed to `memory_and_bandwidth_tradeoffs.md` for an analysis of DRAM bandwidth pressure, L1 footprint, and T3K multi-chip considerations for both approaches.
+**Next:** [memory_and_bandwidth_tradeoffs.md](./memory_and_bandwidth_tradeoffs.md)

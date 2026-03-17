@@ -268,6 +268,6 @@ So with `C = 1.25`, the sparsity ratio under the no-drop condition is `1 - 1/1.2
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`moe_on_hardware.md`](./moe_on_hardware.md) to understand how the structural properties defined in this section (variable load, data-dependent routing, sparse activation) translate into hardware efficiency challenges on Tenstorrent accelerators, and to get a first preview of the two TTNN strategies this guide evaluates.
+**Next:** [moe_on_hardware.md](./moe_on_hardware.md)

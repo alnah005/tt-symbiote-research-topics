@@ -214,6 +214,6 @@ This is small enough to replicate on all 8 devices. Each device needs the full r
 - Chapter 6: [decision_guide.md](../ch06_comparative_analysis/decision_guide.md) — hybrid strategy selection
 - T3K guide: [collective_primitives.md](../../t3k_guide/ch02_ttnn_mesh_api/collective_primitives.md) — `ttnn.all_to_all`
 
-## Next Steps
+---
 
-Proceed to [program_configs_t3k.md](./program_configs_t3k.md) for concrete per-chip program config derivations, grid utilization analysis, and worked examples for Qwen3.5-35B and Mixtral 8x7B.
+**Next:** [program_configs_t3k.md](./program_configs_t3k.md)

@@ -194,3 +194,7 @@ All API names below are [VERIFY].
 | Expert FFN | `ttnn.matmul` | $[C, H] \times [H, D]$ | $[C, D]$ (and back) |
 | Combine collective | `ttnn.all_to_all` | $[C \times E_d, H]$ per device | $[B, k, H]$ |
 | Residual add | `ttnn.add` | $[B, H]$ | $[B, H]$ |
+
+---
+
+**Next:** [troubleshooting_guide.md](./troubleshooting_guide.md)

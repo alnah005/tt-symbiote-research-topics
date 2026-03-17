@@ -162,3 +162,7 @@ Expert sharding is **not** preferred when $k < N$ (the all-to-all is cheaper in 
 - [Ch3Index] Chapter 3, `ch03_alternative_routing_schemes/index.md` — chapter overview and notation table.
 - [Ch4Uniform] Chapter 4, `ch04_expert_device_assignment/uniform_partitioning.md` — 32-experts-per-device assignment.
 - [Ch7Capacity] Chapter 7, `ch07_load_balancing/capacity_factor_mechanics.md` — capacity factor and token-dropping mechanics.
+
+---
+
+**Next:** [pipeline_expert_parallelism.md](./pipeline_expert_parallelism.md)

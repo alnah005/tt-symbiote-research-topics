@@ -169,3 +169,7 @@ The following conclusions follow from the T3K physical layout and Ethernet link 
 4. **Center link group saturation is the primary contention risk.** In asymmetric traffic patterns or concurrent collective operations, the link groups near the center of the chain (3↔4) saturate first. Symmetric expert placement and serialized collective dispatch are the primary mitigations.
 
 5. **Prefill and decode have different optimal `num_links` settings.** Large prefill tensors are throughput-bound and benefit from high `num_links`; small decode tensors are latency-bound and often perform better with low `num_links` due to reduced coordination overhead.
+
+---
+
+**Next:** [Chapter 2 — TTNN Mesh API](../ch02_ttnn_mesh_api/index.md)

@@ -338,3 +338,7 @@ def build_sparsity_tensor_vectorized(
 - `common_pitfalls.md` — P2 (partial tile rows), P3 (stale mask), P5 (wrong dtype), P6 (recompilation)
 - Chapter 1 — MoE routing, top-k selection, expert capacity definition
 - Chapter 4, `sparse_matmul_internals.md` — how the kernel consumes the mask
+
+---
+
+**Next:** [sparsity_tensor_placement.md](./sparsity_tensor_placement.md)

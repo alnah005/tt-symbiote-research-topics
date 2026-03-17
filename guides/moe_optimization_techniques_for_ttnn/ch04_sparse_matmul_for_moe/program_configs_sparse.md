@@ -313,3 +313,7 @@ All `per_core_N` and `out_subblock_w` entries marked [UNVERIFIED] depend on conf
 - Chapter 3, `program_configs_batched.md` §4.1–4.2 — Baseline decode and prefill configs compared throughout this file.
 - Chapter 2, `matmul_fundamentals_in_ttnn.md` — Config vocabulary, L1 budget formulas, subblock constraints.
 - Chapter 3, `performance_profile_batched.md` §4.3 — Program cache management for dynamic batch sizes.
+
+---
+
+**Next:** [Chapter 5 — Sparsity Tensor Construction](../ch05_sparsity_tensor_construction/index.md)

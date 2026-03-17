@@ -187,3 +187,7 @@ In practice, for most MoE inference workloads, BF16 accumulation with a fixed or
 - [Ch5WeightNorm] Chapter 5, `ch05_routing_weight_optimization/weight_normalization.md` — deferring weight normalization to the combine step.
 - [Ch6CombineAcc] Chapter 6, `ch06_fused_dispatch_compute_combine/combine_accumulation.md` — scatter-add accumulation implementation and parallelization.
 - [Ch7Capacity] Chapter 7, `ch07_load_balancing/capacity_factor_mechanics.md` — expert capacity $C$ and its effect on buffer sizing.
+
+---
+
+**Next:** [dispatch_combine_overhead.md](./dispatch_combine_overhead.md)

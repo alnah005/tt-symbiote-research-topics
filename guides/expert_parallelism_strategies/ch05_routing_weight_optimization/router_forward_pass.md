@@ -175,3 +175,7 @@ The difference is $\approx 0.0015$, which is larger than the BF16 rounding unit 
 - Micikevicius et al., "Mixed Precision Training," ICLR 2018. (BF16 precision analysis.)
 - Chapter 1 of this guide: `ch01_moe_fundamentals/routing_problem.md`.
 - Chapter 5 of this guide: `topk_selection_efficiency.md`, `weight_normalization.md`.
+
+---
+
+**Next:** [topk_selection_efficiency.md](./topk_selection_efficiency.md)

@@ -191,3 +191,7 @@ holding 448 KB of the accumulator), making FP32 accumulation practical even at d
 - TT-Metalium TTNN documentation: `ttnn.TensorMemoryLayout.HEIGHT_SHARDED`, BF16
   precision characteristics.
 - Wormhole B0 Architecture Guide: per-core L1 (1.5 MB), aggregate L1 (120 MB).
+
+---
+
+**Next:** [end_to_end_latency_model.md](./end_to_end_latency_model.md)

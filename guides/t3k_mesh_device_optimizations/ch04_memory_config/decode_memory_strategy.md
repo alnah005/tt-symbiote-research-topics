@@ -313,3 +313,7 @@ All sizes in BF16. KV cache estimate assumes $n_{\text{layers}}=64$, $n_{KV}=8$,
 - `prefill_memory_strategy.md` — Contrast with prefill phase, where larger tensors require DRAM
 - TT-NN source: `ttnn/cpp/ttnn/operations/eltwise/unary/` — example of `memory_config` propagation in unary ops
 - Tenstorrent technical note: MoE dispatch buffer sizing (internal)
+
+---
+
+**Next:** [prefill_memory_strategy.md](./prefill_memory_strategy.md)

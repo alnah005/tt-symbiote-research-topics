@@ -168,3 +168,7 @@ As established in the Precondition section, Qwen3.5-35B's parallel top-$k$ routi
 - [Ch3Index] Chapter 3, `ch03_alternative_routing_schemes/index.md` — chapter overview and notation.
 - [Ch3Sharding] Chapter 3, `ch03_alternative_routing_schemes/expert_sharding.md` — all-gather alternative.
 - [Ch6Pipeline] Chapter 6, `ch06_fused_dispatch_compute_combine/pipeline_design.md` — micro-batch pipelining of all-to-all collectives (distinct from pipeline expert parallelism).
+
+---
+
+**Next:** [hierarchical_routing.md](./hierarchical_routing.md)

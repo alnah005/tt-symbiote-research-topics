@@ -203,3 +203,7 @@ Had softmax been used instead, a typical top-8 selection might yield scores summ
 - Fedus et al., "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity," JMLR 2022.
 - Chapter 2 of this guide: `ch02_all_to_all_primitives/all_to_all_combine.md`.
 - Chapter 5 of this guide: `router_forward_pass.md`, `router_kernel_fusion.md`.
+
+---
+
+**Next:** [router_kernel_fusion.md](./router_kernel_fusion.md)

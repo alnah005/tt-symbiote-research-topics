@@ -205,3 +205,7 @@ analysis) and the remediation procedure, see `bottleneck_diagnosis_guide.md` Sec
 - `ch03_all_to_all_num_links/num_links_parameter.md` — `num_links` tuning and overhead model
 - `ch04_memory_config/decode_memory_strategy.md` — L1 budget estimation and placement decisions
 - `ttnn_profiler.md` — TTNN profiler setup (prerequisite for counter interpretation)
+
+---
+
+**Next:** [bottleneck_diagnosis_guide.md](./bottleneck_diagnosis_guide.md)

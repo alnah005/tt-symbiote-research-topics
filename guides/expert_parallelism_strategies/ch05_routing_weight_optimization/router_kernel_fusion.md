@@ -378,3 +378,7 @@ Before deploying INT8-quantized $W_r$, validate that the expert selection distri
 - Lepikhin et al., "GShard: Scaling Giant Models with Conditional Computation and Automatic Sharding," ICLR 2021.
 - Chapter 2 of this guide: `ch02_all_to_all_primitives/all_to_all_dispatch.md`, `ch02_all_to_all_primitives/all_to_all_combine.md`.
 - Chapter 5 of this guide: `router_forward_pass.md`, `topk_selection_efficiency.md`, `weight_normalization.md`.
+
+---
+
+**Next:** [Chapter 6 — Fused Dispatch Compute Combine](../ch06_fused_dispatch_compute_combine/index.md)

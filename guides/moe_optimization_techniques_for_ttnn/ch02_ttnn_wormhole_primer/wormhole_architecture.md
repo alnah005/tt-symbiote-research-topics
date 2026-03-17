@@ -186,6 +186,6 @@ At ~7.1 GB/s effective ethernet bandwidth, this is on the order of 2–3 ms per 
 
 ---
 
-## Next Steps
+---
 
-Proceed to [ttnn_programming_model.md](ttnn_programming_model.md) to see how TTNN's Python API maps onto the hardware structures described here, including how tensor memory placement interacts with L1 and DRAM, and how the op dispatch model uses the RISC-V processors described above.
+**Next:** [ttnn_programming_model.md](./ttnn_programming_model.md)

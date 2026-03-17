@@ -184,3 +184,7 @@ See Chapter 7, `dynamic_routing_strategies.md`.
 - Chapter 7, `capacity_overflow_handling.md` — Poisson overflow model; drop rate at B=32
 - Chapter 7, `load_imbalance_detection.md` — CV threshold; monitoring overhead
 - Chapter 7, `dynamic_routing_strategies.md` — score biases; inference-time balancing
+
+---
+
+**Next:** [open_questions.md](./open_questions.md)

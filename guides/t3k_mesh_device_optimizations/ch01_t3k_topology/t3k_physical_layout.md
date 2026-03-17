@@ -114,3 +114,7 @@ Three properties of this physical layout dominate all subsequent analysis in thi
 **Symmetric bandwidth.** The Ethernet links between adjacent device pairs on T3K are symmetric: the same number of link pairs connect devices 0↔1 as connect devices 3↔4 or any other adjacent pair. This means there is no "bottleneck edge" in the mesh for uniform traffic patterns, and ring collectives that distribute load evenly across all links are bandwidth-optimal.
 
 **Logical coordinate space matches physical adjacency.** Because device IDs increase monotonically from left to right and the `(1, 8)` logical mesh maps col=0 to col=7 in the same order, the logical coordinate distance between two devices equals their physical hop distance. A tensor shard on `(row=0, col=2)` is one hop away from `(row=0, col=3)` both logically and physically. This alignment simplifies reasoning about data locality and expert placement.
+
+---
+
+**Next:** [ethernet_link_bandwidth.md](./ethernet_link_bandwidth.md)

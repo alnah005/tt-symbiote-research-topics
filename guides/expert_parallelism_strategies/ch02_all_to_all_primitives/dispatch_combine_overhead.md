@@ -334,3 +334,7 @@ The analysis above indicates that on T3K, for the Qwen3.5-35B MoE configuration,
 - [Ch2Combine] Chapter 2, `all_to_all_combine.md` — combine buffer layout and accumulation step.
 - [Ch6Pipeline] Chapter 6, `ch06_fused_dispatch_compute_combine/pipeline_design.md` — overlapping communication and compute.
 - [Ch7Capacity] Chapter 7, `ch07_load_balancing/capacity_factor_mechanics.md` — formal analysis of capacity factor and token dropping trade-offs.
+
+---
+
+**Next:** [Chapter 3 — Alternative Routing Schemes](../ch03_alternative_routing_schemes/index.md)

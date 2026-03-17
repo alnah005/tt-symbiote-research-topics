@@ -192,3 +192,7 @@ The above is a heuristic starting point. The optimal value depends on the actual
 - Chapter 3, `all_to_all_in_moe.md` — data volume derivation for prefill and decode regimes
 - Chapter 3, `benchmarking_num_links.md` — empirical measurement procedure for $\tau_{\text{setup}}$ and optimal `num_links`
 - Chapter 6, `device_perf_counters.md` — Ethernet link utilization counters for contention detection
+
+---
+
+**Next:** [benchmarking_num_links.md](./benchmarking_num_links.md)

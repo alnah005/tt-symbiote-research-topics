@@ -223,3 +223,7 @@ For Qwen3.5-35B on T3K with $CF = 1.25$ and near-uniform routing, **hard drop** 
 - [Zoph2022] Zoph, B. et al., "ST-MoE: Designing Stable and Transferable Sparse Expert Models", arXiv:2202.08906, 2022.
 - [Lepikhin2021] Lepikhin, D. et al., "GShard: Scaling Giant Models with Conditional Computation and Automatic Sharding", ICLR, 2021.
 - [Qwen3] Qwen Team, Alibaba Group, "Qwen3 Technical Report", 2025.
+
+---
+
+**Next:** [dynamic_routing_strategies.md](./dynamic_routing_strategies.md)

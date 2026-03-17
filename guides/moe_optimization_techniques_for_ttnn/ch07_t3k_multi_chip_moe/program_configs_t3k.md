@@ -251,6 +251,6 @@ Qwen3.5-35B has 32 experts per device. Even with $C = 2$ (low token utilization)
 - [expert_parallelism_on_t3k.md](./expert_parallelism_on_t3k.md) — EP partitioning and all-to-all communication
 - [sharding_strategies.md](./sharding_strategies.md) — activation and weight tensor placement
 
-## Next Steps
+---
 
-Proceed to **Chapter 8** for end-to-end pipeline integration: scheduling multiple MoE layers across the T3K mesh, managing L1 and DRAM budgets across layers, and combining prefill and decode batching strategies in a single inference server.
+**Next:** [Chapter 8 — E2E Workflow and Troubleshooting](../ch08_e2e_workflow_and_troubleshooting/index.md)

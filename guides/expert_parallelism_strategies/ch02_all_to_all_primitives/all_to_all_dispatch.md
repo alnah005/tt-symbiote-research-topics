@@ -290,3 +290,7 @@ The output buffer after expert FFN has shape $[C \times E_d, H] = [8, H]$ — th
 - [Ch2Combine] Chapter 2, `all_to_all_combine.md` — inverse operation: routing expert outputs back to originating devices.
 - [Ch6FFNTiling] Chapter 6, `ch06_fused_dispatch_compute_combine/expert_ffn_tiling.md` — expert FFN kernel tiling and L1 management.
 - [Ch7Capacity] Chapter 7, `ch07_load_balancing/capacity_factor_mechanics.md` — formal definition of expert capacity $C$ and capacity factor $CF$.
+
+---
+
+**Next:** [all_to_all_combine.md](./all_to_all_combine.md)

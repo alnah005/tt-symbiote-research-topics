@@ -429,3 +429,7 @@ This amortized over 1,000 steps is typically a small fraction of per-step infere
 - [Fedus2022] Fedus, W., Zoph, B., Shazeer, N., "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity", JMLR, 2022.
 - [Zoph2022] Zoph, B. et al., "ST-MoE: Designing Stable and Transferable Sparse Expert Models", arXiv:2202.08906, 2022.
 - [Qwen3] Qwen Team, Alibaba Group, "Qwen3 Technical Report", 2025.
+
+---
+
+**Next:** [expert_replication.md](./expert_replication.md)

@@ -182,3 +182,7 @@ This is a fundamental inefficiency of dense-matmul kernels at very small token c
 - TT-Metalium TTNN documentation: Tensix matmul tiling, `TILE_SIZE`, L1 memory layout.
 - Wormhole B0 Architecture Guide: NoC bandwidth, L1 per core (1.5 MB), aggregate
   L1 (120 MB).
+
+---
+
+**Next:** [combine_accumulation.md](./combine_accumulation.md)

@@ -194,6 +194,6 @@ The sparsity tensor shape depends on $B$ (through expert capacity $C = \lceil k 
 - `ch05_sparsity_tensor_construction/sparsity_tensor_placement.md` — sparsity tensor L1 placement and lifecycle
 - `ch05_sparsity_tensor_construction/constructing_from_router_output.md` — per-step construction and update requirements
 
-## Next Steps
+---
 
-This completes Chapter 6. The hybrid strategy — batched matmul for prefill, sparse matmul for decode — is the recommended default for Qwen3.5-35B on T3K. Future chapters may address dynamic routing distributions, load balancing under non-uniform expert selection, and kernel fusion opportunities that combine the gather and matmul phases.
+**Next:** [Chapter 7 — T3K Multi-Chip MoE](../ch07_t3k_multi_chip_moe/index.md)

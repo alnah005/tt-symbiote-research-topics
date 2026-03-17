@@ -185,3 +185,7 @@ These schemes remain relevant for future model designs. Chapter 6, `ch06_fused_d
 - [Ch3Hierarchical] Chapter 3, `ch03_alternative_routing_schemes/hierarchical_routing.md` — two-level routing and load-balance challenges.
 - [Ch6Latency] Chapter 6, `ch06_fused_dispatch_compute_combine/end_to_end_latency_model.md` — formal crossover derivation for all-to-all vs. all-gather; referenced for $B^*$ threshold.
 - [Ch8Config] Chapter 8, `ch08_qwen35b_t3k_strategy/recommended_configuration.md` — final recommended configuration.
+
+---
+
+**Next:** [Chapter 4 — Expert Device Assignment](../ch04_expert_device_assignment/index.md)

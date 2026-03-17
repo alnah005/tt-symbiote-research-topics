@@ -158,6 +158,6 @@ def moe_ffn_naive(x, router, expert_w1s, expert_w2s, top_k):
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`routing_and_sparsity.md`](./routing_and_sparsity.md) for a precise treatment of how the router works, what expert capacity means, and how routing decisions determine the shape of all downstream computation.
+**Next:** [routing_and_sparsity.md](./routing_and_sparsity.md)

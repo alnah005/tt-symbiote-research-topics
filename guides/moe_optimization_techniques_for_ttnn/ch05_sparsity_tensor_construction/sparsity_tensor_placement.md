@@ -201,3 +201,7 @@ with ttnn.Trace(mesh_device) as trace:
 - `common_pitfalls.md` — P3 (stale mask), P4 (DRAM placement regression)
 - Chapter 4, `sparse_matmul_internals.md` — how the kernel reads the mask during execution
 - Chapter 2, TTNN Wormhole primer — L1 capacity (1.5 MB/core), memory config API, `ttnn.Trace` semantics
+
+---
+
+**Next:** [common_pitfalls.md](./common_pitfalls.md)

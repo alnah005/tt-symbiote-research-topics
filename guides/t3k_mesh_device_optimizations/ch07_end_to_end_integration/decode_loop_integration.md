@@ -357,3 +357,7 @@ to a compute-bound regime — investigate with `ch06_profiling/device_perf_count
 - `ch06_profiling/ttnn_profiler.md` — Profiler setup, CSV parsing, Tracy visualization
 - `ch06_profiling/bottleneck_diagnosis_guide.md` — Decode bottleneck categorization; remediation for communication-bound regime
 - `prefill_considerations.md` (this chapter) — Differences for prefill phase
+
+---
+
+**Next:** [prefill_considerations.md](./prefill_considerations.md)

@@ -129,3 +129,7 @@ For the decode path, per-device activations are $[C \times E_d, H]$ tokens at mo
 (the $B = 32$ case) and $E_d = 32$, this is $64 \times 7168 \times 2$ bytes $\approx 0.9$ MB,
 which fits in L1. The prefill path uses DRAM throughout because sequence-length activations are
 too large for L1.
+
+---
+
+**Next:** [inference_loop_structure.md](./inference_loop_structure.md)

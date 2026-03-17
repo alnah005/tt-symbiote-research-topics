@@ -227,3 +227,7 @@ new_mesh_device = ttnn.open_mesh_device(
     device_ids=[0, 1, 2, 3, 4, 5, 6, 7],
 )
 ```
+
+---
+
+**Next:** [tensor_distribution.md](./tensor_distribution.md)

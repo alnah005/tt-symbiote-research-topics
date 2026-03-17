@@ -337,3 +337,7 @@ For reference, see the all-to-all buffer sizing formula and table in the All-to-
 - Chapter 3 — `ch03_all_to_all_num_links/` — All-to-all bandwidth and buffer sizing background
 - Tenstorrent technical note: chunked prefill performance on T3K (internal)
 - TT-NN source: `ttnn/cpp/ttnn/operations/transformer/` — transformer op `memory_config` support
+
+---
+
+**Next:** [Chapter 5 — Expert Parallelism](../ch05_expert_parallelism/index.md)

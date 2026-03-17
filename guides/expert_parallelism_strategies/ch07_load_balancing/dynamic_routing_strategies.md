@@ -214,3 +214,7 @@ Given the model parameters ($E=256$, $k=8$, $N=8$, $CF=1.25$, $E_d=32$) and the 
 - [Zoph2022] Zoph, B. et al., "ST-MoE: Designing Stable and Transferable Sparse Expert Models", arXiv:2202.08906, 2022.
 - [Rajbhandari2022] Rajbhandari, S. et al., "DeepSpeed-MoE: Advancing Mixture-of-Experts Inference and Training to Power Next-Generation AI Scale", ICML, 2022.
 - [Qwen3] Qwen Team, Alibaba Group, "Qwen3 Technical Report", 2025.
+
+---
+
+**Next:** [Chapter 8 — Qwen3.5B T3K Strategy](../ch08_qwen35b_t3k_strategy/index.md)

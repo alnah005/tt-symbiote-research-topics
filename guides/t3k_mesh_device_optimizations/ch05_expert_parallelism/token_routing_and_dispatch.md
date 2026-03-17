@@ -284,3 +284,7 @@ recv_buffer = ttnn.all_to_all(
 - `expert_parallelism_strategies/ch05_routing_weight_optimization/router_forward_pass.md` — Router kernel fusion details
 - [Fedus2022] Fedus, W., Zoph, B., Shazeer, N., "Switch Transformers", JMLR, 2022.
 - [Lepikhin2021] Lepikhin, D. et al., "GShard: Scaling Giant Models with Conditional Computation and Automatic Sharding", ICLR, 2021.
+
+---
+
+**Next:** [combine_and_accumulation.md](./combine_and_accumulation.md)

@@ -285,3 +285,7 @@ not be caught unless PCC is checked against a reference at every step.
 - `ch04_memory_config/prefill_memory_strategy.md` — Prefill memory constraints
 - `ch05_expert_parallelism/expert_placement_strategies.md` — Expert placement as communication lever
 - Wormhole B0 architecture specification (internal) — Tensix BFP8_b throughput [UNVERIFIED]
+
+---
+
+**Next:** [Chapter 7 — End-to-End Integration](../ch07_end_to_end_integration/index.md)

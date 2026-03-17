@@ -215,3 +215,7 @@ An important point: $\rho$ depends only on the number of active expert slots rel
 - Chapter 3, `performance_profile_batched.md` §2.2 — Tile-level FLOP efficiency at decode; motivation for tile skipping.
 - Chapter 4, `when_sparse_matmul_wins.md` — Quantitative crossover analysis.
 - Chapter 4, `program_configs_sparse.md` — SparsityConfig and program config selection for sparse decode.
+
+---
+
+**Next:** [when_sparse_matmul_wins.md](./when_sparse_matmul_wins.md)

@@ -151,3 +151,7 @@ See `common_pitfalls.md`, P6 for symptoms and detection.
 - `constructing_from_router_output.md` — how to build a mask of this format from router top-k indices
 - `sparsity_tensor_placement.md` — L1 vs. DRAM placement analysis
 - `common_pitfalls.md` — P1 (shape), P2 (partial tiles), P4 (DRAM), P5 (dtype), P6 (recompilation)
+
+---
+
+**Next:** [constructing_from_router_output.md](./constructing_from_router_output.md)

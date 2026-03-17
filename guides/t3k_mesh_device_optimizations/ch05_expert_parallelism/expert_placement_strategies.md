@@ -280,3 +280,7 @@ Expert placement strategy does not change the optimal `num_links` value directly
 - `expert_parallelism_strategies/ch04_expert_device_assignment/expert_replication.md` — Replication factor formula, dispatch metadata requirements
 - [Fedus2022] Fedus, W., Zoph, B., Shazeer, N., "Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity", JMLR, 2022.
 - [Zoph2022] Zoph, B. et al., "ST-MoE: Designing Stable and Transferable Sparse Expert Models", arXiv:2202.08906, 2022.
+
+---
+
+**Next:** [token_routing_and_dispatch.md](./token_routing_and_dispatch.md)

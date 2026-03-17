@@ -510,3 +510,7 @@ def _check_preconditions(
 - `ch06_profiling/ttnn_profiler.md` — Profiler hooks for first-step profiling
 - [Qwen3] Qwen Team, Alibaba Group, "Qwen3 Technical Report", 2025.
 - [Fedus2022] Fedus, W., Zoph, B., Shazeer, N., "Switch Transformers", JMLR, 2022.
+
+---
+
+**Next:** [decode_loop_integration.md](./decode_loop_integration.md)

@@ -260,3 +260,7 @@ for your specific configuration.
 - `ch01_t3k_topology/ethernet_link_bandwidth.md` — Ethernet link bandwidth baseline (~12.5 GB/s per link)
 - `ch02_ttnn_mesh_api/collective_primitives.md` — `ttnn.all_to_all` API reference
 - `ch03_all_to_all_num_links/num_links_parameter.md` — `num_links` and bandwidth utilization
+
+---
+
+**Next:** [device_perf_counters.md](./device_perf_counters.md)

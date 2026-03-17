@@ -288,6 +288,6 @@ for token_idx in range(total_tokens):
 
 ---
 
-## Next Steps
+---
 
-Proceed to [program_configs_batched.md](program_configs_batched.md) to select and validate a `MatmulMultiCoreReuseMultiCastProgramConfig` for the shapes derived here, including L1 budget checks for both the decode ($C=1$) and prefill ($C=64$) regimes.
+**Next:** [program_configs_batched.md](./program_configs_batched.md)

@@ -365,3 +365,7 @@ The key principle: **one migration in at the start, one migration out at the end
 - Chapter 4 — `wormhole_memory_hierarchy.md`: L1 and DRAM hardware background
 - Chapter 4 — `decode_memory_strategy.md`: decode-phase placement decisions using this API
 - Chapter 4 — `prefill_memory_strategy.md`: prefill-phase placement decisions using this API
+
+---
+
+**Next:** [decode_memory_strategy.md](./decode_memory_strategy.md)

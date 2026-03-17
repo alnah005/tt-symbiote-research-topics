@@ -390,8 +390,6 @@ expert_output = ttnn.matmul(
 
 ---
 
-## Next Steps
+---
 
-You have now completed Chapter 2. The hardware model (Tensix cores, L1 vs. DRAM, NoC, T3K mesh), programming abstractions (tensor shapes, dtypes, memory configs, op dispatch, program caching), and matmul configuration vocabulary (`M_t`/`K_t`/`N_t`, `out_subblock_h`, `out_subblock_w`, program config selection) are fully established.
-
-Proceed to **Chapter 3 — Expert Tensor Parallelism** to see how these primitives combine to distribute MoE expert computations across the Tensix grid and across the T3K multi-chip mesh.
+**Next:** [Chapter 3 — Batched Matmul for MoE](../ch03_batched_matmul_for_moe/index.md)

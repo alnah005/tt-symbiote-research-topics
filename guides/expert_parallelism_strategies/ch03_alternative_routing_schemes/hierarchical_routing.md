@@ -161,3 +161,7 @@ Hierarchical routing is **not applicable** to Qwen3.5-35B on T3K in its off-the-
 - [Ch3Index] Chapter 3, `ch03_alternative_routing_schemes/index.md` — chapter overview and notation.
 - [Ch4LoadAware] Chapter 4, `ch04_expert_device_assignment/load_aware_assignment.md` — expert popularity profiling.
 - [Ch7AuxLoss] Chapter 7, `ch07_load_balancing/auxiliary_loss_free_inference.md` — inference-time load skew without auxiliary losses.
+
+---
+
+**Next:** [scheme_comparison_matrix.md](./scheme_comparison_matrix.md)
