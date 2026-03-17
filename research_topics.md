@@ -148,8 +148,3 @@ Findings: [Pending research]
 **Findings:**
 [Pending research - requires profiling on hardware]
 
-3. Is decode latency or prefill throughput the primary target?
-4. What batch sizes and sequence lengths represent your target workload?
-
-**Findings:**
-[Pending research - requires user input]
