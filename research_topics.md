@@ -119,3 +119,46 @@ This file tracks research topics that the Architect needs to investigate for mak
 3. Are there any known issues with TTNN paged attention?
 
 Findings: [Pending research]
+
+---
+
+## Tracy Profiling and MoE Forward Pass Analysis
+**Date:** 2026-03-17
+**Status:** Pending
+**Why Needed:** Need op-level breakdown of MoE forward pass to identify bottlenecks and understand where the 16ms gap occurs.
+**Questions:**
+1. Have you captured a Tracy trace or op-level breakdown of the MoE forward pass?
+2. What operations occur between expert dispatch and combine?
+3. Does the 16ms gap scale with sequence length?
+
+**Findings:**
+[Pending research - requires running Tracy profiler on actual hardware]
+
+---
+
+## SiLU Activation Latency Measurement
+**Date:** 2026-03-17
+**Status:** Pending
+**Why Needed:** Need to understand SiLU activation contribution to overall MoE latency.
+**Questions:**
+1. What is the current measured latency of the SiLU activation in MoE expert computation?
+2. How does SiLU latency compare to the matmul operations?
+3. Would fusing SiLU with matmul improve performance?
+
+**Findings:**
+[Pending research - requires profiling on hardware]
+
+---
+
+## Target Workload and Latency Requirements
+**Date:** 2026-03-17
+**Status:** Pending
+**Why Needed:** Need user-provided requirements to make optimization trade-offs.
+**Questions:**
+1. What is the target latency and minimum acceptable accuracy?
+2. Are there memory budget constraints (L1 or DRAM)?
+3. Is decode latency or prefill throughput the primary target?
+4. What batch sizes and sequence lengths represent your target workload?
+
+**Findings:**
+[Pending research - requires user input]
