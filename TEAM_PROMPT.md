@@ -48,10 +48,19 @@ cat /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics/research_
 
 ### Step 3: For EACH Topic the Plan Depends On (REQUIRED)
 
-| Cache Status | Action |
-|--------------|--------|
-| **HIT** (Status: Completed) | Read findings. Use them in plan. Do NOT re-add. |
-| **MISS** (absent or Pending) | Add topic with `Status: Pending` and push immediately. |
+> **What makes a good research topic?**
+> Topics must be **generic and reusable** — they should be broadly applicable across different tasks, not tied to one specific bug or feature. Ask yourself: *"Would another task in a different context ever need this answer?"* If not, do not add it.
+>
+> **Examples of good (reusable) topics:**
+> - "How does TTNN handle attention head splitting across multiple devices?"
+> - "What are the numerical precision trade-offs of bfloat16 vs float32 in TTNN matmuls?"
+>
+> **Examples of bad (task-specific) topics:**
+> - "Why is Qwen3.5-35B-A3B output garbled on T3K?"
+> - "What changed in commit abc123 that broke GLM flash?"
+
+- **Cache HIT** — topic exists with `Status: Completed`: read the findings and use them in the plan. Do not re-add the topic.
+- **Cache MISS** — topic is absent OR has `Status: Pending`: proceed using best-effort knowledge. **Do not stall or wait.** Append the topic to `research_topics.md` with `Status: Pending` and push:
 
 ### Step 4: Push Any New Topics (REQUIRED if cache miss)
 ```bash
@@ -85,6 +94,8 @@ This step is NON-NEGOTIABLE. Do not skip it.
 - Skipping cache lookup wastes effort re-discovering already-known information
 - Adding pending topics allows the research instance to prioritize work
 - The cache is shared across all team sessions
+
+> **Important:** The Architect only **poses the question** — it does NOT attempt to answer or fill in findings. Leave `Findings: TBD` and `Status: Pending`. The research instance answers it asynchronously. Continue planning immediately after pushing.
 
 ---
 
@@ -145,8 +156,9 @@ This step is NON-NEGOTIABLE. Do not skip it.
    - Success criteria
 
 2. **Research topics:** pushed to shared repo at `/home/ttuser/salnahari/research-topics/tt-symbiote-research-topics/research_topics.md` (if cache miss) with:
-   - Topic name and why it's needed
-   - Questions to answer
+   - Topic name (must be generic and reusable across tasks — not tied to the current bug/feature)
+   - Questions to answer (the Architect poses questions only — do NOT fill in answers or findings)
+   - Findings: TBD
    - Status: Pending (the research instance fills in Findings and sets Status: Completed)
 
 3. **Session notes:** Progress updates after each loop iteration
