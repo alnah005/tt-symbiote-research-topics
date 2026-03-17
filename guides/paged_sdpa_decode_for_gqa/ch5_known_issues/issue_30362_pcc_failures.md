@@ -103,3 +103,7 @@ for pos in bad_positions:
 Until the issue is resolved, validate across the full position range during
 initial bringup on new hardware or after any kernel update that touches
 block-address arithmetic.
+
+---
+
+**Next:** [`silent_shape_violations.md`](./silent_shape_violations.md)

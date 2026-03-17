@@ -195,8 +195,6 @@ If PCC falls below threshold, use these steps to narrow down the cause:
 
 > **Tip:** Run weight-level PCC validation for every expert weight at model load time and log the results. This creates a baseline record that can be compared against later if model output quality degrades after a TTNN version update or hardware configuration change.
 
-## Next Steps
+---
 
-This completes Chapter 2. You now have the full API picture: converting weights with `ttnn.as_tensor`, configuring compute kernels with `WormholeComputeKernelConfig`, understanding how dtype drives kernel dispatch in `ttnn.linear`, and validating accuracy with PCC checks.
-
-Proceed to **Chapter 3** for an analysis of the latency and memory trade-offs between bfloat8_b and bfloat4_b across different MoE model sizes, including measured throughput data on Wormhole T3K hardware.
+**Next:** [Chapter 3 — Accuracy Analysis for MoE Expert Quantization](../ch03_accuracy_analysis/index.md)

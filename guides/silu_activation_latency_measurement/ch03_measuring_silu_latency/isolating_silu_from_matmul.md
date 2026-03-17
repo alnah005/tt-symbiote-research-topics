@@ -162,6 +162,6 @@ ttnn.close_device(device)
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`measurement_methodology.md`](measurement_methodology.md) for the recommended input shapes, statistical protocol (median and p95 over 20+ iterations), and a complete pitfalls table covering all common measurement errors.
+**Next:** [`measurement_methodology.md`](./measurement_methodology.md)

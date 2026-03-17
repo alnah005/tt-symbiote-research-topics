@@ -102,6 +102,6 @@ For a full description of the `.tracy` binary and `tracy-csvexport` output forma
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`output_format.md`](output_format.md) to learn how to read and post-process both output files, compute inter-zone gaps, and understand how Tracy CPU timestamps relate to device profiler cycle counts.
+**Next:** [`output_format.md`](./output_format.md)

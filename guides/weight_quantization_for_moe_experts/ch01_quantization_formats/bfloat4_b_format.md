@@ -179,7 +179,6 @@ For trained transformer weights, the distribution within a single tile is typica
 
 ---
 
-## Next Steps
+---
 
-- [hardware_dtype_support.md](./hardware_dtype_support.md) — TTNN DataType enum, MathFidelity levels, `fp32_dest_acc_en`, and DRAM bandwidth analysis
-- Return to [index.md](./index.md) for the full format comparison table
+**Next:** [`hardware_dtype_support.md`](./hardware_dtype_support.md)

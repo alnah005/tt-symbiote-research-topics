@@ -116,3 +116,7 @@ Prefill workloads that process long prompts (128–2048 tokens) are compute-boun
 - Matmul transitions from memory-bound to compute-bound between M = 512 and M = 1024 for a 4096×8192 weight shape on Wormhole B0.
 - The practical fusion threshold is `num_tokens < 16`; above 64 tokens, SiLU latency is negligible relative to total FFN time.
 - In MoE decode (the primary workload), SiLU and elem_mul together represent 35–50% of FFN time and are the correct target for kernel fusion.
+
+---
+
+**Next:** [Chapter 5 — Fused Activation Strategies](../ch05_fused_activation_strategies/index.md)

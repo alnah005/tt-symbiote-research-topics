@@ -278,20 +278,6 @@ Run the regression test suite in these situations:
 | 4 | `throughput_profiling.md` | Per-op latency table; decode improvement quantified |
 | 5 (this file) | `iterative_tuning_guide.md` | Locked `ExpertQuantizationConfig`; passing perplexity; regression tests in CI |
 
-## Next Steps
+---
 
-Chapter 7 is the final chapter of this guide. For further reading and related resources:
-
-- **TTNN API reference** — `ttnn.as_tensor`, `ttnn.linear`, `WormholeComputeKernelConfig`
-  documentation at https://github.com/tenstorrent/tt-metal.
-- **Chapter 2, `compute_kernel_config_patterns.md`** — detailed MathFidelity impact
-  analysis with PCC vs. throughput trade-off tables.
-- **Chapter 4, `decode_vs_prefill_intensity.md`** — arithmetic intensity derivation for
-  the crossover batch size, used to determine whether throughput tuning will be effective.
-- **Chapter 6, `recommendations_and_decision_framework.md`** — the decision criteria
-  (accuracy budget, deployment regime, training history) that feed into the tuning tree
-  in this chapter.
-- **DeepSeek-V3 technical report** — the reference QAT-trained MoE model used as the
-  aggressive tier baseline throughout this guide.
-- **WikiText-2 dataset** (HuggingFace `datasets` library: `wikitext`, `wikitext-2-v1`)
-  — calibration dataset for the perplexity procedure.
+**End of guide.** Return to [Guide Index](../index.md)

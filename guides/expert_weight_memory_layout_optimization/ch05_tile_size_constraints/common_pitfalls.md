@@ -184,6 +184,4 @@ for expert_idx in range(num_experts):
 
 ---
 
-## Next Steps
-
-With all tile-alignment rules and failure modes covered, proceed to Chapter 6, `index.md`, to see how tile-valid shard configurations translate into quantified bandwidth gains and the conditions under which sharding provides the greatest performance improvement.
+**Next:** [Chapter 6 — Performance Analysis and Trade-offs](../ch06_performance_analysis_and_tradeoffs/index.md)

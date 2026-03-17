@@ -49,9 +49,9 @@ These approaches are **not mutually exclusive**. The recommended workflow for Mo
 
 This chapter contains three sections:
 
-1. **`device_profiler_api.md`** — How to enable and use the device profiler, what it records, and how to post-process the CSV output.
-2. **`annotating_your_code.md`** — How to add custom Tracy zone markers in Python for fine-grained timing of your own code sections.
-3. **`reading_op_timing_output.md`** — How to read the profiler output, interpret CSV columns, reconstruct total MoE time, and diagnose gaps.
+1. [`device_profiler_api.md`](./device_profiler_api.md) — How to enable and use the device profiler, what it records, and how to post-process the CSV output.
+2. [`annotating_your_code.md`](./annotating_your_code.md) — How to add custom Tracy zone markers in Python for fine-grained timing of your own code sections.
+3. [`reading_op_timing_output.md`](./reading_op_timing_output.md) — How to read the profiler output, interpret CSV columns, reconstruct total MoE time, and diagnose gaps.
 
 ---
 

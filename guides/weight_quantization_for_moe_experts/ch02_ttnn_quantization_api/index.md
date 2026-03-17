@@ -25,10 +25,10 @@ After completing this chapter you will be able to:
 
 | File | Topic |
 |---|---|
-| `weight_conversion.md` | Converting weights at checkpoint load time with `ttnn.as_tensor` |
-| `compute_kernel_config.md` | `WormholeComputeKernelConfig` fields and how they affect matmul precision |
-| `dtype_in_linear_and_matmul.md` | How weight dtype drives kernel dispatch inside `ttnn.linear` |
-| `validation_patterns.md` | Verifying conversion accuracy with Pearson Correlation Coefficient checks |
+| [`weight_conversion.md`](./weight_conversion.md) | Converting weights at checkpoint load time with `ttnn.as_tensor` |
+| [`compute_kernel_config.md`](./compute_kernel_config.md) | `WormholeComputeKernelConfig` fields and how they affect matmul precision |
+| [`dtype_in_linear_and_matmul.md`](./dtype_in_linear_and_matmul.md) | How weight dtype drives kernel dispatch inside `ttnn.linear` |
+| [`validation_patterns.md`](./validation_patterns.md) | Verifying conversion accuracy with Pearson Correlation Coefficient checks |
 
 ## Quick Reference: bfloat16 to bfloat4_b Conversion
 

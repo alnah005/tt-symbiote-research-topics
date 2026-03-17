@@ -39,9 +39,9 @@ By the end of this chapter you will be able to:
 
 | File | Contents |
 |---|---|
-| `wormhole_memory_hierarchy.md` | Physical DRAM topology, L1 per core, bandwidth figures, NoC model |
-| `memory_config_api.md` | `ttnn.MemoryConfig`, `BufferType`, `TensorMemoryLayout`, predefined configs, code patterns |
-| `interleaved_vs_sharded.md` | Page distribution mechanics, NoC contention, the reshard pattern |
+| [`wormhole_memory_hierarchy.md`](./wormhole_memory_hierarchy.md) | Physical DRAM topology, L1 per core, bandwidth figures, NoC model |
+| [`memory_config_api.md`](./memory_config_api.md) | `ttnn.MemoryConfig`, `BufferType`, `TensorMemoryLayout`, predefined configs, code patterns |
+| [`interleaved_vs_sharded.md`](./interleaved_vs_sharded.md) | Page distribution mechanics, NoC contention, the reshard pattern |
 
 Read the files in the order listed above. Each file assumes the concepts introduced in the files before it.
 

@@ -150,6 +150,4 @@ Despite having 16× more experts than Mixtral 8x7B, each Qwen expert is ~4× sma
 
 ---
 
-## Next Steps
-
-Continue to [`tensor_to_shard_grid_mapping.md`](./tensor_to_shard_grid_mapping.md) to learn the divisibility rules and grid selection guidelines for mapping these weight shapes to valid TTNN shard configurations.
+**Next:** [`tensor_to_shard_grid_mapping.md`](./tensor_to_shard_grid_mapping.md)

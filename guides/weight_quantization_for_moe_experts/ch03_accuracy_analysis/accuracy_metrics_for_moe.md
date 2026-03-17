@@ -81,3 +81,7 @@ can amplify or suppress the error unpredictably.
 
 **Validation protocol**: always measure both per-layer PCC AND end-to-end perplexity delta.
 Per-layer PCC tells you where the problem is; perplexity delta tells you whether it matters.
+
+---
+
+**Next:** [`projection_sensitivity.md`](./projection_sensitivity.md)

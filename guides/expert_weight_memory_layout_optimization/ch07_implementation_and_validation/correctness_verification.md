@@ -232,6 +232,4 @@ This can happen if the matmul output is silently cast to a lower-precision dtype
 
 ---
 
-## Next Steps
-
-Once PCC verification passes across all projections and multiple trials, proceed to `benchmark_methodology.md` to measure the actual latency and bandwidth improvement from DRAM-sharded weights versus interleaved, using a reproducible benchmark harness with Tracy profiler support.
+**Next:** [`benchmark_methodology.md`](./benchmark_methodology.md)

@@ -28,9 +28,9 @@ By the end of this chapter you should be able to:
 
 | File | Content |
 |---|---|
-| `cur_pos_definition.md` | Precise semantics, passing modes, and the `-1` sentinel |
-| `per_user_vs_shared.md` | Per-user independence, common mistakes with code examples |
-| `cur_pos_in_paged_mode.md` | Block selection, partial-block masking, Issue #30362 |
+| [`cur_pos_definition.md`](./cur_pos_definition.md) | Precise semantics, passing modes, and the `-1` sentinel |
+| [`per_user_vs_shared.md`](./per_user_vs_shared.md) | Per-user independence, common mistakes with code examples |
+| [`cur_pos_in_paged_mode.md`](./cur_pos_in_paged_mode.md) | Block selection, partial-block masking, Issue #30362 |
 
 ## Tensor Shape Reminder
 

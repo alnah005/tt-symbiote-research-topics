@@ -127,12 +127,4 @@ Run the workflow above to confirm these recommendations hold for your model's we
 
 ---
 
-## Next Steps
-
-This completes Chapter 2. You can now:
-
-- Characterize any MoE projection's fidelity tolerance using the PCC sweep template
-- Apply the step-down workflow to identify the lowest safe fidelity per projection
-- Use the decision table to quickly configure gate, up, and down projections for standard MoE expert shapes
-
-Proceed to **Chapter 3** (`ch3_fp32_dest_acc/`) for a deep dive into `fp32_dest_acc_en` — the accumulator precision field that is typically paired with HiFi2 for down projections, and which addresses a different class of rounding error than `math_fidelity`.
+**Next:** [Chapter 3 — `packer_l1_acc` — Throughput Effect](../ch3_packer_l1_acc/index.md)

@@ -116,7 +116,6 @@ This is the primary configuration used throughout this chapter. Key characterist
 
 ---
 
-## Next Steps
+---
 
-This chapter feeds directly into Chapter 5 (`ch5_identifying_gap/`), which uses this op sequence
-and latency table as the expected baseline when searching for the 16ms gap in a real Tracy trace.
+**Next:** [Chapter 5 — Identifying the 16ms Gap](../ch5_identifying_gap/index.md)

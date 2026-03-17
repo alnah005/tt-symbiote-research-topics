@@ -83,3 +83,7 @@ mem_config = ttnn.MemoryConfig(
 )
 weight_sharded = ttnn.to_memory_config(weight_tensor, mem_config)
 ```
+
+---
+
+**Next:** [`bandwidth_estimation.md`](./bandwidth_estimation.md)

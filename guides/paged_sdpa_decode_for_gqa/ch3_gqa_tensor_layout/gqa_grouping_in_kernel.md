@@ -105,6 +105,6 @@ effective_group_size = pnh // nkv_padded  # 32 // 8 = 4  ✓ matches original
 
 ---
 
-## Next Steps
+---
 
-Continue to [`paged_layout_for_gqa.md`](paged_layout_for_gqa.md) to see how the paged KV cache stores GQA tensors, and why writing expanded Q-head-count data into the cache is a common and silent correctness mistake.
+**Next:** [`paged_layout_for_gqa.md`](./paged_layout_for_gqa.md)

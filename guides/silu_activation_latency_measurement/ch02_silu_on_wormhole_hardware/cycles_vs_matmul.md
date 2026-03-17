@@ -170,6 +170,4 @@ sharding reduces absolute latency but does not change arithmetic intensity.
 
 ---
 
-**Next Steps:** Proceed to Chapter 3 (`ch03_measurement_methodology/`) to learn how to
-measure SiLU latency empirically using the TTNN profiler and device-side cycle counters,
-replacing these estimates with real numbers from your hardware.
+**Next:** [Chapter 3 — Measuring SiLU Latency](../ch03_measuring_silu_latency/index.md)

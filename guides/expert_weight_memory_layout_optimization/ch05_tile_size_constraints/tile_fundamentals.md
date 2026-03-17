@@ -99,6 +99,4 @@ The same arithmetic holds for `bfloat8_b` (1024-byte tiles) and `bfloat4_b` (512
 
 ---
 
-## Next Steps
-
-With the tile unit, zero-padding behavior, memory footprints, and tile-count notation established, proceed to `shard_shape_alignment_rules.md` for the five concrete rules that translate these fundamentals into valid `ShardSpec.shape` values.
+**Next:** [`shard_shape_alignment_rules.md`](./shard_shape_alignment_rules.md)

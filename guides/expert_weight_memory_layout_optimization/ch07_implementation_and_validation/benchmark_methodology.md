@@ -284,8 +284,4 @@ On T3K, each chip receives approximately `total_batch × top_k / num_experts` to
 
 ---
 
-## Next Steps
-
-With correctness verified (PCC > threshold) and performance benchmarked (latency and bandwidth measured across regimes), the DRAM-sharded expert weight configuration is validated for deployment. The complete guide — Chapters 1 through 7 — has now covered the full stack: from Wormhole memory architecture to tile alignment rules to a deployed, measured, and validated inference configuration.
-
-For further optimization, revisit Chapter 6, `tradeoff_matrix.md` for L1 pressure interaction guidance, and Chapter 4, `bandwidth_estimation.md` for the roofline model that predicts where future hardware generations or larger batch sizes will shift the compute/memory boundary.
+**End of guide.** Return to [Guide Index](../index.md)

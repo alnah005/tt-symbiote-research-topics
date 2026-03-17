@@ -122,3 +122,7 @@ assert cache_after_second == cache_after_first,    "unexpected recompile on seco
 If `cur_pos` is passed as a Python list (not `cur_pos_tensor`), a new compile
 is triggered for each unique `cur_pos` tuple.  Use `cur_pos_tensor` (device
 tensor) to avoid recompilation across positions.
+
+---
+
+**Next:** [Chapter 6 — Debugging Guide](../ch6_debugging/index.md)

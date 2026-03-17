@@ -313,8 +313,6 @@ it in the gap analysis document (Chapter 7 provides the full template):
 
 ---
 
-## Next Steps
+---
 
-Proceed to [Chapter 7: Interpretation and Next Steps](../ch7_interpretation_and_next_steps/index.md)
-to translate the scaling findings into prioritized optimization actions and document the full
-gap analysis for the optimization team.
+**Next:** [Chapter 7 — Interpretation and Next Steps](../ch7_interpretation_and_next_steps/index.md)

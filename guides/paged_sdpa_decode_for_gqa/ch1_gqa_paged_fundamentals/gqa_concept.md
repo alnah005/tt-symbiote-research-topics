@@ -153,6 +153,4 @@ The paged KV cache shape implications of this history are covered in `gqa_plus_p
 
 ---
 
-## Next Steps
-
-Continue to `paged_kv_cache_concept.md` to understand how the KV cache is physically stored in TTNN's paged block model.
+**Next:** [`paged_kv_cache_concept.md`](./paged_kv_cache_concept.md)

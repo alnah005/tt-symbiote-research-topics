@@ -92,3 +92,7 @@ def compare_dtypes(weight_cpu, input_cpu, device):
   representative calibration set.
 - Never use **bfloat4_b** for the down projection without a full perplexity evaluation
   showing ΔPPL < 1.5 on WikiText-2.
+
+---
+
+**Next:** [`qwen_vs_deepseek_accuracy_comparison.md`](./qwen_vs_deepseek_accuracy_comparison.md)

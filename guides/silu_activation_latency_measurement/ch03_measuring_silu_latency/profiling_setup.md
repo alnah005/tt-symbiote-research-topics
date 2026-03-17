@@ -125,6 +125,6 @@ ttnn.close_device(device)
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`isolating_silu_from_matmul.md`](isolating_silu_from_matmul.md) to learn the two strategies for measuring `ttnn.silu` independently from the gate_proj and element-wise multiply operations that surround it in an MoE forward pass.
+**Next:** [`isolating_silu_from_matmul.md`](./isolating_silu_from_matmul.md)

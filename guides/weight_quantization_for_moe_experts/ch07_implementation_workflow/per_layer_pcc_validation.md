@@ -304,8 +304,6 @@ threshold to keep total accumulated drift within acceptable bounds.
 
 ---
 
-## Next Steps
+---
 
-Proceed to `throughput_profiling.md` to measure the per-operation latency of the expert
-FFN using TTNN's device profiler and Tracy traces, and to compare decode vs. prefill
-throughput under bfloat16, bfloat8_b, and bfloat4_b gate/up configurations.
+**Next:** [`throughput_profiling.md`](./throughput_profiling.md)

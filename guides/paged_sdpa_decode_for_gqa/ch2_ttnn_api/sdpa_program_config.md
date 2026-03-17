@@ -174,3 +174,7 @@ this typically selects a large grid (e.g., `(8, 8)` = 64 cores). For a
 single-batch 4-KV-head model, 60 of those cores are idle but still participate
 in synchronization, adding measurable latency. Always provide an explicit
 `SDPAProgramConfig` for production inference paths.
+
+---
+
+**Next:** [Chapter 3 — GQA Tensor Layout](../ch3_gqa_tensor_layout/index.md)

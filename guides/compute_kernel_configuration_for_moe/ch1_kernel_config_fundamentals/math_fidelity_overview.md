@@ -148,13 +148,4 @@ This overview deliberately omits quantitative throughput multipliers and measure
 
 ---
 
-## Next Steps
-
-This completes Chapter 1. The four primary fields of `WormholeComputeKernelConfig` have been introduced:
-
-- `math_fidelity` — per-multiply mantissa precision (this file)
-- `fp32_dest_acc_en` — destination register accumulation precision (`fp32_dest_acc_en.md`)
-- `packer_l1_acc` — packer L1 vs. DRAM accumulation path (`wormhole_compute_kernel_config_api.md`)
-- `math_approx_mode` — SFPU transcendental approximation (`wormhole_compute_kernel_config_api.md`)
-
-Proceed to **Chapter 2** (`ch2_math_fidelity_levels/index.md`) for a full quantitative comparison of LoFi, HiFi2, and HiFi4 on MoE expert matmul shapes, including PCC data and the fidelity selection workflow.
+**Next:** [Chapter 2 — Math Fidelity Levels — LoFi vs HiFi2 vs HiFi4](../ch2_math_fidelity_levels/index.md)

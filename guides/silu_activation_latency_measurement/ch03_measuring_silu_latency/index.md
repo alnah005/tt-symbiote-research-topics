@@ -32,9 +32,9 @@ By the end of this chapter you will be able to:
 | File | Contents |
 |---|---|
 | `index.md` (this file) | Chapter overview, learning objectives, prerequisites |
-| `profiling_setup.md` | How to enable the TTNN profiler, what the CSV output contains, and warm-up requirements |
-| `isolating_silu_from_matmul.md` | Two strategies for measuring `ttnn.silu` in isolation from gate_proj matmul |
-| `measurement_methodology.md` | Recommended input shapes, statistical protocol, pitfalls table, and expected result ranges |
+| [`profiling_setup.md`](./profiling_setup.md) | How to enable the TTNN profiler, what the CSV output contains, and warm-up requirements |
+| [`isolating_silu_from_matmul.md`](./isolating_silu_from_matmul.md) | Two strategies for measuring `ttnn.silu` in isolation from gate_proj matmul |
+| [`measurement_methodology.md`](./measurement_methodology.md) | Recommended input shapes, statistical protocol, pitfalls table, and expected result ranges |
 
 ---
 

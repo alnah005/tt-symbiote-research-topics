@@ -73,3 +73,7 @@ For a standard MoE expert pass (gate → silu → element-wise multiply → down
 | Softmax, K=65536 | ~0.005–0.01 | Recommend `math_approx_mode=False` |
 
 The PCC delta for the MoE FFN path at typical input scales is effectively zero — the dominant accuracy lever is `math_fidelity` (LoFi vs HiFi2) and `fp32_dest_acc_en`, not `math_approx_mode`.
+
+---
+
+**Next:** [`approx_mode_for_moe.md`](./approx_mode_for_moe.md)

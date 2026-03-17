@@ -35,21 +35,19 @@ def ref_sdpa(Q, K, V, scale, is_causal=False):
 
 | Step | File | Cost | Catches |
 |------|------|------|---------|
-| 1 | `shape_validation_checklist.md` | seconds | wrong rank, bad GQA ratio, wrong axis ordering |
-| 2 | `cur_pos_validation.md` | minutes | off-by-one, batch scalar vs list, wrong block count |
-| 3 | `pcc_comparison_workflow.md` | minutes–hours | numerical divergence, layout bugs, boundary bugs |
-| 4 | `root_cause_isolation.md` | hours | paging logic vs attention logic vs kernel |
+| 1 | [`shape_validation_checklist.md`](./shape_validation_checklist.md) | seconds | wrong rank, bad GQA ratio, wrong axis ordering |
+| 2 | [`cur_pos_validation.md`](./cur_pos_validation.md) | minutes | off-by-one, batch scalar vs list, wrong block count |
+| 3 | [`pcc_comparison_workflow.md`](./pcc_comparison_workflow.md) | minutes–hours | numerical divergence, layout bugs, boundary bugs |
+| 4 | [`root_cause_isolation.md`](./root_cause_isolation.md) | hours | paging logic vs attention logic vs kernel |
 
 ## File Map
 
-```
-ch6_debugging/
-├── index.md                      ← this file
-├── shape_validation_checklist.md ← Step 1: tensor shape audit
-├── cur_pos_validation.md         ← Step 2: cur_pos correctness
-├── pcc_comparison_workflow.md    ← Step 3: numerical comparison
-└── root_cause_isolation.md       ← Step 4: root cause flowchart
-```
+| File | Content |
+|------|---------|
+| [`shape_validation_checklist.md`](./shape_validation_checklist.md) | Step 1: tensor shape audit |
+| [`cur_pos_validation.md`](./cur_pos_validation.md) | Step 2: cur_pos correctness |
+| [`pcc_comparison_workflow.md`](./pcc_comparison_workflow.md) | Step 3: numerical comparison |
+| [`root_cause_isolation.md`](./root_cause_isolation.md) | Step 4: root cause flowchart |
 
 ## Tensor Shape Quick Reference
 

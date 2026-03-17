@@ -172,8 +172,6 @@ whether the device profiler shows the device actively executing during the "barr
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`experiment_design.md`](./experiment_design.md) to learn how to design and
-automate the controlled `seq_len` sweep that will empirically confirm or refute the scaling
-predictions made in this file.
+**Next:** [`experiment_design.md`](./experiment_design.md)

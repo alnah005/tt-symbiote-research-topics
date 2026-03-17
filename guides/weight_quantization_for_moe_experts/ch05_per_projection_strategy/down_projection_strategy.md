@@ -192,8 +192,6 @@ def expert_down_projection(inter_tt, w2_tt):
 | Decode BW vs. bfloat16 | 0.5× |
 | Fallback if PCC < 0.975 | bfloat8_b + HiFi4, or bfloat16 for down projection only |
 
-## Next Steps
+---
 
-Continue to `mixed_precision_memory_layout.md` to see how gate, up, and down projection
-weight tensors with different dtypes are organised in a single MoE module, including the
-total DRAM footprint calculation for Qwen 235B-A22B on a T3K system.
+**Next:** [`mixed_precision_memory_layout.md`](./mixed_precision_memory_layout.md)

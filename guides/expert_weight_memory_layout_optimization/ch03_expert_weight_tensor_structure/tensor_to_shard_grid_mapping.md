@@ -208,6 +208,4 @@ Use this checklist when deriving a shard grid for any expert weight tensor:
 
 ---
 
-## Next Steps
-
-Continue to [`dtype_and_tile_layout.md`](./dtype_and_tile_layout.md) for dtype size tables, the tile layout requirement for `ttnn.matmul`, padding implications, and byte-accurate per-expert memory footprint calculations.
+**Next:** [`dtype_and_tile_layout.md`](./dtype_and_tile_layout.md)

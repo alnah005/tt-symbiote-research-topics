@@ -331,6 +331,4 @@ def expert_ffn_forward_with_l1_stage(hidden_states, gate_w_dram, up_w_dram, down
 
 ---
 
-## Next Steps
-
-Proceed to `correctness_verification.md` to verify that the resharded weights produce numerically correct outputs by comparing PCC between interleaved and DRAM-sharded inference runs. Only after PCC is confirmed should you proceed to `benchmark_methodology.md` to measure performance.
+**Next:** [`correctness_verification.md`](./correctness_verification.md)

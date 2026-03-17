@@ -24,15 +24,15 @@ and an end-to-end implementation workflow with PCC validation gates.
 
 ## Chapter Table
 
-| # | Title | What you learn |
-|---|---|---|
-| 1 | Quantization Formats on Wormhole: bfloat16, bfloat8_b, bfloat4_b | Binary layout of each format, block floating-point semantics, TTNN dtype constants, tile memory footprints, throughput ceilings |
-| 2 | TTNN Quantization API | `ttnn.as_tensor` dtype/layout arguments, `WormholeComputeKernelConfig` construction, LoFi and HiFi2 configs, T3K shard mapping |
-| 3 | Accuracy Analysis for MoE Expert Quantization | PCC as the primary correctness metric, per-projection sensitivity ordering (down > gate > up), per-dtype PCC ranges, model-family differences |
-| 4 | Throughput and Memory Bandwidth Impact | Roofline model for decode (memory-bound) vs. prefill (compute-bound), DRAM read volume reduction, MathFidelity pass counts, tile efficiency |
-| 5 | Per-Projection Quantization Strategy | Why gate/up tolerate `bfloat4_b` + LoFi and down requires `bfloat8_b` + HiFi2; DRAM layout for mixed-precision expert tensors; Qwen weight conversion guide |
-| 6 | Comparative Study: DeepSeek-V3 vs. Qwen | Production DeepSeek-V3 design vs. Qwen bfloat16 baseline; the 16ms decode gap; three-criterion decision framework; recommended Qwen starting point |
-| 7 | Implementation and Validation Workflow | Five-step workflow: baseline measurement, weight conversion, per-layer PCC validation, throughput profiling, iterative tuning and regression locking |
+| Chapter | What you learn |
+|---|---|
+| [Ch 1 — Quantization Formats on Wormhole](ch01_quantization_formats/index.md) | Binary layout of each format, block floating-point semantics, TTNN dtype constants, tile memory footprints, throughput ceilings |
+| [Ch 2 — TTNN Quantization API](ch02_ttnn_quantization_api/index.md) | `ttnn.as_tensor` dtype/layout arguments, `WormholeComputeKernelConfig` construction, LoFi and HiFi2 configs, T3K shard mapping |
+| [Ch 3 — Accuracy Analysis for MoE Expert Quantization](ch03_accuracy_analysis/index.md) | PCC as the primary correctness metric, per-projection sensitivity ordering (down > gate > up), per-dtype PCC ranges, model-family differences |
+| [Ch 4 — Throughput and Memory Bandwidth Impact](ch04_throughput_impact/index.md) | Roofline model for decode (memory-bound) vs. prefill (compute-bound), DRAM read volume reduction, MathFidelity pass counts, tile efficiency |
+| [Ch 5 — Per-Projection Quantization Strategy](ch05_per_projection_strategy/index.md) | Why gate/up tolerate `bfloat4_b` + LoFi and down requires `bfloat8_b` + HiFi2; DRAM layout for mixed-precision expert tensors; Qwen weight conversion guide |
+| [Ch 6 — Comparative Study: DeepSeek-V3 vs. Qwen](ch06_comparative_study/index.md) | Production DeepSeek-V3 design vs. Qwen bfloat16 baseline; the 16ms decode gap; three-criterion decision framework; recommended Qwen starting point |
+| [Ch 7 — Implementation and Validation Workflow](ch07_implementation_workflow/index.md) | Five-step workflow: baseline measurement, weight conversion, per-layer PCC validation, throughput profiling, iterative tuning and regression locking |
 
 ---
 

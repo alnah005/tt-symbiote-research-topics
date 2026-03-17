@@ -75,3 +75,7 @@ See `index.md` § Key Config Reference for the canonical `COMPUTE_KERNEL_CONFIG_
 The HiFi2 config is shared across the broader model, including attention softmax and layer norm, both of which use SFPU ops (`exp`, `reciprocal`). The throughput gain from polynomial approximation is measurable in these fused kernels, and the error is within acceptable bounds for bfloat16 accumulation. Setting `math_approx_mode=True` is intentional for this config.
 
 See `index.md` § Key Config Reference for the canonical `COMPUTE_KERNEL_CONFIG_HIFI2` definition.
+
+---
+
+**Next:** [`approx_mode_accuracy_risks.md`](./approx_mode_accuracy_risks.md)

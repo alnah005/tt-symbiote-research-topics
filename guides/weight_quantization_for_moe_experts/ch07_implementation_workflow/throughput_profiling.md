@@ -275,8 +275,6 @@ increases available DRAM for KV cache, reducing eviction pressure.
 
 ---
 
-## Next Steps
+---
 
-Proceed to `iterative_tuning_guide.md` to apply the profiling results and PCC reports
-to the tuning decision tree, run calibration perplexity, and lock in the final per-
-projection configuration for regression testing.
+**Next:** [`iterative_tuning_guide.md`](./iterative_tuning_guide.md)

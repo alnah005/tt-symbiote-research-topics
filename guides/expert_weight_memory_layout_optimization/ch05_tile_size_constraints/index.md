@@ -48,9 +48,9 @@ Use this checklist before calling `ttnn.to_memory_config` with a sharded layout.
 
 | File | Contents |
 |---|---|
-| `tile_fundamentals.md` | 32×32 tile unit; zero-padding behavior; tile memory footprints by dtype; tile-count notation |
-| `shard_shape_alignment_rules.md` | Five alignment rules with consequences; worked derivation for Mixtral gate projection |
-| `common_pitfalls.md` | Five pitfalls that produce errors or silent misalignment; diagnostic guidance |
+| [`tile_fundamentals.md`](./tile_fundamentals.md) | 32×32 tile unit; zero-padding behavior; tile memory footprints by dtype; tile-count notation |
+| [`shard_shape_alignment_rules.md`](./shard_shape_alignment_rules.md) | Five alignment rules with consequences; worked derivation for Mixtral gate projection |
+| [`common_pitfalls.md`](./common_pitfalls.md) | Five pitfalls that produce errors or silent misalignment; diagnostic guidance |
 
 ---
 

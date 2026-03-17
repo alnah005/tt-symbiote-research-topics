@@ -168,6 +168,4 @@ Is this projection's output used directly in the residual stream (down projectio
 
 ---
 
-## Next Steps
-
-Read `math_fidelity_overview.md` for a description of the `math_fidelity` enum values, what mantissa bits each level presents to the multiplier, and the throughput/accuracy intuition needed before Chapter 2's full comparative analysis.
+**Next:** [`math_fidelity_overview.md`](./math_fidelity_overview.md)

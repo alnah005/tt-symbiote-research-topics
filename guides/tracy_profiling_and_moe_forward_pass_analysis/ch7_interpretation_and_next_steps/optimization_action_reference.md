@@ -312,21 +312,6 @@ print(f"PCC: {pcc:.6f}  PASS")
 
 ---
 
-## Next Steps
+---
 
-This is the final file of the guide. You have now covered the full investigation loop:
-collecting Tracy and device profiler data (Chapters 1–3), mapping the MoE op sequence and
-expected performance (Chapter 4), attributing gaps to specific patterns (Chapter 5),
-quantifying scaling behavior (Chapter 6), and translating findings into concrete optimization
-actions with validation criteria (Chapter 7).
-
-For related guides that build on this material, see:
-
-- **Qwen 235B MoE Optimization Plan** — applies the gap analysis methodology to the specific
-  16ms gap observed in the Qwen 235B-A22B model on T3K, with detailed implementation notes
-  for the synchronization barrier and CCL overlap fixes.
-- **T3K Expert Parallelism Configuration Guide** — covers `ep_degree` selection, CCL topology,
-  and weight sharding strategies for large MoE models on the 8-chip Wormhole mesh.
-- **TTNN Program Cache and Trace Capture Reference** — comprehensive API reference for
-  `ttnn.enable_program_cache`, `ttnn.begin_trace_capture`, and related functions, including
-  multi-device and multi-queue configurations not covered in this guide.
+**End of guide.** Return to [Guide Index](../index.md)

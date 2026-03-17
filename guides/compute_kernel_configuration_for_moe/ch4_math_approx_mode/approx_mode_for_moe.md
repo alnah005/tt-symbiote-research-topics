@@ -70,3 +70,7 @@ COMPUTE_KERNEL_CONFIG_SAFE = WormholeComputeKernelConfig(
     packer_l1_acc=True,
 )
 ```
+
+---
+
+**Next:** [Chapter 5 — MoE Expert Matmul Configuration](../ch5_moe_expert_matmul_config/index.md)

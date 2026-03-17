@@ -67,3 +67,7 @@ The fix requires adding two config objects and passing them to three matmul call
 ## Why the Default Exists
 
 Device defaults are conservative: `packer_l1_acc=False` avoids any risk of L1 overflow for unexpected tensor shapes or large `per_core_N` tile counts. For production MoE models where the shapes are known and the L1 budget has been verified, overriding the default with `packer_l1_acc=True` is safe and beneficial. DeepSeek-V3's explicit config definitions are the model to follow.
+
+---
+
+**Next:** [`applying_configs_to_qwen.md`](./applying_configs_to_qwen.md)

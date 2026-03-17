@@ -86,9 +86,9 @@ For the authoritative LOFI and HIFI2 constructor definitions with all field valu
 
 | File | Contents |
 |---|---|
-| `deepseek_v3_quantization_design.md` | DeepSeek-V3 dtype and kernel config per projection; training context (FP8/bfloat4 QAT); PCC outcome ~0.97; memory and throughput gains |
-| `qwen_bfloat16_baseline.md` | Qwen 235B-A22B bfloat16 baseline; memory cost analysis; throughput cost; the 16ms gap motivation |
-| `recommendations_and_decision_framework.md` | Three decision criteria; recommended starting point; fallback conditions |
+| [`deepseek_v3_quantization_design.md`](./deepseek_v3_quantization_design.md) | DeepSeek-V3 dtype and kernel config per projection; training context (FP8/bfloat4 QAT); PCC outcome ~0.97; memory and throughput gains |
+| [`qwen_bfloat16_baseline.md`](./qwen_bfloat16_baseline.md) | Qwen 235B-A22B bfloat16 baseline; memory cost analysis; throughput cost; the 16ms gap motivation |
+| [`recommendations_and_decision_framework.md`](./recommendations_and_decision_framework.md) | Three decision criteria; recommended starting point; fallback conditions |
 
 ## Next Steps
 

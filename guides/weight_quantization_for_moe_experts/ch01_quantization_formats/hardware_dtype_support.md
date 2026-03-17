@@ -180,10 +180,6 @@ Is the layer a MoE expert projection?
 
 ---
 
-## Next Steps
+---
 
-This chapter has covered the three Wormhole quantization formats and their hardware integration. Continue to:
-
-- **Chapter 2** — Casting and Converting Expert Weights in TTNN (loading checkpoints, in-place casting, validating with PCC)
-- **Chapter 3** — MathFidelity and Compute Kernel Configuration (deeper dive into kernel tuning for MoE throughput)
-- Return to [index.md](./index.md) for the chapter overview and navigation
+**Next:** [Chapter 2 — TTNN Quantization API](../ch02_ttnn_quantization_api/index.md)

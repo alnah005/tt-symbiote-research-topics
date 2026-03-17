@@ -118,4 +118,8 @@ def measure_projection_pcc(x, w, quant_dtype, math_fidelity, device):
 
     # compute_pcc defined in accuracy_metrics_for_moe.md
     return compute_pcc(ref_out, out)
+
+---
+
+**Next:** [`bfloat16_vs_bfloat8_vs_bfloat4_accuracy.md`](./bfloat16_vs_bfloat8_vs_bfloat4_accuracy.md)
 ```

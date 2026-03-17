@@ -105,3 +105,7 @@ Escalate to a kernel bug report only after confirming all of the following:
 6. Self-contained Python script that reproduces the failure on a single device.
 
 File the issue with the tt-metal repo and tag the attention kernel owners.
+
+---
+
+**End of guide.** Return to [Guide Index](../index.md)

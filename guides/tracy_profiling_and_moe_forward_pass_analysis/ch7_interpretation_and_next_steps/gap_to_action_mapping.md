@@ -316,9 +316,6 @@ prefill `seq_len`.
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`writing_a_gap_analysis.md`](./writing_a_gap_analysis.md) to structure the
-findings from Chapters 5, 6, and this mapping into a shareable document with the seven-section
-template. Include the prioritized backlog table above as the final section of your gap
-analysis.
+**Next:** [`writing_a_gap_analysis.md`](./writing_a_gap_analysis.md)

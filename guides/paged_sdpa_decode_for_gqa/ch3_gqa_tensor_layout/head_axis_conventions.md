@@ -67,6 +67,6 @@ The shapes `[nkv x b x S x dh]` and `[b x nkv x S x dh]` can have identical tota
 
 ---
 
-## Next Steps
+---
 
-Continue to [`gqa_grouping_in_kernel.md`](gqa_grouping_in_kernel.md) to see how the Flash-Decode kernel uses the axis ordering established here to map Q heads onto KV heads, and how padding can silently collapse GQA into MHA behavior.
+**Next:** [`gqa_grouping_in_kernel.md`](./gqa_grouping_in_kernel.md)

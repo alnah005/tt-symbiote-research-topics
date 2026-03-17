@@ -154,6 +154,6 @@ Tracy is an instrumentation-based, low-overhead C++ profiler that records named 
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`tracy_vs_device_profiler.md`](tracy_vs_device_profiler.md) to understand how Tracy compares to the TTNN device profiler, what each tool can and cannot see, and how to combine them for MoE forward-pass gap analysis.
+**Next:** [`tracy_vs_device_profiler.md`](./tracy_vs_device_profiler.md)

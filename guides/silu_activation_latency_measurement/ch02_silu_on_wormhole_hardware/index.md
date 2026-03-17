@@ -32,9 +32,9 @@ By the end of this chapter you will be able to:
 
 | File | Topic |
 |---|---|
-| `tensix_compute_engine.md` | Tensix core architecture: RISC-V, FPU, and SFPU pipelines |
-| `silu_sfpu_execution.md` | How SiLU decomposes into SFPU LLK instructions; the 32-pass constraint |
-| `cycles_vs_matmul.md` | SFPU cycle cost of SiLU versus FPU matmul cost; roofline placement |
+| [`tensix_compute_engine.md`](./tensix_compute_engine.md) | Tensix core architecture: RISC-V, FPU, and SFPU pipelines |
+| [`silu_sfpu_execution.md`](./silu_sfpu_execution.md) | How SiLU decomposes into SFPU LLK instructions; the 32-pass constraint |
+| [`cycles_vs_matmul.md`](./cycles_vs_matmul.md) | SFPU cycle cost of SiLU versus FPU matmul cost; roofline placement |
 
 ---
 

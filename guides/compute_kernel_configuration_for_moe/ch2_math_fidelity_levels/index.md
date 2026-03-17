@@ -37,17 +37,17 @@ For the full fidelity comparison with K_t and PCC data, see `fidelity_selection_
 | File | Contents |
 |---|---|
 | `index.md` (this file) | Chapter overview, learning objectives, decision table, reading order |
-| `fidelity_precision_model.md` | What math fidelity controls in the FPU; throughput and PCC characterization table |
-| `fidelity_and_moe_accuracy.md` | Why gate/up projections tolerate LoFi; why down projections need HiFi2; K-loop depth and rounding accumulation; PCC measurement in Python |
-| `fidelity_selection_workflow.md` | Step-by-step workflow for choosing fidelity for a new MoE model; parameterized PCC sweep template; decision thresholds |
+| [`fidelity_precision_model.md`](./fidelity_precision_model.md) | What math fidelity controls in the FPU; throughput and PCC characterization table |
+| [`fidelity_and_moe_accuracy.md`](./fidelity_and_moe_accuracy.md) | Why gate/up projections tolerate LoFi; why down projections need HiFi2; K-loop depth and rounding accumulation; PCC measurement in Python |
+| [`fidelity_selection_workflow.md`](./fidelity_selection_workflow.md) | Step-by-step workflow for choosing fidelity for a new MoE model; parameterized PCC sweep template; decision thresholds |
 
 ---
 
 ## Reading Order
 
-1. `fidelity_precision_model.md` — establish the quantitative characterization of each fidelity level
-2. `fidelity_and_moe_accuracy.md` — understand why different MoE projections map to different fidelity levels
-3. `fidelity_selection_workflow.md` — apply the selection process to a new model
+1. [`fidelity_precision_model.md`](./fidelity_precision_model.md) — establish the quantitative characterization of each fidelity level
+2. [`fidelity_and_moe_accuracy.md`](./fidelity_and_moe_accuracy.md) — understand why different MoE projections map to different fidelity levels
+3. [`fidelity_selection_workflow.md`](./fidelity_selection_workflow.md) — apply the selection process to a new model
 
 ---
 

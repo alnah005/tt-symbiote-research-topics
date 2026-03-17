@@ -21,8 +21,8 @@ Readers are expected to arrive with the following background. If any item is unf
 
 | File | Topic |
 |---|---|
-| `what_is_tracy.md` | Tracy's origins, data model, two-process architecture, and how tt-metal instruments itself with Tracy macros |
-| `tracy_vs_device_profiler.md` | The distinction between Tracy (CPU-side host timing) and the TTNN device profiler (on-device kernel timing), and how to combine them |
+| [`what_is_tracy.md`](./what_is_tracy.md) | Tracy's origins, data model, two-process architecture, and how tt-metal instruments itself with Tracy macros |
+| [`tracy_vs_device_profiler.md`](./tracy_vs_device_profiler.md) | The distinction between Tracy (CPU-side host timing) and the TTNN device profiler (on-device kernel timing), and how to combine them |
 
 ---
 

@@ -34,9 +34,9 @@ You do **not** need to know TTNN Flash-Decode internals; those are introduced in
 
 | File | Contents |
 |------|----------|
-| `gqa_concept.md` | MHA/MQA/GQA definitions; the `nh = nkv * group_size` invariant; memory reduction; broadcast vs. native implementations; historical `repeat_interleave` workaround |
-| `paged_kv_cache_concept.md` | Paged block model; supported block sizes; `page_table_tensor` shape and semantics; contiguous vs. paged K/V tensor shapes; motivation for long-context decode |
-| `gqa_plus_paging_interaction.md` | How paged storage and GQA interact; the `max_num_blocks` invariant; common mistake: expanding KV heads before writing to cache |
+| [`gqa_concept.md`](./gqa_concept.md) | MHA/MQA/GQA definitions; the `nh = nkv * group_size` invariant; memory reduction; broadcast vs. native implementations; historical `repeat_interleave` workaround |
+| [`paged_kv_cache_concept.md`](./paged_kv_cache_concept.md) | Paged block model; supported block sizes; `page_table_tensor` shape and semantics; contiguous vs. paged K/V tensor shapes; motivation for long-context decode |
+| [`gqa_plus_paging_interaction.md`](./gqa_plus_paging_interaction.md) | How paged storage and GQA interact; the `max_num_blocks` invariant; common mistake: expanding KV heads before writing to cache |
 
 ---
 

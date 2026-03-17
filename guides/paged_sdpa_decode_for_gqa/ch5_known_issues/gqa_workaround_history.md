@@ -91,3 +91,7 @@ and pass the `[b x nkv x s x dh]` tensor directly.
 | Pre-#12330, with workaround | `[b x nh x s x dh]` | MHA path; no GQA sharing | Yes (functionally correct, expensive) |
 | Post-#12330, no workaround | `[b x nkv x s x dh]` | Native GQA; `group_size` applied | Yes |
 | Post-#12330, workaround left in | `[b x nh x s x dh]` | Native GQA with `group_size = 1` | No — silently MQA |
+
+---
+
+**Next:** [`program_cache_issues.md`](./program_cache_issues.md)

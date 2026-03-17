@@ -142,6 +142,6 @@ stacked_tt = ttnn.as_tensor(
 
 TTNN automatically dequantizes quantized weights during the matmul kernel; see `dtype_in_linear_and_matmul.md` for the full dequantization path.
 
-## Next Steps
+---
 
-Continue to `compute_kernel_config.md` to understand how `WormholeComputeKernelConfig` controls the precision of the multiply-accumulate operations that process the dequantized weight tiles.
+**Next:** [`compute_kernel_config.md`](./compute_kernel_config.md)

@@ -128,6 +128,6 @@ For Wormhole B0 hardware constants and SiLU arithmetic intensity context, see Ch
 
 ---
 
-## Next Steps
+---
 
-Continue to [`swiglu_fusion_pattern.md`](swiglu_fusion_pattern.md) for the concrete Pattern A implementation that applies fused SiLU to the gate_proj matmul in a SwiGLU FFN block.
+**Next:** [`swiglu_fusion_pattern.md`](./swiglu_fusion_pattern.md)

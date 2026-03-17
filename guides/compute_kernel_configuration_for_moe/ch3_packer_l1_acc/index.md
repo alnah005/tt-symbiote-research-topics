@@ -42,9 +42,9 @@ By the end of this chapter you will be able to:
 
 | File | Topic |
 |---|---|
-| `tensix_packer_pipeline.md` | The Tensix packer stage: default vs. accumulation mode, bandwidth model, K-loop walk-through |
-| `throughput_impact.md` | Quantitative impact: bandwidth reduction formula, decode vs. prefill regimes, DeepSeek-V3 example |
-| `packer_l1_acc_constraints.md` | L1 budget constraints, overflow detection, interaction with `fp32_dest_acc_en`, safe defaults |
+| [`tensix_packer_pipeline.md`](./tensix_packer_pipeline.md) | The Tensix packer stage: default vs. accumulation mode, bandwidth model, K-loop walk-through |
+| [`throughput_impact.md`](./throughput_impact.md) | Quantitative impact: bandwidth reduction formula, decode vs. prefill regimes, DeepSeek-V3 example |
+| [`packer_l1_acc_constraints.md`](./packer_l1_acc_constraints.md) | L1 budget constraints, overflow detection, interaction with `fp32_dest_acc_en`, safe defaults |
 
 ---
 

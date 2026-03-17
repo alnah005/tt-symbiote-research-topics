@@ -93,3 +93,7 @@ DeepSeek-V3's QAT training makes it inherently more robust to low-precision infe
 models trained in bfloat16 require per-projection validation before deploying bfloat4_b, and
 the down projection should remain at bfloat8_b in all cases until full perplexity evaluation
 confirms the delta is within the 1.5 PPL budget.
+
+---
+
+**Next:** [Chapter 4 — Throughput and Memory Bandwidth Impact](../ch04_throughput_impact/index.md)

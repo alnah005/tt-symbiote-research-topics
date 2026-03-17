@@ -227,8 +227,4 @@ print(expert_weight_bytes(7168, 2048,  "bfloat8_b"))  # 44040192 bytes
 
 ---
 
-## Next Steps
-
-This file concludes Chapter 3. You now have the full picture of expert weight tensor shapes, valid shard grid selection, and byte-accurate memory estimation.
-
-Proceed to **Chapter 4** for the end-to-end weight loading and sharding workflow: reading checkpoint tensors, applying dtype conversion, padding to tile alignment, constructing ShardSpec objects, and placing tensors into L1-sharded memory configs ready for `ttnn.matmul` dispatch.
+**Next:** [Chapter 4 — Prefetch Patterns and Bandwidth](../ch04_prefetch_patterns_and_bandwidth/index.md)

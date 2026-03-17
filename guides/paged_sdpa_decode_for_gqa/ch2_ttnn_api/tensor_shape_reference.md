@@ -145,3 +145,7 @@ For `nkv=4, nh=16, group_size=4`:
 The paged K/V tensors must be allocated with `nkv_padded` KV heads (8 in this
 example), not the original `nkv=4`. Allocating K/V with `nkv=4` while using
 `pnh=32` in Q leaves the group_size broken.
+
+---
+
+**Next:** [`sdpa_program_config.md`](./sdpa_program_config.md)

@@ -50,6 +50,6 @@ COMPUTE_KERNEL_CONFIG_HIFI2 = WormholeComputeKernelConfig(
 
 ## Chapter Structure
 
-- `sfpu_approx_operations.md` — SFPU architecture and which ops use approximation
-- `approx_mode_accuracy_risks.md` — When approximation causes problems vs. when it is safe
-- `approx_mode_for_moe.md` — Recommended settings for each MoE FFN projection
+- [`sfpu_approx_operations.md`](./sfpu_approx_operations.md) — SFPU architecture and which ops use approximation
+- [`approx_mode_accuracy_risks.md`](./approx_mode_accuracy_risks.md) — When approximation causes problems vs. when it is safe
+- [`approx_mode_for_moe.md`](./approx_mode_for_moe.md) — Recommended settings for each MoE FFN projection

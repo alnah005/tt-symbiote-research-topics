@@ -128,6 +128,6 @@ The MoE model therefore invokes more total SiLU work per forward pass than the d
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`swiglu_variant.md`](swiglu_variant.md) for the mathematical definition of SwiGLU, a comparison of SiLU vs other activations, and a survey of which production models use SwiGLU vs plain activations.
+**Next:** [`swiglu_variant.md`](./swiglu_variant.md)

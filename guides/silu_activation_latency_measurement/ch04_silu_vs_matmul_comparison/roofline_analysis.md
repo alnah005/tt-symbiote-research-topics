@@ -103,6 +103,6 @@ SiLU sits at the far left: 0.5 FLOP/byte, well below the ridge. Decode-batch mat
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`latency_ratio_by_shape.md`](latency_ratio_by_shape.md) to see how these roofline positions translate into measured latency ratios across the shape sweep.
+**Next:** [`latency_ratio_by_shape.md`](./latency_ratio_by_shape.md)

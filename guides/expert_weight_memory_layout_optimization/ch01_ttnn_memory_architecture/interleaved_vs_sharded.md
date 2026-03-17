@@ -177,4 +177,6 @@ This completes Chapter 1. You now have the physical and API-level vocabulary nee
 - The difference between interleaved round-robin distribution and contiguous sharded placement
 - The two-step DRAM-sharded → L1-sharded reshard pattern for matmul
 
-Proceed to **Chapter 2: DRAM-Sharded Memory Layout** (`ch02_dram_sharded_memory_layout/`) to learn how to construct valid `ShardSpec` objects, choose a sharding strategy for a given expert weight shape, and verify that the resulting config is physically correct before submitting it to the device.
+---
+
+**Next:** [Chapter 2 — DRAM-Sharded Memory Layout](../ch02_dram_sharded_memory_layout/index.md)

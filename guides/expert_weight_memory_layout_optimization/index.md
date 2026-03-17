@@ -80,6 +80,14 @@ Quick reference for practitioners. Full derivations are in the chapters indicate
 
 ---
 
-## Navigation
+## Chapter Navigation
 
-Start here: [Chapter 1 — TTNN Memory Architecture](ch01_ttnn_memory_architecture/index.md)
+| Chapter | Description |
+|---|---|
+| [Ch 1 — TTNN Memory Architecture](ch01_ttnn_memory_architecture/index.md) | Wormhole B0 DRAM topology (6 controllers, 12 banks, 12 GB), L1 per-core (1.5 MB), NoC hop model, `ttnn.MemoryConfig` API, interleaved vs sharded allocation |
+| [Ch 2 — DRAM-Sharded Memory Layout](ch02_dram_sharded_memory_layout/index.md) | `ttnn.ShardSpec` fields (`grid`, `shape`, `orientation`), `CoreRange`/`CoreRangeSet` construction, HEIGHT_SHARDED vs WIDTH_SHARDED vs BLOCK_SHARDED strategies, constructing and verifying a DRAM-sharded `MemoryConfig` |
+| [Ch 3 — Expert Weight Tensor Structure](ch03_expert_weight_tensor_structure/index.md) | Gate/up/down projection shapes for Mixtral 8x7B, DeepSeek-V3, and Qwen 235B-A22B; shard grid selection rules; dtype memory footprint (BF16, bfloat8_b); TILE_LAYOUT alignment requirement |
+| [Ch 4 — Prefetch Patterns and Bandwidth](ch04_prefetch_patterns_and_bandwidth/index.md) | NoC packet model, DRAM controller column topology, why interleaved access creates hotspots, how DRAM-sharded layout eliminates them, double-buffering for DMA prefetch, roofline analysis for decode vs prefill |
+| [Ch 5 — Tile Size Constraints](ch05_tile_size_constraints/index.md) | 32-element tile constraint on height and width, all five shard-shape alignment rules, page-alignment of shard byte sizes, common pitfalls and how to diagnose them |
+| [Ch 6 — Performance Analysis and Trade-offs](ch06_performance_analysis_and_tradeoffs/index.md) | Bandwidth efficiency gap (interleaved vs DRAM-sharded), decode regime rule of thumb (`batch_size × top_k ≤ 16`), reshard overhead at load time, four-regime trade-off matrix, T3K multi-chip interactions |
+| [Ch 7 — Implementation and Validation](ch07_implementation_and_validation/index.md) | End-to-end code: weight loading, shard config construction, `ttnn.to_memory_config`, `ttnn.matmul` integration; PCC-based correctness verification; reproducible benchmark harness |

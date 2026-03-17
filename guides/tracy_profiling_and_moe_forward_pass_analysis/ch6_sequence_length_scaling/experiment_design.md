@@ -455,8 +455,6 @@ to decompose and attribute these two components.
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`interpreting_scaling_results.md`](./interpreting_scaling_results.md) to learn
-how to plot the sweep output, read the scaling exponent from the log-log slope, and use the
-decision table to identify the root cause.
+**Next:** [`interpreting_scaling_results.md`](./interpreting_scaling_results.md)

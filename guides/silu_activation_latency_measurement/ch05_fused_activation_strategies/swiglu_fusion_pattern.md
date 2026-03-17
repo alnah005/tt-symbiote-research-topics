@@ -168,6 +168,6 @@ For DeepSeek-V3 and Qwen 235B-A22B: `d_model=7168`, `d_ff=2048` per expert. At t
 
 ---
 
-## Next Steps
+---
 
-Continue to [`activation_dtype_and_precision.md`](activation_dtype_and_precision.md) for guidance on choosing between `bfloat16` and `bfloat8_b` as the `activation_dtype` for the fused SiLU output.
+**Next:** [`activation_dtype_and_precision.md`](./activation_dtype_and_precision.md)

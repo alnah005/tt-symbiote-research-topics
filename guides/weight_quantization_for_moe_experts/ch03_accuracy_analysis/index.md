@@ -28,10 +28,10 @@ After completing this chapter you will be able to:
 
 | File | Contents |
 |---|---|
-| `accuracy_metrics_for_moe.md` | PCC definition, thresholds, perplexity delta, code |
-| `projection_sensitivity.md` | Sensitivity ordering across gate/up/down projections |
-| `bfloat16_vs_bfloat8_vs_bfloat4_accuracy.md` | Per-dtype PCC ranges, comparison table, code |
-| `qwen_vs_deepseek_accuracy_comparison.md` | Empirical comparison across model families |
+| [`accuracy_metrics_for_moe.md`](./accuracy_metrics_for_moe.md) | PCC definition, thresholds, perplexity delta, code |
+| [`projection_sensitivity.md`](./projection_sensitivity.md) | Sensitivity ordering across gate/up/down projections |
+| [`bfloat16_vs_bfloat8_vs_bfloat4_accuracy.md`](./bfloat16_vs_bfloat8_vs_bfloat4_accuracy.md) | Per-dtype PCC ranges, comparison table, code |
+| [`qwen_vs_deepseek_accuracy_comparison.md`](./qwen_vs_deepseek_accuracy_comparison.md) | Empirical comparison across model families |
 
 ## Summary Table: Quantization Level vs. Expected Accuracy
 

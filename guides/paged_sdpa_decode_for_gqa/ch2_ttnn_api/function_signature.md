@@ -217,3 +217,7 @@ output = output[:, :, :nh, :]  # drop padding heads -> [1, b, 16, dh]
 
 Forgetting this slice passes padding-head garbage into the subsequent linear
 projection, which silently corrupts all subsequent logits.
+
+---
+
+**Next:** [`tensor_shape_reference.md`](./tensor_shape_reference.md)

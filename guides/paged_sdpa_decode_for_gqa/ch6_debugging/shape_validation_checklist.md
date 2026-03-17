@@ -97,3 +97,7 @@ assert kv_write.shape == (b, nkv, 1, dh), \
 | 7 | Page table shape | `(b, max_num_blocks_per_seq)`, int32 |
 | 8 | Page table capacity | `max_num_blocks_per_seq * block_size >= max_seq_len` |
 | 9 | Cache write input | `(b, nkv, 1, dh)` — not `(b, nh, 1, dh)` |
+
+---
+
+**Next:** [`cur_pos_validation.md`](./cur_pos_validation.md)

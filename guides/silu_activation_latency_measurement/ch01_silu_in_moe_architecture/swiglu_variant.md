@@ -131,6 +131,6 @@ The distinction matters for code paths:
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`compute_role_and_cost_hypothesis.md`](compute_role_and_cost_hypothesis.md) for an analysis of why SiLU may carry non-trivial latency on SFPU-based hardware and the cost hypothesis that motivates the measurement methodology in later chapters.
+**Next:** [`compute_role_and_cost_hypothesis.md`](./compute_role_and_cost_hypothesis.md)

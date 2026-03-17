@@ -228,13 +228,6 @@ EOF
 
 ---
 
-## Next Steps
+---
 
-This completes Chapter 3. You now have the tools to:
-
-- Enable device-side cycle counter collection for every TTNN op
-- Post-process the CSV output to get accurate nanosecond timings
-- Add custom Tracy zones to measure host-side code sections
-- Reconstruct total MoE forward pass time and interpret the gaps
-
-Continue to **Chapter 4** for an applied case study that applies these techniques to a full Qwen MoE forward pass on T3K hardware — walking through a real profile trace, identifying the dominant overhead sources, and mapping them to specific code paths.
+**Next:** [Chapter 4 — MoE Forward Pass Op Breakdown](../ch4_moe_op_breakdown/index.md)

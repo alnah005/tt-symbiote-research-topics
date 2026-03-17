@@ -106,6 +106,4 @@ For a concrete expert weight worked example, see `constructing_dram_sharded_conf
 
 ---
 
-## Next Steps
-
-Proceed to [sharding_strategies.md](./sharding_strategies.md) to understand when to choose HEIGHT_SHARDED, WIDTH_SHARDED, or BLOCK_SHARDED for a given expert weight tensor.
+**Next:** [`sharding_strategies.md`](./sharding_strategies.md)

@@ -31,9 +31,9 @@ By the end of this chapter you will be able to:
 | File | Contents |
 |---|---|
 | `index.md` (this file) | Chapter overview, learning objectives, prerequisites, file map |
-| `roofline_analysis.md` | Wormhole B0 roofline model: hardware ceilings, ridge point, arithmetic intensity of SiLU and matmul, ASCII sketch |
-| `latency_ratio_by_shape.md` | Latency ratio table across shapes; expected vs. measured values; how to read the table and draw conclusions |
-| `compute_vs_memory_bound_regimes.md` | Compute-bound / memory-bound transition walkthrough; SiLU linear scaling; fusion threshold; decision table |
+| [`roofline_analysis.md`](./roofline_analysis.md) | Wormhole B0 roofline model: hardware ceilings, ridge point, arithmetic intensity of SiLU and matmul, ASCII sketch |
+| [`latency_ratio_by_shape.md`](./latency_ratio_by_shape.md) | Latency ratio table across shapes; expected vs. measured values; how to read the table and draw conclusions |
+| [`compute_vs_memory_bound_regimes.md`](./compute_vs_memory_bound_regimes.md) | Compute-bound / memory-bound transition walkthrough; SiLU linear scaling; fusion threshold; decision table |
 
 ---
 

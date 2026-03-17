@@ -354,9 +354,6 @@ def convert_qwen_moe_checkpoint(state_dict, device, cache_dir=CACHE_DIR):
 | 4 | Assign compute kernel configs | Gate/up: `COMPUTE_KERNEL_CONFIG_LOFI`; down: `COMPUTE_KERNEL_CONFIG_HIFI2` |
 | 5 | Validate and cache | PCC ≥ 0.96 (inter), ≥ 0.975 (out); cache converted weights to avoid re-conversion |
 
-## Next Steps
+---
 
-Chapter 5 is complete. Chapter 6, `ch06_comparative_study/index.md`, places the
-mixed-precision strategy developed here in context by comparing it side-by-side with
-the DeepSeek-V3 TTNN quantization design and Qwen's bfloat16 baseline, and provides a
-decision framework for teams choosing between them.
+**Next:** [Chapter 6 — Comparative Study: DeepSeek-V3 vs. Qwen](../ch06_comparative_study/index.md)

@@ -97,6 +97,6 @@ Expanded-head-count write (incorrect):
 
 ---
 
-## Next Steps
+---
 
-This completes Chapter 3. Proceed to **Chapter 4** for the end-to-end decode loop: combining the tensor shapes from this chapter with `paged_sdpa_decode`, `paged_update_cache`, and the block table to run a complete autoregressive decode step.
+**Next:** [Chapter 4 — `cur_pos` Semantics](../ch4_cur_pos_semantics/index.md)

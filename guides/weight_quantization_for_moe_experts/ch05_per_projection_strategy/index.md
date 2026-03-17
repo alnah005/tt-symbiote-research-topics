@@ -65,10 +65,10 @@ This configuration is directly derived from the Pareto frontier documented in Ch
 
 | File | Contents |
 |---|---|
-| `gate_and_up_projection_strategy.md` | Mechanistic explanation for bfloat4_b + LoFi on gate and up; SiLU error compression; element-wise product dilution; validation criterion; code pattern |
-| `down_projection_strategy.md` | Why bfloat8_b + HiFi2 is required for down projection; residual stream sensitivity; accumulation fidelity argument; validation criterion and fallback options |
-| `mixed_precision_memory_layout.md` | DRAM layout for mixed-precision expert weight tensors; footprint calculation for Qwen 235B-A22B on a T3K system; tile alignment constraints |
-| `qwen_adaptation_guide.md` | Step-by-step weight conversion from Qwen 235B-A22B bfloat16 checkpoints; per-layer PCC validation; checkpoint caching |
+| [`gate_and_up_projection_strategy.md`](./gate_and_up_projection_strategy.md) | Mechanistic explanation for bfloat4_b + LoFi on gate and up; SiLU error compression; element-wise product dilution; validation criterion; code pattern |
+| [`down_projection_strategy.md`](./down_projection_strategy.md) | Why bfloat8_b + HiFi2 is required for down projection; residual stream sensitivity; accumulation fidelity argument; validation criterion and fallback options |
+| [`mixed_precision_memory_layout.md`](./mixed_precision_memory_layout.md) | DRAM layout for mixed-precision expert weight tensors; footprint calculation for Qwen 235B-A22B on a T3K system; tile alignment constraints |
+| [`qwen_adaptation_guide.md`](./qwen_adaptation_guide.md) | Step-by-step weight conversion from Qwen 235B-A22B bfloat16 checkpoints; per-layer PCC validation; checkpoint caching |
 
 ## Next Steps
 

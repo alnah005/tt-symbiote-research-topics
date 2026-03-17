@@ -91,6 +91,6 @@ At these ratios, eliminating or fusing the SiLU kernel cannot produce more than 
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`compute_vs_memory_bound_regimes.md`](compute_vs_memory_bound_regimes.md) for a detailed regime walkthrough and the fusion decision table.
+**Next:** [`compute_vs_memory_bound_regimes.md`](./compute_vs_memory_bound_regimes.md)

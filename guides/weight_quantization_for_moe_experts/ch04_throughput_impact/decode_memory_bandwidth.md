@@ -108,3 +108,7 @@ from quantization is still proportional, so decode latency ratios closely follow
 - bfloat8_b halves DRAM read volume; bfloat4_b quarters it.
 - Bandwidth reduction directly translates to proportional latency reduction.
 - Activation tensors stay in L1; weight tensors stream from DRAM each pass.
+
+---
+
+**Next:** [`tile_compute_efficiency.md`](./tile_compute_efficiency.md)

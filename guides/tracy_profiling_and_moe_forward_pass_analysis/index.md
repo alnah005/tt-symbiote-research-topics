@@ -21,15 +21,15 @@ latency is suspected to be limiting throughput.
 
 ## Chapters
 
-| # | Title | What you learn |
-|---|---|---|
-| 1 | Tracy Profiler Overview | Tracy data model, two-process architecture, `TRACY_ENABLE` flag, and how Tracy differs from the TTNN device profiler |
-| 2 | Setting Up Tracy Profiling | CMake build flags (`ENABLE_TRACY=ON`), launch order, `TRACY_NO_EXIT=1`, output artifacts (`.tracy` file and `profile_log_device.csv`), common failure modes |
-| 3 | TTNN Op-Level Profiling API | `TT_METAL_DEVICE_PROFILER=1`, custom Tracy zone markers in Python, `process_ops_logs.py`, reconstructing total MoE time from CSV output |
-| 4 | MoE Forward Pass Op Breakdown | Complete 13-step op sequence (dispatch / expert matmul / combine phases), per-phase latency budgets on Wormhole B0, T3K CCL ops, Qwen 235B reference configuration |
-| 5 | Identifying the 16ms Gap | Tracy GUI navigation, gap measurement via `tracy-csvexport`, three-method attribution (host Python / sync barrier / CCL), four common gap patterns A–D |
-| 6 | Sequence Length Scaling Analysis | Why `seq_len` is the primary variable, four scaling behaviors (O(1) / O(seq_len) / sublinear / non-monotonic), controlled 7-point sweep, log-log fitting, mixed-gap decomposition |
-| 7 | Interpretation and Next Steps | Mapping gap patterns to TTNN optimization levers, writing a gap analysis document, building a prioritized optimization backlog |
+| Chapter | What you learn |
+|---|---|
+| [Ch 1 — Tracy Profiler Overview](ch1_tracy_overview/index.md) | Tracy data model, two-process architecture, `TRACY_ENABLE` flag, and how Tracy differs from the TTNN device profiler |
+| [Ch 2 — Setting Up Tracy Profiling](ch2_tracy_setup/index.md) | CMake build flags (`ENABLE_TRACY=ON`), launch order, `TRACY_NO_EXIT=1`, output artifacts (`.tracy` file and `profile_log_device.csv`), common failure modes |
+| [Ch 3 — TTNN Op-Level Profiling API](ch3_ttnn_profiling_api/index.md) | `TT_METAL_DEVICE_PROFILER=1`, custom Tracy zone markers in Python, `process_ops_logs.py`, reconstructing total MoE time from CSV output |
+| [Ch 4 — MoE Forward Pass Op Breakdown](ch4_moe_op_breakdown/index.md) | Complete 13-step op sequence (dispatch / expert matmul / combine phases), per-phase latency budgets on Wormhole B0, T3K CCL ops, Qwen 235B reference configuration |
+| [Ch 5 — Identifying the 16ms Gap](ch5_identifying_gap/index.md) | Tracy GUI navigation, gap measurement via `tracy-csvexport`, three-method attribution (host Python / sync barrier / CCL), four common gap patterns A–D |
+| [Ch 6 — Sequence Length Scaling Analysis](ch6_sequence_length_scaling/index.md) | Why `seq_len` is the primary variable, four scaling behaviors (O(1) / O(seq_len) / sublinear / non-monotonic), controlled 7-point sweep, log-log fitting, mixed-gap decomposition |
+| [Ch 7 — Interpretation and Next Steps](ch7_interpretation_and_next_steps/index.md) | Mapping gap patterns to TTNN optimization levers, writing a gap analysis document, building a prioritized optimization backlog |
 
 ---
 

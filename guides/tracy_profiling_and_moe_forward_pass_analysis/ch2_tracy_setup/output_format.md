@@ -118,6 +118,6 @@ Direct cross-tool correlation — using the dispatch markers to compute a clock 
 
 ---
 
-## Next Steps
+---
 
-You now have all the tools needed to build a profiler-enabled binary, capture a trace, and inspect its output. The next chapter (`ch3_ttnn_profiling_api/`) covers the Python-level `ttnn` profiling API — specifically the `ttnn.device_profiler_state` context manager and how it interacts with the Tracy instrumentation enabled in this chapter.
+**Next:** [Chapter 3 — TTNN Op-Level Profiling API](../ch3_ttnn_profiling_api/index.md)

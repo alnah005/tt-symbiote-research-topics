@@ -146,9 +146,9 @@ to ensure the sweep points cover the relevant range for discriminating between p
 
 | File | Contents |
 |---|---|
-| `scaling_theory.md` | Why seq_len is the primary variable; expected scaling by op class; CCL message size formula |
-| `experiment_design.md` | Sweep point selection; confounder controls; warm-up protocol; sweep automation script |
-| `interpreting_scaling_results.md` | Log-log plotting; reading the scaling exponent; decision table; mixed-gap decomposition; non-monotonic results |
+| [`scaling_theory.md`](./scaling_theory.md) | Why seq_len is the primary variable; expected scaling by op class; CCL message size formula |
+| [`experiment_design.md`](./experiment_design.md) | Sweep point selection; confounder controls; warm-up protocol; sweep automation script |
+| [`interpreting_scaling_results.md`](./interpreting_scaling_results.md) | Log-log plotting; reading the scaling exponent; decision table; mixed-gap decomposition; non-monotonic results |
 
 ---
 

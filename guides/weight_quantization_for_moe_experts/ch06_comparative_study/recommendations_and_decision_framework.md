@@ -207,9 +207,6 @@ Is the model QAT-trained (FP8 or bfloat4-aware)?
         └── If any layer fails → retain bfloat8_b for that projection
 ```
 
-## Next Steps
+---
 
-Chapter 7, `ch07_implementation_workflow/`, provides the end-to-end implementation guide:
-weight conversion scripts, per-layer PCC validation harness, throughput profiling
-methodology, and iterative tuning decision tree for finalising a quantization configuration
-in production.
+**Next:** [Chapter 7 — Implementation and Validation Workflow](../ch07_implementation_workflow/index.md)

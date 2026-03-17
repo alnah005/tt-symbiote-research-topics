@@ -137,12 +137,4 @@ Config Storage
 
 ---
 
-## Next Steps
-
-This is the final file in Chapter 6. You have now completed the full guide:
-
-- **Chapter 1–4**: Parameter fundamentals — what each field controls at the hardware level.
-- **Chapter 5**: Production config pattern — LOFI for gate/up, HIFI2 for down, validated on DeepSeek-V3 and applicable to Qwen MoE.
-- **Chapter 6**: Benchmarking methodology, decision matrix, and production checklist.
-
-To apply this guide to a new model, start with `config_decision_matrix.md`, run the benchmarks from `benchmarking_methodology.md`, and complete this checklist before merging.
+**End of guide.** Return to [Guide Index](../index.md)

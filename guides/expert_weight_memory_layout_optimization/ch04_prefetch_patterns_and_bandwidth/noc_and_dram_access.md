@@ -81,3 +81,7 @@ A core processing a weight shard of shape `[32, 1792]` (56 tiles wide) will issu
 | Hotspot risk | High under full-grid matmul | None |
 | Bandwidth efficiency | 60–80% of peak | 87–97% of peak |
 | Prefetch predictability | Low | High |
+
+---
+
+**Next:** [`sharded_access_pattern.md`](./sharded_access_pattern.md)

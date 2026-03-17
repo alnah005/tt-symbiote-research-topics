@@ -154,8 +154,6 @@ def load_mixed_precision_expert_weights(
 | **Total (bfloat16)** | — | — | 2.0 | **1,344 MB** |
 | **Reduction** | — | — | — | **3.0×** |
 
-## Next Steps
+---
 
-Continue to `qwen_adaptation_guide.md` for the step-by-step procedure to convert Qwen
-235B-A22B bfloat16 checkpoints to the mixed-precision layout described in this file,
-including per-layer PCC validation and checkpoint caching.
+**Next:** [`qwen_adaptation_guide.md`](./qwen_adaptation_guide.md)

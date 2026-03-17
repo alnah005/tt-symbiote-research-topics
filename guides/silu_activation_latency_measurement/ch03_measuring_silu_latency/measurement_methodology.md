@@ -122,6 +122,6 @@ At prefill batch sizes, gate_proj matmul becomes compute-bound (matrix multiply 
 
 ---
 
-## Next Steps
+---
 
-This completes Chapter 3. Proceed to **Chapter 4** to use the measurements collected here to compare SiLU latency against gate_proj matmul latency and interpret the ratio in the context of MoE forward-pass optimization and potential kernel fusion opportunities.
+**Next:** [Chapter 4 — SiLU vs. Matmul Comparison](../ch04_silu_vs_matmul_comparison/index.md)

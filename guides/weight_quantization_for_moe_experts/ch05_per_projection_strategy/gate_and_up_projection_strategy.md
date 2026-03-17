@@ -219,8 +219,6 @@ def swiglu_gate_up(x_tt, w1_tt, w3_tt):
 | Memory vs. bfloat16 | 0.25× (4× reduction) |
 | Decode BW vs. bfloat16 | 0.25× per projection |
 
-## Next Steps
+---
 
-Continue to `down_projection_strategy.md` to understand why the down projection requires
-a different dtype and a higher-fidelity compute config, based on its direct contribution
-to the residual stream.
+**Next:** [`down_projection_strategy.md`](./down_projection_strategy.md)

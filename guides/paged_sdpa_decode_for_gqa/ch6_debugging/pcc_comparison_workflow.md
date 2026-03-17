@@ -119,3 +119,7 @@ read path or kernel, not the write path.
 3. If PCC < 0.99: binary-search `cur_pos` to find the first failing position.
 4. Check if failure aligns with `block_size` multiples.
 5. Isolate KV write path before blaming the attention kernel.
+
+---
+
+**Next:** [`root_cause_isolation.md`](./root_cause_isolation.md)

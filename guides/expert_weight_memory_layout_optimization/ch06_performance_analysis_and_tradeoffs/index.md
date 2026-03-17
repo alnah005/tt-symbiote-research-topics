@@ -53,9 +53,9 @@ A negative latency delta means the sharded layout is faster. A positive delta me
 
 | File | Contents |
 |---|---|
-| `bandwidth_gain_analysis.md` | Theoretical peak vs indicative effective bandwidth; decode vs prefill bottleneck analysis; the `batch_size × top_k ≤ 16` rule |
-| `shard_setup_overhead.md` | `ttnn.to_memory_config` cost at load time; recommended load-time resharding pattern; program cache stability |
-| `tradeoff_matrix.md` | Four-regime comparison table; when sharding hurts; L1 pressure interaction; T3K multi-chip compounding |
+| [`bandwidth_gain_analysis.md`](./bandwidth_gain_analysis.md) | Theoretical peak vs indicative effective bandwidth; decode vs prefill bottleneck analysis; the `batch_size × top_k ≤ 16` rule |
+| [`shard_setup_overhead.md`](./shard_setup_overhead.md) | `ttnn.to_memory_config` cost at load time; recommended load-time resharding pattern; program cache stability |
+| [`tradeoff_matrix.md`](./tradeoff_matrix.md) | Four-regime comparison table; when sharding hurts; L1 pressure interaction; T3K multi-chip compounding |
 
 ---
 

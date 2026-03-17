@@ -111,12 +111,6 @@ The hypotheses above define the measurement objectives for this guide:
 
 ---
 
-## Next Steps
+---
 
-This completes Chapter 1. You now have the architectural context needed to interpret measurement results:
-
-- The SwiGLU compute graph places `ttnn.silu` at a specific point in the per-expert forward pass.
-- The SFPU execution model explains why SiLU carries more instruction-level cost than ReLU on Wormhole.
-- The cost hypotheses give falsifiable predictions that the benchmarks in Chapter 2 and Chapter 3 will test.
-
-Proceed to Chapter 2, `index.md` for the measurement setup and benchmark harness design.
+**Next:** [Chapter 2 — SiLU on Wormhole Hardware](../ch02_silu_on_wormhole_hardware/index.md)

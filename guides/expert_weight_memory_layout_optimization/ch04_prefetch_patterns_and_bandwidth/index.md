@@ -69,9 +69,9 @@ Core(5,0) ──► D5 ──── 1 hop (always)
 
 | File | Contents |
 |---|---|
-| `noc_and_dram_access.md` | NoC packet model; DRAM controller topology; interleaved access hotspots |
-| `sharded_access_pattern.md` | DRAM-sharded layout; shard orientation; double-buffering interaction |
-| `bandwidth_estimation.md` | Effective bandwidth model; roofline analysis; decode regime arithmetic intensity |
+| [`noc_and_dram_access.md`](./noc_and_dram_access.md) | NoC packet model; DRAM controller topology; interleaved access hotspots |
+| [`sharded_access_pattern.md`](./sharded_access_pattern.md) | DRAM-sharded layout; shard orientation; double-buffering interaction |
+| [`bandwidth_estimation.md`](./bandwidth_estimation.md) | Effective bandwidth model; roofline analysis; decode regime arithmetic intensity |
 
 ---
 

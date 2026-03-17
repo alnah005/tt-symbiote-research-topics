@@ -40,9 +40,9 @@ See `wormhole_compute_kernel_config_api.md` for the complete field reference.
 | File | Contents |
 |---|---|
 | `index.md` (this file) | Overview, learning objectives, field summary table |
-| `wormhole_compute_kernel_config_api.md` | API construction, field descriptions, Python examples, default behavior |
-| `fp32_dest_acc_en.md` | Destination accumulator register deep dive; when fp32 precision matters for MoE |
-| `math_fidelity_overview.md` | Math fidelity enum values, mantissa bit intuition, throughput/accuracy trade-off overview |
+| [`wormhole_compute_kernel_config_api.md`](./wormhole_compute_kernel_config_api.md) | API construction, field descriptions, Python examples, default behavior |
+| [`fp32_dest_acc_en.md`](./fp32_dest_acc_en.md) | Destination accumulator register deep dive; when fp32 precision matters for MoE |
+| [`math_fidelity_overview.md`](./math_fidelity_overview.md) | Math fidelity enum values, mantissa bit intuition, throughput/accuracy trade-off overview |
 
 ---
 

@@ -233,6 +233,4 @@ down_output = ttnn.matmul(activated,     w2, compute_kernel_config=COMPUTE_KERNE
 
 ---
 
-## Next Steps
-
-Read `fp32_dest_acc_en.md` for a detailed explanation of what the FPU destination register is, why bfloat16 truncation in that register accumulates error across K tiles, and when the float32 mode matters (and when it does not) for MoE expert matmul shapes.
+**Next:** [`fp32_dest_acc_en.md`](./fp32_dest_acc_en.md)

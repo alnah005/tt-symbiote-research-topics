@@ -162,6 +162,4 @@ Is effective_M = batch_size × top_k?
 
 ---
 
-## Next Steps
-
-Chapter 6 has established what bandwidth gains to expect from DRAM-sharded expert weights and under which conditions sharding is beneficial. Chapter 7, `index.md` provides the complete implementation: runnable code patterns for constructing the sharded configs, integrating with `ttnn.matmul`, verifying correctness via PCC, and measuring bandwidth with the Tracy profiler to validate the indicative estimates presented in this chapter against your specific hardware and TTNN version.
+**Next:** [Chapter 7 — Implementation and Validation](../ch07_implementation_and_validation/index.md)

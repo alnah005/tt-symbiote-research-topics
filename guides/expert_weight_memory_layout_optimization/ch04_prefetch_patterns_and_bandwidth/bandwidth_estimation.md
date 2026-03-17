@@ -124,3 +124,7 @@ At 494 FLOP/byte, the workload is marginally compute-bound. DRAM layout has dimi
 | Prefill, long sequence | 512+ | >400 FLOP/byte | Marginally compute | Low |
 
 For MoE inference at decode, DRAM-sharded expert weights are the single highest-leverage memory layout change available.
+
+---
+
+**Next:** [Chapter 5 — Tile Size Constraints](../ch05_tile_size_constraints/index.md)

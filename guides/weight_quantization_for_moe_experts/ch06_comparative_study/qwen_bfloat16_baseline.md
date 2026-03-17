@@ -159,8 +159,6 @@ Switching to `bfloat8_b` for all projections (the recommended first step for Qwe
 halve the per-expert weight bytes to 42 MB, reducing the per-MoE-layer DRAM read volume
 by 2× and providing immediate decode latency relief without the accuracy risk of bfloat4_b.
 
-## Next Steps
+---
 
-Proceed to `recommendations_and_decision_framework.md` for the structured decision criteria
-that determine which quantization tier is appropriate for a given deployment scenario,
-accuracy budget, and model training history.
+**Next:** [`recommendations_and_decision_framework.md`](./recommendations_and_decision_framework.md)

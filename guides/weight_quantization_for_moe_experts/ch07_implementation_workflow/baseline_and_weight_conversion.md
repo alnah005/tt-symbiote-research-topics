@@ -290,8 +290,6 @@ For the caching and version-pinning pattern, see `../ch05_per_projection_strateg
 | 2c | Pad non-tile-aligned shapes before conversion | Both dims multiples of 32 |
 | 2d | Cache converted weights to disk | Reload produces same TTNN tensor |
 
-## Next Steps
+---
 
-Proceed to `per_layer_pcc_validation.md` to build the per-layer PCC test harness and
-validate that quantized forward passes meet the accuracy thresholds for each projection
-type and for the full MoE layer end-to-end.
+**Next:** [`per_layer_pcc_validation.md`](./per_layer_pcc_validation.md)

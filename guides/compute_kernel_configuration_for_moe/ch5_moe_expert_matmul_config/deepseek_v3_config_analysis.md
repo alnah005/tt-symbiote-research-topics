@@ -88,3 +88,7 @@ For K_t=64 (the DeepSeek-V3 down projection), enabling `packer_l1_acc=True` elim
 ## Summary
 
 DeepSeek-V3 applies two configs, not one. The assignment is structural: gate/up → LoFi (tolerant of rounding, feeds nonlinearity), down → HiFi2 (accumulates into residual, requires higher fidelity). Both configs share `packer_l1_acc=True`, which eliminates 98.4% of accumulation-related DRAM reads for the K_t=64 down projection at decode. This pattern is the reference for applying configs to other MoE models including Qwen.
+
+---
+
+**Next:** [`qwen_moe_current_state.md`](./qwen_moe_current_state.md)

@@ -121,3 +121,7 @@ for pos in positions_to_test:
 Until the issue is resolved, do not assume correctness for untested `cur_pos`
 values in paged mode.  Production deployments should validate across the full
 position range during bringup on new hardware or after kernel updates.
+
+---
+
+**Next:** [Chapter 5 — Known Issues and Workarounds](../ch5_known_issues/index.md)

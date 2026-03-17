@@ -128,6 +128,6 @@ output = ttnn.linear(
 | Program config tile params | Unchanged by weight dtype; same shape = same tile count |
 | `out_subblock` limits | May need reduction when `fp32_dest_acc_en=True` |
 
-## Next Steps
+---
 
-Continue to `validation_patterns.md` to learn how to verify that weight conversion preserved sufficient accuracy using Pearson Correlation Coefficient checks against a bfloat16 reference.
+**Next:** [`validation_patterns.md`](./validation_patterns.md)

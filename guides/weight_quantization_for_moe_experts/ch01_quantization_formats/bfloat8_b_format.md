@@ -173,7 +173,6 @@ DeepSeek-V3 uses bfloat8_b for the down projection (w2) because it feeds the res
 
 ---
 
-## Next Steps
+---
 
-- [bfloat4_b_format.md](./bfloat4_b_format.md) — The 4-bit block FP format, 4× compression, and when it is viable
-- [hardware_dtype_support.md](./hardware_dtype_support.md) — MathFidelity levels and TTNN DataType enum details
+**Next:** [`bfloat4_b_format.md`](./bfloat4_b_format.md)

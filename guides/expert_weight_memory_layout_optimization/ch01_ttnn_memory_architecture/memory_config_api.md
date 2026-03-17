@@ -221,6 +221,4 @@ print(weight_sharded.memory_config().shard_spec())
 
 ---
 
-## Next Steps
-
-Proceed to `interleaved_vs_sharded.md` to understand the runtime behavior difference between `INTERLEAVED` and the sharded layouts: how pages are physically distributed, how NoC traffic patterns differ, and when to choose each. The `MemoryConfig` objects introduced here will be used directly in the code examples in that file.
+**Next:** [`interleaved_vs_sharded.md`](./interleaved_vs_sharded.md)

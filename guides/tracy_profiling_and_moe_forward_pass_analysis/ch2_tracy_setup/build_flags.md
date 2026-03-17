@@ -91,6 +91,6 @@ cmake -DENABLE_TRACY=ON -DTRACY_ON_DEMAND=1 \
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`capture_workflow.md`](capture_workflow.md) to learn the launch order, required environment variables, and a complete two-terminal capture example.
+**Next:** [`capture_workflow.md`](./capture_workflow.md)

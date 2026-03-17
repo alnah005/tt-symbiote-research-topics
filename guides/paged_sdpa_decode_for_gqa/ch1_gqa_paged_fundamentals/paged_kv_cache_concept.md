@@ -189,6 +189,4 @@ The contiguous model cannot do this: once sequence A's 3000-token slot is freed 
 
 ---
 
-## Next Steps
-
-Continue to `gqa_plus_paging_interaction.md` to see how paged storage and GQA head counts interact, and where the most common conceptual mistake occurs.
+**Next:** [`gqa_plus_paging_interaction.md`](./gqa_plus_paging_interaction.md)

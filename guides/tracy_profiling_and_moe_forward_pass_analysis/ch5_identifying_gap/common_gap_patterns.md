@@ -377,9 +377,6 @@ as recompilation (Pattern D) or a synchronization barrier (Pattern B).
 
 ---
 
-## Next Steps
+---
 
-With the gap attributed to one or more patterns, proceed to
-[Chapter 6: Sequence Length Scaling Analysis](../ch6_sequence_length_scaling/index.md) to
-design a controlled sweep that quantifies the scaling exponent and confirms the root cause
-attribution before investing in an optimization.
+**Next:** [Chapter 6 — Sequence Length Scaling Analysis](../ch6_sequence_length_scaling/index.md)

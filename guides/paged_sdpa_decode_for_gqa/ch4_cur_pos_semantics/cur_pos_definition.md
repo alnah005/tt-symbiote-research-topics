@@ -98,3 +98,7 @@ output = ttnn.transformer.paged_scaled_dot_product_attention_decode(
 Padding slots must also have a valid (but irrelevant) page table row; the
 kernel may or may not dereference it depending on implementation version.
 Safe practice: set the page table row for `-1` slots to all-zeros.
+
+---
+
+**Next:** [`per_user_vs_shared.md`](./per_user_vs_shared.md)

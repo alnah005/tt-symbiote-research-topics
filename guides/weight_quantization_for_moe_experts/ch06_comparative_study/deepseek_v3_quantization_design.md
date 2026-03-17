@@ -189,8 +189,6 @@ two-stage approach: start with bfloat8_b (which bfloat16-trained models generall
 without QAT), validate accuracy thoroughly, and then consider bfloat4_b for gate and up only
 if the accuracy budget permits and the throughput improvement justifies the validation cost.
 
-## Next Steps
+---
 
-Proceed to `qwen_bfloat16_baseline.md` to understand the current state of the Qwen
-235B-A22B TTNN implementation: why it uses bfloat16, what that costs in memory and
-decode throughput, and how the "16ms gap" connects to this choice.
+**Next:** [`qwen_bfloat16_baseline.md`](./qwen_bfloat16_baseline.md)

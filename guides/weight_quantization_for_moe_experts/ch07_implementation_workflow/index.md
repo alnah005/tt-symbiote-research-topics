@@ -103,13 +103,13 @@ This chapter assumes knowledge of all previous chapters:
 
 ## Navigation
 
-- `baseline_and_weight_conversion.md` — Steps 1 and 2: baseline measurement and weight
+- [`baseline_and_weight_conversion.md`](./baseline_and_weight_conversion.md) — Steps 1 and 2: baseline measurement and weight
   conversion with PCC verification.
-- `per_layer_pcc_validation.md` — Step 3: per-layer PCC test harness and diagnostic
+- [`per_layer_pcc_validation.md`](./per_layer_pcc_validation.md) — Step 3: per-layer PCC test harness and diagnostic
   procedures.
-- `throughput_profiling.md` — Step 4: device profiler usage and expert FFN latency
+- [`throughput_profiling.md`](./throughput_profiling.md) — Step 4: device profiler usage and expert FFN latency
   breakdown.
-- `iterative_tuning_guide.md` — Step 5: tuning decision tree, calibration perplexity,
+- [`iterative_tuning_guide.md`](./iterative_tuning_guide.md) — Step 5: tuning decision tree, calibration perplexity,
   and regression testing.
 
 ## Next Steps

@@ -93,9 +93,9 @@ OPT-1  Pattern B  ~14ms constant term  Eliminate ttnn.synchronize_device
 | File | Contents |
 |---|---|
 | `index.md` | This overview, learning objectives, and navigation (you are here) |
-| `gap_to_action_mapping.md` | Systematic mapping from Patterns A–D to TTNN optimization actions; prioritization using scaling data |
-| `writing_a_gap_analysis.md` | Seven-section template, evidence requirements, confidence levels, audience guidance |
-| `optimization_action_reference.md` | Reference table of TTNN optimization levers with expected reductions, conditions, and caveats |
+| [`gap_to_action_mapping.md`](./gap_to_action_mapping.md) | Systematic mapping from Patterns A–D to TTNN optimization actions; prioritization using scaling data |
+| [`writing_a_gap_analysis.md`](./writing_a_gap_analysis.md) | Seven-section template, evidence requirements, confidence levels, audience guidance |
+| [`optimization_action_reference.md`](./optimization_action_reference.md) | Reference table of TTNN optimization levers with expected reductions, conditions, and caveats |
 
 ---
 

@@ -95,6 +95,4 @@ See the PCC reliability note in `fidelity_selection_workflow.md` before finalizi
 
 ---
 
-## Next Steps
-
-Read `fidelity_selection_workflow.md` for the step-by-step process to apply these principles to a new MoE model: how to establish a float32 reference baseline, step down through fidelity levels, and identify the lowest safe fidelity for each projection type.
+**Next:** [`fidelity_selection_workflow.md`](./fidelity_selection_workflow.md)

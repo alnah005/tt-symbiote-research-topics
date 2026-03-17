@@ -75,3 +75,7 @@ over bfloat16 + HiFi2.
 - MathFidelity overhead (HiFi2 vs LoFi) adds 20–30% latency; choose based on PCC
   requirements.
 - Always measure with all-to-all overhead isolated to observe true FFN speedup.
+
+---
+
+**Next:** [`decode_memory_bandwidth.md`](./decode_memory_bandwidth.md)

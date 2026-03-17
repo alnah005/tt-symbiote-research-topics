@@ -84,10 +84,10 @@ Steps [11]–[13] are the **combine phase** (`combine_phase.md`).
 
 | File | Contents |
 |---|---|
-| `dispatch_phase.md` | Router ops, gather, T3K all-to-all, latency budget |
-| `expert_matmul_phase.md` | Batched matmul structure, Qwen 235B latency, prefill vs. decode |
-| `combine_phase.md` | Scatter, weighted sum, T3K reduction, load imbalance |
-| `full_op_sequence_reference.md` | Consolidated op table: shapes, durations, Tracy zone names |
+| [`dispatch_phase.md`](./dispatch_phase.md) | Router ops, gather, T3K all-to-all, latency budget |
+| [`expert_matmul_phase.md`](./expert_matmul_phase.md) | Batched matmul structure, Qwen 235B latency, prefill vs. decode |
+| [`combine_phase.md`](./combine_phase.md) | Scatter, weighted sum, T3K reduction, load imbalance |
+| [`full_op_sequence_reference.md`](./full_op_sequence_reference.md) | Consolidated op table: shapes, durations, Tracy zone names |
 
 ---
 

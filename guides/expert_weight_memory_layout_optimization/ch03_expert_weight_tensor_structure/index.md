@@ -52,9 +52,9 @@ The following models are used as concrete examples throughout this chapter. All 
 
 | File | Contents |
 |---|---|
-| `projection_shapes.md` | Gate, up, and down weight projection shapes; stacked tensor conventions |
-| `tensor_to_shard_grid_mapping.md` | Rules for selecting valid shard grids; worked examples |
-| `dtype_and_tile_layout.md` | Dtype sizes, tile alignment requirements, memory footprint calculations |
+| [`projection_shapes.md`](./projection_shapes.md) | Gate, up, and down weight projection shapes; stacked tensor conventions |
+| [`tensor_to_shard_grid_mapping.md`](./tensor_to_shard_grid_mapping.md) | Rules for selecting valid shard grids; worked examples |
+| [`dtype_and_tile_layout.md`](./dtype_and_tile_layout.md) | Dtype sizes, tile alignment requirements, memory footprint calculations |
 
 ---
 

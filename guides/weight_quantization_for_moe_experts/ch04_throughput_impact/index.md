@@ -54,10 +54,10 @@ read), shifting memory-bound workloads rightward toward the ridge.
 
 | File | Contents |
 |------|----------|
-| `prefill_compute_throughput.md` | Prefill regime: compute-bound analysis, dtype throughput ratios |
-| `decode_memory_bandwidth.md` | Decode regime: memory-bound analysis, bandwidth reduction formulas |
-| `tile_compute_efficiency.md` | Tile-level efficiency: byte counts, MathFidelity passes, grid utilization |
-| `bandwidth_vs_accuracy_tradeoff.md` | Joint Pareto analysis: accuracy vs bandwidth for all projection types |
+| [`prefill_compute_throughput.md`](./prefill_compute_throughput.md) | Prefill regime: compute-bound analysis, dtype throughput ratios |
+| [`decode_memory_bandwidth.md`](./decode_memory_bandwidth.md) | Decode regime: memory-bound analysis, bandwidth reduction formulas |
+| [`tile_compute_efficiency.md`](./tile_compute_efficiency.md) | Tile-level efficiency: byte counts, MathFidelity passes, grid utilization |
+| [`bandwidth_vs_accuracy_tradeoff.md`](./bandwidth_vs_accuracy_tradeoff.md) | Joint Pareto analysis: accuracy vs bandwidth for all projection types |
 
 ## Key Hardware Constants (Reference)
 

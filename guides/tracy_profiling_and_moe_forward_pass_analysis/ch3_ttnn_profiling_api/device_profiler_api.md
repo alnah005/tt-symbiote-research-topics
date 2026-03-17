@@ -156,6 +156,6 @@ tt-smi | grep AICLK
 
 ---
 
-## Next Steps
+---
 
-Continue to [`annotating_your_code.md`](./annotating_your_code.md) to learn how to add custom Tracy zone markers around your own code sections, giving you named CPU-side zones visible alongside the device profiler data in the Tracy GUI.
+**Next:** [`annotating_your_code.md`](./annotating_your_code.md)

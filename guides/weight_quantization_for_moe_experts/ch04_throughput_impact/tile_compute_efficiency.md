@@ -92,3 +92,7 @@ choice, delivering PCC ~0.97–0.98.
 - LoFi is optimal for gate/up; HiFi2 for down projection/residual stream; HiFi4 for dense MLP. See Chapter 2, `compute_kernel_config.md` for pass counts and throughput figures.
 - 80-core grid benefits from lower per-tile byte footprint via reduced L1 pressure.
 - bfloat4_b + LoFi is optimal for gate/up; bfloat8_b + HiFi2 for down projection.
+
+---
+
+**Next:** [`bandwidth_vs_accuracy_tradeoff.md`](./bandwidth_vs_accuracy_tradeoff.md)

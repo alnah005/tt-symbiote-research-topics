@@ -84,3 +84,7 @@ Passing `-1` for a batch element signals the op to skip that element; the corres
 | 3 | Length-1 list for b=1 | `assert isinstance(cur_pos, list) and len(cur_pos) == b` |
 | 4 | Block count consistent with page table | `cur_pos[i] // block_size <= allocated_blocks[i]` |
 | 5 | `-1` outputs explicitly ignored | code review / assert downstream mask |
+
+---
+
+**Next:** [`pcc_comparison_workflow.md`](./pcc_comparison_workflow.md)

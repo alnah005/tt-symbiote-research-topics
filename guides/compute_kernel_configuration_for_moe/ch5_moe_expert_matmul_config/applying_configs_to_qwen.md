@@ -115,3 +115,7 @@ At prefill, M (the number of tokens) is large. Two things change:
 2. **PCC difference narrows.** At large M, the output tensor has many more elements. Statistical averaging means that LoFi rounding errors partially cancel across the M dimension. The PCC difference between LoFi and HiFi2 for the down projection will be smaller at prefill than at decode.
 
 The same two configs (LOFI for gate/up, HIFI2 for down) are still the correct assignment at prefill. There is no reason to switch configs based on sequence length. The numerical argument for HiFi2 on the down projection applies regardless of M; the accuracy improvement is smaller at prefill but the cost is also smaller (fewer redundant DRAM reads relative to total compute).
+
+---
+
+**Next:** [Chapter 6 — Performance Benchmarking and Config Selection](../ch6_benchmarking_and_selection/index.md)

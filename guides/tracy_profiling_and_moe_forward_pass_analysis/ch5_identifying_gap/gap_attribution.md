@@ -275,7 +275,6 @@ optimization decisions without further filtering.
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`common_gap_patterns.md`](./common_gap_patterns.md) to match your measured gap
-against the four canonical patterns, each with a specific diagnostic and remediation path.
+**Next:** [`common_gap_patterns.md`](./common_gap_patterns.md)

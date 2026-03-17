@@ -103,6 +103,4 @@ Both DRAM-sharded and L1-sharded buffers use `ShardSpec` and the same three stra
 
 ---
 
-## Next Steps
-
-Proceed to [constructing_dram_sharded_config.md](./constructing_dram_sharded_config.md) for a step-by-step guide to building and verifying a complete DRAM-sharded `MemoryConfig`, including common mistakes and an end-to-end code example.
+**Next:** [`constructing_dram_sharded_config.md`](./constructing_dram_sharded_config.md)

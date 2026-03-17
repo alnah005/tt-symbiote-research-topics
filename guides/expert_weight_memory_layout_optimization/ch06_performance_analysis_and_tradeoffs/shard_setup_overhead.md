@@ -214,6 +214,4 @@ _ = ttnn.matmul(prefill_activation_dummy, weight_sharded_prefill_config, ...)
 
 ---
 
-## Next Steps
-
-Proceed to `tradeoff_matrix.md` for the full four-regime comparison table that consolidates the bandwidth gain analysis with the shard setup overhead to produce per-regime layout recommendations, including T3K multi-chip deployment guidance.
+**Next:** [`tradeoff_matrix.md`](./tradeoff_matrix.md)

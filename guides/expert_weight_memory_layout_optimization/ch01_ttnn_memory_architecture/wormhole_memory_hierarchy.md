@@ -98,6 +98,4 @@ The resolution — discussed in `interleaved_vs_sharded.md` and the following ch
 
 ---
 
-## Next Steps
-
-Proceed to `memory_config_api.md` to learn how to express DRAM placement, L1 placement, and sharding directives using the `ttnn.MemoryConfig` API. The bandwidth and hop-count concepts introduced here will be referenced when evaluating which `TensorMemoryLayout` value is appropriate for a given weight tensor shape.
+**Next:** [`memory_config_api.md`](./memory_config_api.md)

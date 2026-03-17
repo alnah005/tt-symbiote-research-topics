@@ -175,6 +175,4 @@ This is a silent correctness failure. The full treatment of padding and its impl
 
 ---
 
-## Next Steps
-
-You have now covered all of Chapter 1. Proceed to **Chapter 2: TTNN paged_sdpa_decode API** (`../ch2_ttnn_api/index.md`) to see how these conceptual shapes map to the exact parameter types and constraints of the `ttnn.transformer.scaled_dot_product_attention_decode` function call.
+**Next:** [Chapter 2 — TTNN API](../ch2_ttnn_api/index.md)

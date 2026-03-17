@@ -35,9 +35,9 @@ Follow these five steps in order to go from a clean tt-metal checkout to your fi
 
 | File | Topic |
 |---|---|
-| `build_flags.md` | CMake flags, Tracy submodule pinning, build verification, and `TRACY_ON_DEMAND` |
-| `capture_workflow.md` | Launch order, environment variables, complete two-terminal example, and common failure modes |
-| `output_format.md` | The `.tracy` binary, `tracy-csvexport` CSV columns, `profile_log_device.csv` post-processing, and cross-tool timestamp correlation |
+| [`build_flags.md`](./build_flags.md) | CMake flags, Tracy submodule pinning, build verification, and `TRACY_ON_DEMAND` |
+| [`capture_workflow.md`](./capture_workflow.md) | Launch order, environment variables, complete two-terminal example, and common failure modes |
+| [`output_format.md`](./output_format.md) | The `.tracy` binary, `tracy-csvexport` CSV columns, `profile_log_device.csv` post-processing, and cross-tool timestamp correlation |
 
 ---
 

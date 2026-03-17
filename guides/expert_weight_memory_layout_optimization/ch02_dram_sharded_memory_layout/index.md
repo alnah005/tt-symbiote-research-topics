@@ -29,8 +29,8 @@ For the full ShardSpec field reference, see `shard_spec_deep_dive.md`.
 
 | File | Topic |
 |---|---|
-| `shard_spec_deep_dive.md` | `ttnn.ShardSpec`, `CoreCoord`, `CoreRange`, `CoreRangeSet`, shard shape arithmetic |
-| `sharding_strategies.md` | HEIGHT_SHARDED, WIDTH_SHARDED, BLOCK_SHARDED — mechanics, use cases, comparison |
-| `constructing_dram_sharded_config.md` | Step-by-step construction of a DRAM-sharded `MemoryConfig`, `to_memory_config`, verification, common mistakes, end-to-end example |
+| [`shard_spec_deep_dive.md`](./shard_spec_deep_dive.md) | `ttnn.ShardSpec`, `CoreCoord`, `CoreRange`, `CoreRangeSet`, shard shape arithmetic |
+| [`sharding_strategies.md`](./sharding_strategies.md) | HEIGHT_SHARDED, WIDTH_SHARDED, BLOCK_SHARDED — mechanics, use cases, comparison |
+| [`constructing_dram_sharded_config.md`](./constructing_dram_sharded_config.md) | Step-by-step construction of a DRAM-sharded `MemoryConfig`, `to_memory_config`, verification, common mistakes, end-to-end example |
 
-**Recommended reading order:** `shard_spec_deep_dive.md` → `sharding_strategies.md` → `constructing_dram_sharded_config.md`
+**Recommended reading order:** [`shard_spec_deep_dive.md`](./shard_spec_deep_dive.md) → [`sharding_strategies.md`](./sharding_strategies.md) → [`constructing_dram_sharded_config.md`](./constructing_dram_sharded_config.md)

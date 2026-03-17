@@ -159,7 +159,6 @@ the compute time. Expert matmul may be only 30–50% of total MoE time in decode
 
 ---
 
-## Next Steps
+---
 
-Continue to [`combine_phase.md`](./combine_phase.md) for the scatter, weighted sum, and T3K
-reduce-scatter mechanics.
+**Next:** [`combine_phase.md`](./combine_phase.md)

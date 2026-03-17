@@ -41,10 +41,10 @@ By the end of this chapter you should be able to:
 
 | File | Content |
 |---|---|
-| `issue_30362_pcc_failures.md` | Full description of #30362: affected positions, CI gap, GQA impact, workaround |
-| `silent_shape_violations.md` | Four silent failure modes: padding collapse, layout mismatch, head count, page table dtype |
-| `gqa_workaround_history.md` | `repeat_interleave` history; risk of mixing old workaround with native GQA kernel |
-| `program_cache_issues.md` | Issues #21534, #16674; page table shape cache key; BFP8/BF16 cache miss |
+| [`issue_30362_pcc_failures.md`](./issue_30362_pcc_failures.md) | Full description of #30362: affected positions, CI gap, GQA impact, workaround |
+| [`silent_shape_violations.md`](./silent_shape_violations.md) | Four silent failure modes: padding collapse, layout mismatch, head count, page table dtype |
+| [`gqa_workaround_history.md`](./gqa_workaround_history.md) | `repeat_interleave` history; risk of mixing old workaround with native GQA kernel |
+| [`program_cache_issues.md`](./program_cache_issues.md) | Issues #21534, #16674; page table shape cache key; BFP8/BF16 cache miss |
 
 ---
 

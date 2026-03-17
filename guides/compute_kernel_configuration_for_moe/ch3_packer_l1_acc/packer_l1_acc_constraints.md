@@ -153,6 +153,4 @@ fits  = usage <= L1_CAPACITY
 
 ---
 
-## Next Steps
-
-This completes Chapter 3. Proceed to **Chapter 4** for coverage of `math_approx_mode` — the second single-bit flag in `WormholeComputeKernelConfig` — including which transcendental operations it affects, the accuracy trade-offs for MoE softmax and gating, and when to enable or disable it for production deployments.
+**Next:** [Chapter 4 — `math_approx_mode` — Accuracy Trade-offs](../ch4_math_approx_mode/index.md)

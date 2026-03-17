@@ -147,6 +147,4 @@ For tile-count values by model (M_t, N_t), see `tile_fundamentals.md` in this ch
 
 ---
 
-## Next Steps
-
-With the five alignment rules defined, proceed to `common_pitfalls.md` for the five failure modes that arise in practice when these rules are not applied correctly or completely.
+**Next:** [`common_pitfalls.md`](./common_pitfalls.md)

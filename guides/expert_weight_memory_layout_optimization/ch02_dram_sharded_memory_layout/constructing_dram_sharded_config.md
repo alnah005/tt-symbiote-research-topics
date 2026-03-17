@@ -170,6 +170,4 @@ assert ss.shape == [4096, 1792]
 
 ---
 
-## Next Steps
-
-Chapter 2 is complete. Proceed to Chapter 3 — L1-Sharded Activations and the Matmul Dispatch Pattern — to see how DRAM-sharded weights are paired with L1-sharded activations to drive the matmul kernel efficiently on Wormhole B0.
+**Next:** [Chapter 3 — Expert Weight Tensor Structure](../ch03_expert_weight_tensor_structure/index.md)

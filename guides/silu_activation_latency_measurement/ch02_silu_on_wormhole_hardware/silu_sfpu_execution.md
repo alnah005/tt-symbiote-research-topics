@@ -125,5 +125,4 @@ measurements with both modes to quantify the wall-clock difference.
 
 ---
 
-**Next Steps:** Read `cycles_vs_matmul.md` to compare the SFPU cycle budget for SiLU against
-the FPU cycle budget for the gate_proj matmul, and to place both operations on a roofline.
+**Next:** [`cycles_vs_matmul.md`](./cycles_vs_matmul.md)

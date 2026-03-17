@@ -267,7 +267,6 @@ sources is the foundation of the gap attribution methods in `gap_attribution.md`
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`gap_attribution.md`](./gap_attribution.md) to apply the three attribution methods
-to the gaps you have measured here.
+**Next:** [`gap_attribution.md`](./gap_attribution.md)

@@ -165,6 +165,6 @@ Tracy measures what the host CPU is doing: op dispatch, program enqueue, Python-
 
 ---
 
-## Next Steps
+---
 
-This chapter is complete. Proceed to **Chapter 2** ([`../ch2_tracy_setup/index.md`](../ch2_tracy_setup/index.md)) to learn how to build tt-metal with Tracy enabled, launch the capture server, and produce your first `.tracy` file from a TTNN workload.
+**Next:** [Chapter 2 — Setting Up Tracy Profiling](../ch2_tracy_setup/index.md)

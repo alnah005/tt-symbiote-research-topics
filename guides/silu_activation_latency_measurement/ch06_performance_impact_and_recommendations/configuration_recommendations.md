@@ -237,6 +237,6 @@ On T3K, Tracy captures per-chip device traces. Check each chip's trace independe
 
 ---
 
-## Next Steps
+---
 
-Continue to [`measurement_summary_and_next_steps.md`](measurement_summary_and_next_steps.md) for a summary of expected absolute latency numbers from the Chapter 4 benchmark, interpretation guidance, open research questions, and pointers to related guides.
+**Next:** [`measurement_summary_and_next_steps.md`](./measurement_summary_and_next_steps.md)

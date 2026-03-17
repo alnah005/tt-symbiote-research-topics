@@ -102,5 +102,4 @@ For the quantitative matmul vs. SiLU cost comparison — including roofline plac
 
 ---
 
-**Next Steps:** Read `silu_sfpu_execution.md` to see exactly which SFPU LLK instructions
-implement SiLU and why the polynomial approximation for sigmoid is the dominant cost.
+**Next:** [`silu_sfpu_execution.md`](./silu_sfpu_execution.md)

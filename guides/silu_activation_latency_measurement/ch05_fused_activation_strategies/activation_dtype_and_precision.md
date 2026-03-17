@@ -179,6 +179,6 @@ If the perplexity delta exceeds tolerance, revert to `activation_dtype=ttnn.bflo
 
 ---
 
-## Next Steps
+---
 
-This completes the technical content for Chapter 5. Continue to Chapter 6 (`ch06_performance_impact_and_recommendations/index.md`) for the synthesis of fusion recommendations, the configuration decision table, and the verification checklist for confirming that fusion is active in the Tracy profiler CSV.
+**Next:** [Chapter 6 — Performance Impact and Recommendations](../ch06_performance_impact_and_recommendations/index.md)

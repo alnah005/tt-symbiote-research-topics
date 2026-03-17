@@ -52,9 +52,9 @@ Both paths achieve the same kernel-level effect: the SFPU activation pass is fol
 | File | Contents |
 |---|---|
 | `index.md` (this file) | Chapter overview, learning objectives, prerequisites, fusion mechanism summary, file map |
-| `ttnn_fused_activation_api.md` | `ttnn.matmul` `activation` parameter; program config `fused_activation` field; kernel-level fusion semantics; `activation_dtype`; code examples |
-| `swiglu_fusion_pattern.md` | SwiGLU fusion challenge; Pattern A (recommended), Pattern B (baseline), Pattern C (custom kernel); memory config requirements |
-| `activation_dtype_and_precision.md` | BFP8_B vs. BF16 accuracy tradeoff; L1 footprint reduction; when to use each dtype; accuracy validation approach |
+| [`ttnn_fused_activation_api.md`](./ttnn_fused_activation_api.md) | `ttnn.matmul` `activation` parameter; program config `fused_activation` field; kernel-level fusion semantics; `activation_dtype`; code examples |
+| [`swiglu_fusion_pattern.md`](./swiglu_fusion_pattern.md) | SwiGLU fusion challenge; Pattern A (recommended), Pattern B (baseline), Pattern C (custom kernel); memory config requirements |
+| [`activation_dtype_and_precision.md`](./activation_dtype_and_precision.md) | BFP8_B vs. BF16 accuracy tradeoff; L1 footprint reduction; when to use each dtype; accuracy validation approach |
 
 ---
 

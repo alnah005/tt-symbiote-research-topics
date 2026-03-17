@@ -111,6 +111,6 @@ If the raw matmul output is needed separately, use Pattern B (unfused) and call 
 
 ---
 
-## Next Steps
+---
 
-Continue to [`configuration_recommendations.md`](configuration_recommendations.md) for the specific TTNN API calls, program config settings, and Tracy profiler verification steps for each of the three production scenarios covered in this chapter.
+**Next:** [`configuration_recommendations.md`](./configuration_recommendations.md)

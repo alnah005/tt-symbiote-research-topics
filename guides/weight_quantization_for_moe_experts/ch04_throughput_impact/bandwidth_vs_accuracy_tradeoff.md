@@ -114,3 +114,7 @@ two alone delivers most of the bandwidth benefit.
 - Dense MLP: bfloat8_b + HiFi2 is the conservative default (PCC ~0.998, 0.5×BW).
 - Full bfloat4_b across all projections is not on the Pareto frontier: down PCC reaches
   only ~0.941–0.943, at or just above the 0.94 floor, causing unacceptable perplexity without further compensation.
+
+---
+
+**Next:** [Chapter 5 — Per-Projection Quantization Strategy](../ch05_per_projection_strategy/index.md)

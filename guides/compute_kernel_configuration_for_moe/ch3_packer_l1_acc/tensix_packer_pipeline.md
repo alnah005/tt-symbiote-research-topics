@@ -96,6 +96,4 @@ config = WormholeComputeKernelConfig(
 
 ---
 
-## Next Steps
-
-Continue to [`throughput_impact.md`](./throughput_impact.md) for quantitative throughput analysis: bandwidth reduction formulas, decode-mode vs. prefill regime comparison, and the DeepSeek-V3 TTNN configuration as a real-world reference point.
+**Next:** [`throughput_impact.md`](./throughput_impact.md)

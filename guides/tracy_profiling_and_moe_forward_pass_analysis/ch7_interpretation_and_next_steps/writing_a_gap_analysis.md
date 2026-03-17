@@ -300,9 +300,6 @@ Before circulating the gap analysis, verify:
 
 ---
 
-## Next Steps
+---
 
-Proceed to [`optimization_action_reference.md`](./optimization_action_reference.md) for the
-detailed reference table of every TTNN optimization lever discussed in the recommended actions
-section, including expected latency reductions, enabling conditions, correctness caveats, and
-the PCC validation procedure.
+**Next:** [`optimization_action_reference.md`](./optimization_action_reference.md)

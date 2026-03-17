@@ -35,11 +35,7 @@ This file tracks research topics that the Architect needs to investigate for mak
 - What program configs are recommended for different batch/sequence sizes?
 
 **Findings:**
-Full guide written: `guides/moe_optimization_techniques_for_ttnn/` (ch01–ch08).
-
-- **sparse_matmul vs batched matmul:** Use `sparse_matmul` when token utilization < ~50% (C/32 < 0.5, i.e., C < 16). At decode with B≤32 and C=2, token utilization is 6.25% — sparse_matmul skips 93.75% of zero tile rows. Switch to dense batched matmul at prefill when C grows past 16.
-- **Sparsity tensor construction:** Build a `[E, C]` sparsity tensor from router top-k indices after capacity-aware assignment. Place in L1 for decode (small), DRAM for prefill (large). Tile-align to 32-element boundaries; pad with sentinel value (e.g., -1) for empty capacity slots.
-- **Program configs:** `per_core_M = ceil(C/32)` — equals 1 for all decode batch sizes (C < 32). Use a (2, 32) core grid (2 cores/expert × 32 local experts = 64 active cores) on T3K. `out_subblock_h = 1` at decode; `in0_block_w = K_t` only if L1 budget permits (K_t=224 at H=7168 is large — may need blocking).
+`guides/moe_optimization_techniques_for_ttnn/`
 
 ---
 
@@ -53,12 +49,7 @@ Full guide written: `guides/moe_optimization_techniques_for_ttnn/` (ch01–ch08)
 - What are the bandwidth characteristics between T3K devices?
 
 **Findings:**
-Full guide written: `guides/t3k_mesh_device_optimizations/` (ch01–ch07).
-
-- **num_links:** Use `num_links=1` for decode (dispatch volume ≤ 6.4 MB at B=32). Link setup overhead outweighs throughput gain below ~20 MB payload. Use `num_links=2` for prefill (dispatch volume ~245 MB+ at B=1,S=2048). The threshold is empirically ~20 MB; confirm with `ch03_all_to_all_num_links/num_links_parameter.md`.
-- **Memory config (decode):** All activations and A2A buffers in `L1_MEMORY_CONFIG`. Expert weights always in `DRAM_MEMORY_CONFIG` (too large for L1). KV cache always DRAM. Set memory configs once before the decode loop — do not reset per step (avoids program cache invalidation).
-- **Memory config (prefill):** All tensors (activations, A2A buffers, expert weights) in `DRAM_MEMORY_CONFIG`; prefill A2A buffers are too large for L1 (~29–940 MB depending on B and S).
-- **T3K bandwidth:** ~12.5 GB/s per Ethernet link; 1×8 linear mesh with average hop count 3.0. Interior devices (IDs 1–6) have 2 active ports; endpoint devices (0, 7) have 1. Wormhole B0: 80 Tensix cores, ~1.5 MB L1/core, ~120 MB aggregate L1, ~300 GB/s DRAM bandwidth [UNVERIFIED].
+`guides/t3k_mesh_device_optimizations/`
 
 ---
 
@@ -72,11 +63,7 @@ Full guide written: `guides/t3k_mesh_device_optimizations/` (ch01–ch07).
 - How should routing weights be processed to minimize overhead?
 
 **Findings:**
-Full guide written: `guides/expert_parallelism_strategies/` (ch01–ch08).
-
-- **Dispatch/combine scheme:** `ttnn.all_to_all` (dispatch + combine) is the preferred scheme for Qwen3.5-35B on T3K at decode batch sizes B=1–32. All-gather-based expert sharding is only better below ~4 tokens/step where dispatch volume drops below link-setup overhead. At B=32, dispatch volume ≈ 6.4 MB, latency ≈ 0.51 ms per direction — the workload is communication-bound.
-- **Expert assignment:** Uniform 32-experts-per-device (256/8) as default. Apply load-aware bin-packing rebalancing only when any expert's activation frequency exceeds 4× average (f_e > 12.5%). Replicate hot experts onto additional devices when f_e > 1/N = 12.5% and DRAM budget allows; replication factor r_e = max(1, ceil(f_e × N)).
-- **Routing weight processing:** Fuse router projection with top-k selection. Defer weight renormalization to the combine kernel (avoid a separate pass). Use BF16 for W_r (3.67 MB); INT8 (1.84 MB) only under DRAM pressure. Capacity factor CF=1.25 → C=2 at B=32; Poisson overflow ≈ 8% per expert, total drops ≈ 10.6% of expert slots. Use hard-drop with renormalization of surviving top-k weights.
+`guides/expert_parallelism_strategies/`
 
 ---
 
@@ -90,7 +77,7 @@ Full guide written: `guides/expert_parallelism_strategies/` (ch01–ch08).
 - Which projections (gate/up/down) are most sensitive to quantization?
 
 **Findings:**
-Mixed layout (bfloat4_b gate/up + bfloat8_b down) reduces per-expert memory from 84.0 MB to 28.0 MB (3x reduction). T3K (8 chips): 16 experts/chip; BF16 1,344 MB/chip → mixed 448 MB/chip. PCC thresholds: gate/up ≥ 0.96, down ≥ 0.975, full layer ≥ 0.97, production baseline > 0.999. Both LOFI and HIFI2 use fp32_dest_acc_en=False.
+`guides/weight_quantization_for_moe_experts/`
 
 ---
 
@@ -104,7 +91,7 @@ Mixed layout (bfloat4_b gate/up + bfloat8_b down) reduces per-expert memory from
 - What is the accuracy trade-off for using math_approx_mode?
 
 **Findings:**
-Two canonical configs for Wormhole B0 MoE: LOFI (gate/up projections) and HIFI2 (down projection). BOTH have fp32_dest_acc_en=False. packer_l1_acc savings formula = (K_t−1)/K_t. PCC standard threshold > 0.999; strict tier > 0.9995. For PCC ≤ 0.9995 use HIFI2; for > 0.9995 use HIFI4 with fp32_dest_acc_en=True. Benchmark: 20 timed iterations, median + p95, warm-up ≥ 3.
+`guides/compute_kernel_configuration_for_moe/`
 
 ---
 
@@ -118,7 +105,7 @@ Two canonical configs for Wormhole B0 MoE: LOFI (gate/up projections) and HIFI2 
 - What are the tile size constraints for expert weight sharding?
 
 **Findings:**
-Per-expert BF16 memory: 84.0 MB (3 × 7168 × 2048 × 2 bytes for Qwen/DeepSeek-V3). Decode regime (batch_size × top_k ≤ 16) benefits from DRAM-sharded layout; prefill (effective_M > 256) benefits from interleaved. Qwen crossover effective_M ≈ 556; Mixtral ≈ 451. L1 weight double-buffer = 2 × in0_block_w × per_core_N_t × tile_size_bytes (no M_t). Reshard overhead ~2.3 s for Mixtral 8x7B (768 tensors × 3 ms/tensor).
+`guides/expert_weight_memory_layout_optimization/`
 
 ---
 
@@ -132,7 +119,7 @@ Per-expert BF16 memory: 84.0 MB (3 × 7168 × 2048 × 2 bytes for Qwen/DeepSeek-
 3. Are there any known issues with TTNN paged attention?
 
 **Findings:**
-cur_pos semantics: 0-indexed position of NEXT token to write = current context length BEFORE write (not post-write). For N tokens cached, cur_pos[i]=N. ShardSpec takes element counts not bytes. shard_H % 32 == 0, shard_W % 32 == 0, shard bytes % 32 == 0. Decode-regime GQA uses paged SDPA with KV cache sharded across cores.
+`guides/paged_sdpa_decode_for_gqa/`
 
 ---
 
@@ -146,7 +133,7 @@ cur_pos semantics: 0-indexed position of NEXT token to write = current context l
 3. Does the 16ms gap scale with sequence length?
 
 **Findings:**
-Pattern A (fused SwiGLU): 3 dispatches; Pattern B (unfused): 4 dispatches; Pattern C (with CCL): adds allgather + reduce_scatter. CCL scaling law: O(num_active_tokens × d_model) — no /num_chips term. Memory-bound condition: expert_capacity/32 < num_cores (for Qwen, expert_capacity = seq_len/16, threshold seq_len < ~40,960). T3K ethernet ~7 GB/s/link. Tracy profiling identifies dispatch-to-matmul gaps (Pattern C only) vs compute gaps (all patterns).
+`guides/tracy_profiling_and_moe_forward_pass_analysis/`
 
 ---
 
@@ -160,5 +147,5 @@ Pattern A (fused SwiGLU): 3 dispatches; Pattern B (unfused): 4 dispatches; Patte
 3. Would fusing SiLU with matmul improve performance?
 
 **Findings:**
-SiLU runs on the SFPU as a sequential pass; arithmetic intensity = 0.5 FLOP/byte (2 FLOPs / 4 bytes read+write); SiLU latency is 4–8% of gate_proj matmul at 128 tokens. Fused Pattern A (3 dispatches) vs unfused Pattern B (4 dispatches); fusion beneficial when num_tokens ≥ 16. Only gate_proj SiLU is fusible in a single ttnn.matmul call; up_proj SiLU requires a separate dispatch.
+`guides/silu_activation_latency_measurement/`
 

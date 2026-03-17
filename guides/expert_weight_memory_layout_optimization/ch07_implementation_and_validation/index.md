@@ -90,9 +90,9 @@ Use this checklist as a completion gate before deploying DRAM-sharded expert wei
 | File | Contents |
 |---|---|
 | `index.md` | This file: learning objectives, checklist, prerequisites |
-| `code_patterns.md` | Runnable code for weight loading, shard config construction, resharding, and `ttnn.matmul` integration |
-| `correctness_verification.md` | PCC computation; step-by-step verification workflow; diagnosing shard misalignment failures |
-| `benchmark_methodology.md` | Benchmark harness setup; what to measure; Tracy profiler usage; two-config comparison loop; result reporting |
+| [`code_patterns.md`](./code_patterns.md) | Runnable code for weight loading, shard config construction, resharding, and `ttnn.matmul` integration |
+| [`correctness_verification.md`](./correctness_verification.md) | PCC computation; step-by-step verification workflow; diagnosing shard misalignment failures |
+| [`benchmark_methodology.md`](./benchmark_methodology.md) | Benchmark harness setup; what to measure; Tracy profiler usage; two-config comparison loop; result reporting |
 
 ---
 

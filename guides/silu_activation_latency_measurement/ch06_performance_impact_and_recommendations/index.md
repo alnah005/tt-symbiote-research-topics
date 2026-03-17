@@ -69,9 +69,9 @@ The following bullets summarize the quantitative and architectural conclusions t
 | File | Contents |
 |---|---|
 | `index.md` (this file) | Chapter overview, learning objectives, key findings summary, quick-reference table, prerequisites |
-| `when_fusion_helps.md` | Decision framework mapping `(num_tokens, hidden_dim, dtype)` to latency ratio regime; decode vs. prefill analysis; T3K multi-chip context; anti-pattern warning |
-| `configuration_recommendations.md` | Recommended config for three production scenarios; program config path for sharded tensors; Tracy profiler verification checklist |
-| `measurement_summary_and_next_steps.md` | Expected latency numbers; interpretation; open questions; pointers to related guides |
+| [`when_fusion_helps.md`](./when_fusion_helps.md) | Decision framework mapping `(num_tokens, hidden_dim, dtype)` to latency ratio regime; decode vs. prefill analysis; T3K multi-chip context; anti-pattern warning |
+| [`configuration_recommendations.md`](./configuration_recommendations.md) | Recommended config for three production scenarios; program config path for sharded tensors; Tracy profiler verification checklist |
+| [`measurement_summary_and_next_steps.md`](./measurement_summary_and_next_steps.md) | Expected latency numbers; interpretation; open questions; pointers to related guides |
 
 ---
 

@@ -51,9 +51,9 @@ After reading this chapter you will be able to:
 
 | File | What it covers |
 |------|----------------|
-| `function_signature.md` | Full Python signature; per-parameter type, purpose, and gotchas |
-| `tensor_shape_reference.md` | Master shape table; layout and dtype requirements; silent failure catalog |
-| `sdpa_program_config.md` | `SDPAProgramConfig` fields; parallelization strategy; worked example |
+| [`function_signature.md`](./function_signature.md) | Full Python signature; per-parameter type, purpose, and gotchas |
+| [`tensor_shape_reference.md`](./tensor_shape_reference.md) | Master shape table; layout and dtype requirements; silent failure catalog |
+| [`sdpa_program_config.md`](./sdpa_program_config.md) | `SDPAProgramConfig` fields; parallelization strategy; worked example |
 
 ---
 

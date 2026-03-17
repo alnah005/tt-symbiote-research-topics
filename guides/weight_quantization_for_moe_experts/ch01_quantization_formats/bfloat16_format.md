@@ -143,9 +143,6 @@ Dimensions that are not multiples of 32 are zero-padded to the next tile boundar
 
 ---
 
-## Next Steps
+---
 
-With bfloat16 as the baseline, the next two sections introduce the block floating-point formats that halve and quarter the memory cost:
-
-- [bfloat8_b_format.md](./bfloat8_b_format.md) — 8-bit block FP, 2× compression, 2× throughput
-- [bfloat4_b_format.md](./bfloat4_b_format.md) — 4-bit block FP, 4× compression
+**Next:** [`bfloat8_b_format.md`](./bfloat8_b_format.md)

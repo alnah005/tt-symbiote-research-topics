@@ -116,9 +116,6 @@ This guide has covered the SiLU activation function from first principles throug
 
 ---
 
-## Next Steps
+---
 
-This is the final chapter of the `silu_activation_latency_measurement` guide. To continue optimizing MoE inference performance on Wormhole B0 and T3K, proceed to the following guides:
-
-- **`moe_optimization_techniques_for_ttnn`** — covers batched expert dispatch, custom kernel authoring for Pattern C full SwiGLU fusion, and down_proj latency reduction strategies.
-- **`t3k_mesh_device_optimizations`** — covers multi-chip expert parallelism, per-chip token count balancing, and Ethernet communication overhead in MoE routing on the T3K board.
+**End of guide.** Return to [Guide Index](../index.md)

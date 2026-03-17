@@ -123,9 +123,9 @@ After completing this chapter you will be able to:
 
 | File | Contents |
 |---|---|
-| `reading_tracy_traces.md` | Tracy GUI orientation; zooming into the MoE forward pass; CSV gap measurement script |
-| `gap_attribution.md` | Three attribution methods; 16ms hypothesis table; ruling out noise |
-| `common_gap_patterns.md` | Patterns A–D: signatures, root causes, diagnostic steps |
+| [`reading_tracy_traces.md`](./reading_tracy_traces.md) | Tracy GUI orientation; zooming into the MoE forward pass; CSV gap measurement script |
+| [`gap_attribution.md`](./gap_attribution.md) | Three attribution methods; 16ms hypothesis table; ruling out noise |
+| [`common_gap_patterns.md`](./common_gap_patterns.md) | Patterns A–D: signatures, root causes, diagnostic steps |
 
 ---
 

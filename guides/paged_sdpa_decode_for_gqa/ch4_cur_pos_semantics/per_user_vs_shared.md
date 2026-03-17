@@ -128,3 +128,7 @@ output = ttnn.transformer.paged_scaled_dot_product_attention_decode(
     scale=dh**-0.5,
 )
 ```
+
+---
+
+**Next:** [`cur_pos_in_paged_mode.md`](./cur_pos_in_paged_mode.md)

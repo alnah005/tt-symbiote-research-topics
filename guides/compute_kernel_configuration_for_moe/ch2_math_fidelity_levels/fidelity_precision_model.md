@@ -75,6 +75,4 @@ For MoE expert matmuls that are pure matmul (no fused activation kernel), `math_
 
 ---
 
-## Next Steps
-
-Read `fidelity_and_moe_accuracy.md` to understand why the three MoE projection types (gate, up, down) map to different entries in the fidelity table above — specifically, how K-loop depth and the presence or absence of a downstream nonlinearity determine whether LoFi mantissa errors remain bounded or compound into residual stream drift.
+**Next:** [`fidelity_and_moe_accuracy.md`](./fidelity_and_moe_accuracy.md)

@@ -87,6 +87,4 @@ The only risk is L1 overflow, which is a configuration error detectable at dispa
 
 ---
 
-## Next Steps
-
-Continue to [`packer_l1_acc_constraints.md`](./packer_l1_acc_constraints.md) for the L1 budget model, overflow detection procedure, and the interaction between `packer_l1_acc` and `fp32_dest_acc_en` that can double the accumulation buffer size.
+**Next:** [`packer_l1_acc_constraints.md`](./packer_l1_acc_constraints.md)

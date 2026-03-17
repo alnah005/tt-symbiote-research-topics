@@ -154,3 +154,7 @@ page_table = ttnn.from_torch(
 assert page_table.dtype == ttnn.int32
 assert page_table.layout == ttnn.ROW_MAJOR_LAYOUT
 ```
+
+---
+
+**Next:** [`gqa_workaround_history.md`](./gqa_workaround_history.md)

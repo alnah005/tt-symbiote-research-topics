@@ -141,8 +141,6 @@ expert capacity capping with token dropping; or Z-loss regularization on router 
 
 ---
 
-## Next Steps
+---
 
-Continue to [`full_op_sequence_reference.md`](./full_op_sequence_reference.md) for the
-consolidated op table covering every TTNN op in the MoE forward pass with shapes, durations,
-and Tracy zone names.
+**Next:** [`full_op_sequence_reference.md`](./full_op_sequence_reference.md)

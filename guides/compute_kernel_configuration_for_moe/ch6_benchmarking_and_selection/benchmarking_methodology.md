@@ -253,6 +253,4 @@ Fill in your measured values. The canonical production configs target the row th
 
 ---
 
-## Next Steps
-
-With benchmark results in hand, proceed to [config_decision_matrix.md](config_decision_matrix.md) to apply structured decision rules for each projection type and regime.
+**Next:** [`config_decision_matrix.md`](./config_decision_matrix.md)

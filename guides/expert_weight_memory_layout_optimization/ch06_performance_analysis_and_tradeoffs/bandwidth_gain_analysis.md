@@ -114,6 +114,4 @@ The "`≤ 16`" rule targets the high-impact zone, not the boundary: at `effectiv
 
 ---
 
-## Next Steps
-
-Proceed to `shard_setup_overhead.md` to understand the one-time cost of resharding expert weights at model load time and how to ensure the reshard does not affect program cache stability during inference.
+**Next:** [`shard_setup_overhead.md`](./shard_setup_overhead.md)

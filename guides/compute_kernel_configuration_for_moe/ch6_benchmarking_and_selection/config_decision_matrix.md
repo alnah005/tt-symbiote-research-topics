@@ -166,6 +166,4 @@ Do not deviate from `packer_l1_acc=True` without an L1 allocation error as justi
 
 ---
 
-## Next Steps
-
-Proceed to [production_config_checklist.md](production_config_checklist.md) for the pre-deployment verification steps before merging a kernel config change into a production model.
+**Next:** [`production_config_checklist.md`](./production_config_checklist.md)

@@ -144,6 +144,6 @@ def expert_forward(x, weight_bfloat4b, weight_bfloat8b):
 
 Which projection types (gate, up, down) should use LoFi vs HiFi2 is covered in Chapter 5, after accuracy characterization of each projection is established.
 
-## Next Steps
+---
 
-Continue to `dtype_in_linear_and_matmul.md` to understand how the weight dtype stored at conversion time determines which matmul kernel TTNN dispatches, and how this interacts with program config tile parameters.
+**Next:** [`dtype_in_linear_and_matmul.md`](./dtype_in_linear_and_matmul.md)

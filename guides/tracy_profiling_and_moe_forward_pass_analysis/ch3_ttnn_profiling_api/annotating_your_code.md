@@ -184,6 +184,6 @@ for i in range(num_iterations):
 
 ---
 
-## Next Steps
+---
 
-Continue to [`reading_op_timing_output.md`](./reading_op_timing_output.md) to learn how to read and interpret the profiler CSV output, identify MoE ops in the timeline, sum kernel durations to reconstruct total forward pass time, and diagnose the gaps between hardware execution time and wallclock measurement.
+**Next:** [`reading_op_timing_output.md`](./reading_op_timing_output.md)

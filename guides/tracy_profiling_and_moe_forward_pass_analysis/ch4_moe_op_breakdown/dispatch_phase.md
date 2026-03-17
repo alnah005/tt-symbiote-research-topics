@@ -151,7 +151,6 @@ The gather output `[total_active_tokens, d_model]` is not fixed even at fixed se
 
 ---
 
-## Next Steps
+---
 
-Continue to [`expert_matmul_phase.md`](./expert_matmul_phase.md) for the gate/up/down projection
-matmul structure, expected FLOPs, and the prefill vs. decode latency relationship.
+**Next:** [`expert_matmul_phase.md`](./expert_matmul_phase.md)
