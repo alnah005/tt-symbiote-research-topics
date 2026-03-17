@@ -139,7 +139,7 @@ Before any writing begins, the orchestrator spawns **Agent A** to generate an **
 The plan must contain:
 
 1. **Audience** — who is this guide for, what do they already know.
-2. **Chapter list** — typically 5–8 chapters, ordered from foundational to advanced. For each chapter:
+2. **Chapter list** — typically 1–8 chapters, ordered from foundational to advanced. For each chapter:
    - Chapter number and title
    - One-sentence description of what it covers
    - List of files inside the chapter directory (e.g., `index.md`, `topic_a.md`, `topic_b.md`)
