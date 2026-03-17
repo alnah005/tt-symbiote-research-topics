@@ -106,3 +106,90 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 **Findings:**
 [Pending research]
+
+---
+
+## Paged SDPA Decode for GQA (Group Query Attention)
+**Date:** 2026-03-17
+**Status:** Completed
+**Why Needed:** Ling model generates incorrect text during decode. Need to understand paged_sdpa_decode kernel expectations for GQA with 4 KV heads and 16 Q heads.
+**Questions:**
+1. What does paged_sdpa_decode kernel expect for GQA (4 KV heads to 16 Q heads)?
+2. Is there a mismatch in how cur_pos is interpreted?
+3. Are there any known issues with TTNN paged attention?
+
+**Findings:**
+
+### 1. Expected Tensor Shapes for paged_sdpa_decode
+
+From FlashDecode technical report and TTNN test utilities:
+
+**Query tensor:**
+- Expected shape: `[1, bsz, num_q_heads, head_dim]` (notation: 1BQD)
+- The kernel puts heads in the Y dimension for parallelization
+- For decode, seq_len=1 in dim 0
+
+**KV Cache tensors:**
+- Shape: `[max_num_blocks, num_kv_heads, block_size, head_dim]` for paged attention
+- Or `[bsz, num_kv_heads, kv_len, head_dim]` for non-paged
+
+**GQA Handling:**
+- The kernel handles GQA natively
+- `n_qh_per_kvh = n_q_heads // n_kv_heads` (e.g., 16/4 = 4)
+- Parallelization: `bsz * n_kv_heads` across cores, `n_qh_per_kvh` within a core
+- Query is internally reshaped: `query.view(1, bsz*n_kv_heads, n_qh_per_kvh, head_dim)`
+
+**cur_pos_tensor:**
+- Shape: `[batch_size]` - 1D tensor of int32
+- Contains the current decoding position for each batch item
+- Used for causal masking (attends only to positions 0..cur_pos for each batch)
+
+### 2. cur_pos Interpretation
+
+The `cur_pos_tensor` is interpreted as:
+- The **current position** where the new token is being decoded
+- Cache reads: `k_cache[:, :, :cur_pos, :]` (all positions up to cur_pos)
+- This matches what paged_update_cache expects for `update_idxs_tensor`
+
+**CRITICAL:** The cur_pos passed to `paged_sdpa_decode` should be the position **after** updating the cache. If you write to position N, then cur_pos should be N so that attention attends to positions 0..N.
+
+### 3. Potential Issues Identified
+
+**Issue A: Query Shape After Permute**
+In tt_symbiote, query is permuted from `[B, H, S, D]` to `[S, B, H, D]`:
+- For decode (S=1): results in `[1, B, H, D]` which matches expected `[1, bsz, num_q_heads, head_dim]`
+- This appears CORRECT
+
+**Issue B: KV Cache Layout vs Standard**
+tt_symbiote cache shape: `(max_num_blocks, num_kv_heads, block_size, head_dim)`
+Standard expected: `(bsz * max_num_blocks_per_seq, num_kv_heads, block_size, head_dim)`
+- This appears CORRECT (matches test utilities)
+
+**Issue C: Position Tracking vs RoPE Position**
+The PLAN document already identified this: cache position uses `get_seq_length(layer_idx)` while RoPE uses external `position_ids`. If these diverge:
+- KV written to wrong cache slot
+- Attention reads wrong context
+
+**Issue D: q_chunk_size=0 in decode config**
+tt_symbiote uses `q_chunk_size=0, k_chunk_size=0` for decode config. The FlashDecode documentation suggests these should be computed based on sequence length. Zero chunk sizes may trigger default behavior which could be incorrect.
+
+**Recommendation:** Match the chunk size calculation from the working model (`models/tt_transformers/tt/attention.py`) which uses `get_attn_sdpa_decode_program_config()`.
+
+### 4. No Known TTNN Paged Attention Bugs
+
+Test file `test_sdpa_decode.py` shows paged attention tests passing for:
+- GQA configurations (nh=32, nkv=8 for llama 3.1)
+- Various block sizes (16, 32, 64, 128)
+- Bug fixes for issue #37927 (block_size=16, q_chunk_size==head_size edge cases)
+
+The kernel itself is well-tested. Issues are likely in how tt_symbiote calls it.
+
+### 5. Root Cause Hypothesis
+
+Based on the existing PLAN document and this analysis, the most likely issues are:
+
+1. **Missing reduce-scatter in dense projection** (documented in PLAN Section 10)
+2. **MoE router precision** causing expert selection drift (documented in PLAN Section 11)
+3. **Position tracking mismatch** between RoPE and cache position
+
+The paged_sdpa_decode kernel itself appears to be called correctly for GQA.
