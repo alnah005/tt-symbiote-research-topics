@@ -269,7 +269,7 @@ After all chapters are complete:
 1. **Orchestrator spawns Agent A** to write `<output_dir>/index.md`. The index must contain:
    - A 1–2 sentence description of the guide (scope and audience).
    - A **"How to Use This Guide"** table: common reader goals mapped to recommended chapter paths and direct deep links.
-   - A **Chapter Index** table: chapter number, title, one-line description, key operations or concepts.
+   - A **Chapter Index** table: chapter number, title, one-line description, key operations or concepts. **Every chapter entry in this table must be a clickable markdown link to that chapter's `index.md`**, e.g. `[Ch 1 — Title](ch1_title/index.md)`.
    - A **Quick Reference** table: the most-used API calls or concepts, what each does, and where to learn more.
    - A **Prerequisites** section.
    - A **Source Code Location** section (if applicable).
@@ -328,7 +328,16 @@ Chapter directory names use the format `ch<N>_<short_snake_case_title>`.
 6. Compression analysis files are append-only across passes (each pass adds a new dated section). Never delete a previous pass's analysis.
 7. Keep `index.md` and chapter `index.md` files as pure navigation — no content that belongs in a section file.
 8. All cross-chapter references use relative markdown links.
+   - **Chapter `index.md` files must use clickable markdown links for every file reference** — both in navigation tables and in reading-order lists. Plain backtick filenames (e.g. `` `topic.md` ``) are not acceptable; every reference must be in the form `[`topic.md`](./topic.md)`.
+   - **Every content file** (any `.md` that is not `index.md`, `b_review.md`, `compression_analysis.md`, or `plan.md`) **must end with a navigation footer**:
+     - If it is not the last file in the chapter: `---\n\n**Next:** [\`next_file.md\`](./next_file.md)`
+     - If it is the last file in the chapter but not the last chapter: `---\n\n**Next:** [Chapter N+1 — Title](../chN+1_title/index.md)`
+     - If it is the last file of the entire guide's last chapter: `---\n\n**End of guide.** Return to [Guide Index](../index.md)`
+   - Agent A is responsible for adding these footers when writing each file. Agent B must flag any content file that is missing its navigation footer as a structural gap.
 9. **Agent B and Agent C are always separate agent invocations.** The orchestrator must never allow B or C to run in the same context as A. This isolation is what makes the review adversarial and trustworthy. Agent B writes to `b_review.md`; Agent C writes to `compression_analysis.md`. These are separate files.
 10. **Agent C must produce a Summary section with actual line count estimates.** A verdict of `Crucial updates: no` without a populated Summary section is invalid.
 11. **A `Crucial updates: no` verdict requires both `## Load-Bearing Evidence` (non-empty, one bullet per file with a quoted line) and at least one `## MINOR Suggestions` item.** The orchestrator must reject and re-spawn Agent C if either is absent. There is no such thing as a chapter with zero MINOR issues.
 12. **The orchestrator must never rubber-stamp Agent C's verdict.** It must explicitly verify the two conditions in rule 11 before accepting the verdict and advancing.
+13. **Every chapter `index.md` must use clickable markdown links for all file references.** Agent A must write all file references in navigation tables and reading-order lists as `[`filename.md`](./filename.md)`, never as plain backtick names. Agent B must flag plain backtick-only file references as a structural gap.
+14. **Every content file must end with the correct navigation footer** (see rule 8). Agent A is responsible for adding it when writing the file. Agent B must flag missing footers as a structural gap.
+15. **The guide-level `index.md` chapter table must use clickable links** to each chapter's `index.md`. Entries of the form `Ch N — Title` without a hyperlink are not acceptable.
