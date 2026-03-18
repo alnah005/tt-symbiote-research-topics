@@ -149,3 +149,19 @@ This file tracks research topics that the Architect needs to investigate for mak
 **Findings:**
 `guides/silu_activation_latency_measurement/`
 
+
+---
+
+## Mistral MoE OOM Analysis
+**Date:** 2026-03-18
+**Status:** Pending
+**Why Needed:** E2E test for Mistral-Small-4-119B OOMs after ~35 minutes during all_to_all_dispatch. Need to identify memory bottlenecks.
+**Questions:**
+1. What is the memory footprint during all_to_all_dispatch?
+2. Is there a tensor accumulation/leak during decode iterations?
+3. How does the TTNNExperts.forward implementation handle memory deallocation?
+
+**Findings:**
+(pending investigation)
+
+---
