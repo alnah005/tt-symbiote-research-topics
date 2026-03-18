@@ -183,3 +183,23 @@ Root cause: The `TTNNLinearInputReplicatedWeightSharded.move_weights_to_device_i
 Fix: Add conditional check in `move_weights_to_device_impl()` to only use mesh mappers when `device.get_num_devices() > 1`.
 
 ---
+
+## MoE Accuracy for Small Sequence Lengths (prefill_32 vs prefill_128)
+**Date:** 2026-03-18
+**Status:** Pending
+**Why Needed:** `test_full_moe_accuracy[prefill_32]` fails with PCC 0.986860 (needs >= 0.99) while `test_full_moe_accuracy[prefill_128]` passes with PCC 0.997561. Need to understand why smaller sequence lengths have lower accuracy.
+**Questions:**
+1. Why does prefill_32 have lower PCC than prefill_128?
+2. Are there precision issues specific to small tensor dimensions?
+3. Should compute kernel configs (HiFi2/HiFi4, fp32_dest_acc_en) be adjusted for small sequences?
+
+**Findings:**
+`PLAN_improve_moe_pcc.md`
+
+Root cause analysis and fix plan documented in the plan file. Key findings:
+- Expert weights use bfloat8_b which introduces quantization error
+- Small sequences have fewer elements for error averaging
+- The forward_local path lacks compute kernel configs for expert matmuls
+- The down projection needs HiFi2 and fp32_dest_acc_en=True for accuracy
+
+---
