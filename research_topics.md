@@ -165,3 +165,21 @@ This file tracks research topics that the Architect needs to investigate for mak
 (pending investigation)
 
 ---
+
+## Integration Test Device Setup (MeshShape Mismatch)
+**Date:** 2026-03-18
+**Status:** Completed
+**Why Needed:** Integration tests for Qwen3LinearAttention fail with MeshShape([1, 8]) != MeshShape([1, 1]) when running on single device.
+**Questions:**
+1. Why are tests failing with MeshShape mismatch when distributed=False is passed?
+2. How do sharded linear layers handle single-device vs multi-device mesh?
+3. What is the correct way to conditionally apply mesh mappers based on device count?
+
+**Findings:**
+`PLAN_integration_test_device_fix.md`
+
+Root cause: The `TTNNLinearInputReplicatedWeightSharded.move_weights_to_device_impl()` always creates mesh mappers via `ttnn.shard_tensor_to_mesh_mapper()`, which expects a multi-device mesh. When the device is single-device (MeshShape [1, 1]), this causes a mismatch.
+
+Fix: Add conditional check in `move_weights_to_device_impl()` to only use mesh mappers when `device.get_num_devices() > 1`.
+
+---
