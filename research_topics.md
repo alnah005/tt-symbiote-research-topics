@@ -149,3 +149,22 @@ This file tracks research topics that the Architect needs to investigate for mak
 **Findings:**
 `guides/silu_activation_latency_measurement/`
 
+---
+
+## TTNN Device-Level Profiling with Tracy
+**Date:** 2026-03-17
+**Status:** Completed
+**Why Needed:** Need to understand how to use the Tracy profiler to capture device-level op timing for TTNN operations, interpret per-RISC kernel durations, and diagnose whether ops are compute-bound or bandwidth-bound.
+**Questions:**
+1. How is the Tracy profiler invoked for a TTNN pytest (env vars, CLI flags)?
+2. What does each field in the ops_perf_results CSV mean (DEVICE KERNEL DURATION, BRISC/NCRISC/TRISC durations, PM IDEAL, FPU UTIL)?
+3. How do you determine if an op is compute-bound vs bandwidth-bound from the profiler output?
+4. What are common causes of low FPU utilization and how can they be addressed?
+5. How does host dispatch overhead compare to device kernel time for small vs large ops?
+
+**Guide:** `guides/ttnn_device_level_profiling_with_tracy/`
+
+**Findings:**
+`guides/ttnn_device_level_profiling_with_tracy/`
+
+---
