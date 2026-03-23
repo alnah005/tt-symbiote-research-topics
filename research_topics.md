@@ -185,3 +185,19 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 **Findings:**
 `guides/ttnn_ops_trace/`
+
+---
+
+## Distributed RMS Norm Garbled Output
+**Date:** 2026-03-23
+**Status:** In Progress
+**Why Needed:** Model output becomes garbled after adding Distributed RMS norm. Need to investigate potential issues with distributed normalization implementation.
+**Questions:**
+1. What changes were made to add Distributed RMS norm?
+2. How is the reduction handled across distributed devices?
+3. Are tensor shapes and memory layouts correct for distributed operation?
+4. How is the normalization scale/weight applied in the distributed case?
+5. What patterns do other distributed normalization ops follow?
+
+**Findings:**
+[Investigation in progress]
