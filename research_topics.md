@@ -181,5 +181,7 @@ This file tracks research topics that the Architect needs to investigate for mak
 4. How is everything related?
 5. How to estimate improvement?
 
+**Guide:** `guides/ttnn_ops_trace/`
+
 **Findings:**
-6-chapter guide covering: dispatch fundamentals (17–63 us per-op overhead, 4 phases), async op execution model, trace capture/replay API and internals (address-fixity constraint, 36–288× per-op elimination), decision framework (4 disqualifying conditions), speedup estimation methodology (`speedup = T / (T - D)`), and a fully-annotated 46-op reference decode loop implementation with operational concerns and CI integration.
+`guides/ttnn_ops_trace/`
