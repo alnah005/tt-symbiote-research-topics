@@ -168,3 +168,19 @@ This file tracks research topics that the Architect needs to investigate for mak
 `guides/ttnn_device_level_profiling_with_tracy/`
 
 ---
+
+## TTNN Ops Trace
+**Date:** 2026-03-23
+**Status:** Pending
+**Why Needed:** Need to understand trace capture, command queues, pipelines, applicable async ops, when to use trace when not to use trace. How to know if something needs tracing and how to estimate the improvment that could come from trace.
+**Questions:**
+1. What is trace capture?
+2. What are command queues?
+3. What are async ops?
+4. How is everything related?
+5. How to estimate improvement?
+
+**Findings**:
+[pending]
+
+**Findings:**
