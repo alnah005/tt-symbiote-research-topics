@@ -188,26 +188,19 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ---
 
-## Distributed RMS Norm Garbled Output
+## TT Transformers Trace Capture
 **Date:** 2026-03-23
 **Status:** Completed
-**Why Needed:** Model output becomes garbled after adding Distributed RMS norm. Need to investigate potential issues with distributed normalization implementation.
+**Guide:** guides/tt_transformers_op_trace/
+**Why Needed:** Need to understand how to add trace capture by default and how adding trace capture with tracy support can be used. In addition, how does model warm-up affect trace capture and tracy support.
 **Questions:**
-1. What changes were made to add Distributed RMS norm?
-2. How is the reduction handled across distributed devices?
-3. Are tensor shapes and memory layouts correct for distributed operation?
-4. How is the normalization scale/weight applied in the distributed case?
-5. What patterns do other distributed normalization ops follow?
+1. How is trace captured in tt-transformers?
+2. How is tracy used when run with tt-transformers?
+3. How to differentiate warm-up calls from actual calls in tracy?
+4. How to differentiate trace captured ops from normal ops in tracy?
+
 
 **Findings:**
-Root causes identified in `TTNNDistributedRMSNorm`:
+[pending]
 
-1. **Weight shaping is incorrect** - Uses `dims=(None, 2)` with `ShardTensor2dMesh` which doesn't properly distribute weights. Reference implementations use `ShardTensorToMesh` with weight shape `(num_devices, 1, -1, 32)` sharded on dim 0.
 
-2. **Missing cluster_axis parameter** - The `all_gather_async` call is missing `cluster_axis=1`, which could cause gathering on the wrong axis and corrupt statistics.
-
-3. **Missing stats reshape** - Reference implementation in `ccl.py` reshapes stats after `rms_norm_pre_all_gather` to `(1, 1, inp.shape[-2], 32)`. This step is missing in `TTNNDistributedRMSNorm`.
-
-4. **Missing compute_kernel_config** - Reference implementations pass compute kernel config for numerical precision.
-
-See `PLAN_distributed_rmsnorm_fix.md` for detailed fix plan.
