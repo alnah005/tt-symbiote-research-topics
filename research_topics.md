@@ -190,7 +190,7 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ## Distributed RMS Norm Garbled Output
 **Date:** 2026-03-23
-**Status:** In Progress
+**Status:** Completed
 **Why Needed:** Model output becomes garbled after adding Distributed RMS norm. Need to investigate potential issues with distributed normalization implementation.
 **Questions:**
 1. What changes were made to add Distributed RMS norm?
@@ -200,4 +200,14 @@ This file tracks research topics that the Architect needs to investigate for mak
 5. What patterns do other distributed normalization ops follow?
 
 **Findings:**
-[Investigation in progress]
+Root causes identified in `TTNNDistributedRMSNorm`:
+
+1. **Weight shaping is incorrect** - Uses `dims=(None, 2)` with `ShardTensor2dMesh` which doesn't properly distribute weights. Reference implementations use `ShardTensorToMesh` with weight shape `(num_devices, 1, -1, 32)` sharded on dim 0.
+
+2. **Missing cluster_axis parameter** - The `all_gather_async` call is missing `cluster_axis=1`, which could cause gathering on the wrong axis and corrupt statistics.
+
+3. **Missing stats reshape** - Reference implementation in `ccl.py` reshapes stats after `rms_norm_pre_all_gather` to `(1, 1, inp.shape[-2], 32)`. This step is missing in `TTNNDistributedRMSNorm`.
+
+4. **Missing compute_kernel_config** - Reference implementations pass compute kernel config for numerical precision.
+
+See `PLAN_distributed_rmsnorm_fix.md` for detailed fix plan.
