@@ -202,3 +202,28 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 **Findings:**
 `guides/tt_transformers_op_trace/`
+
+---
+
+## Ling Attention TTNN Test Patterns
+**Date:** 2026-03-24
+**Status:** In Progress
+**Why Needed:** Need to create tests to verify TTNN attention implementation matches PyTorch for Ling/BailingMoeV2. The Ling model has unique features: partial RoPE (partial_rotary_factor=0.5), QK normalization, GQA with 4 KV heads and 16 Q heads.
+**Questions:**
+1. What existing TTNN attention test patterns can we follow?
+2. How to test QKV projection equivalence?
+3. How to test QK normalization equivalence?
+4. How to test partial RoPE equivalence?
+5. How to test SDPA (prefill and decode) equivalence?
+6. What PCC thresholds are appropriate for each component?
+
+**Findings:**
+Plan documented in: `PLAN_ling_attention_tests.md`
+
+**Key Resources:**
+- Attention comparison document: `ling_attention_implementations.md`
+- Paged SDPA GQA guide: `guides/paged_sdpa_decode_for_gqa/`
+- Reference test patterns:
+  - `/home/ttuser/tt-metal/models/tt_transformers/tests/test_attention.py`
+  - `/home/ttuser/tt-metal/models/tt_transformers/tests/test_attention_prefill.py`
+  - `/home/ttuser/tt-metal/models/demos/t3000/mixtral8x7b/tests/test_mixtral_attention.py`
