@@ -249,3 +249,28 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 **Findings:**
 [pending]
+
+---
+
+## Ling Attention Accuracy Testing
+**Date:** 2026-03-24
+**Status:** Completed
+**Why Needed:** Ling Mini 2.0 model generates incorrect text when only attention runs on TTNN. Need comprehensive tests to isolate and identify the accuracy problem.
+**Questions:**
+1. What tests exist for attention accuracy?
+2. What are the root causes of accuracy issues?
+3. What additional tests are needed to isolate problems?
+
+**Findings:**
+The issue was identified and fixed - root causes were:
+1. **bfloat16 accumulation** in TTNNRMSNorm and TTNNLinear variants causing numerical drift
+2. **Double-counting** of sequence lengths in _forward_decode_paged
+
+Test files created:
+- `test_ling_mini_2_0_attention_pcc_stages.py` - 11 PCC stage tests
+- `test_ling_mini_2_0_attention.py` - 7 attention tests
+- `test_ling_attention_tdd.py` - 17 TDD tests including GQA padding, cur_pos boundaries, etc.
+- `test_ling_attention_error_isolation.py` - Error isolation by stage
+- `test_ling_attention_only.py` - Attention-only acceleration tests
+
+See `PLAN_ling_attention_accuracy.md` for full details.
