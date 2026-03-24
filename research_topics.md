@@ -198,13 +198,7 @@ This file tracks research topics that the Architect needs to investigate for mak
 3. How to differentiate warm-up calls from actual calls in tracy?
 4. How to differentiate trace captured ops from normal ops in tracy?
 
+**Guide:** `guides/tt_transformers_op_trace/`
 
 **Findings:**
-See guide: `guides/tt_transformers_op_trace/`
-
-1. Trace capture uses `ttnn.begin_trace_capture` / `ttnn.end_trace_capture` / `ttnn.execute_trace`. The first call to each trace path runs a compile pass then records the op graph; all subsequent calls replay it. Buffer aliasing (fixed DRAM addresses via `copy_host_to_device` with `device_tensors=`) is required for correctness.
-2. The `Generator` class in `generator.py` captures decode traces keyed by `sampling_on_device` bool and prefill traces keyed by `f"{seq_len}_{model_id}"`. `model_config.py` / `trace_region_config.py` supply per-model, per-device `trace_region_size` values.
-3. Tracy is activated via `TT_METAL_PROFILER_TRACE_TRACKING=1`, `TTNN_OP_PROFILER=1`, `TT_METAL_DEVICE_PROFILER=1` and `python3 -m tracy -p -r`. The C++ macros `TracyTTMetalBeginMeshTrace`, `TracyTTMetalReplayMeshTrace`, `TracyTTMetalEnqueueMeshWorkloadTrace` (gated on `TT_METAL_PROFILER_TRACE_TRACKING=1`) and `TracyTTMetalEndMeshTrace` (unconditional) emit Tracy messages used to populate `METAL TRACE ID` and `METAL TRACE REPLAY SESSION ID` columns in the CSV.
-4. Warm-up rows: `METAL TRACE ID` is null. Capture rows: `METAL TRACE ID` non-null, `METAL TRACE REPLAY SESSION ID` empty string. Replay rows: both non-null, session ID ≥ 1. Use `find_repeated_runs` / `split_compile_and_trace` from `test_utils.py` with `num_runs=2` to slice the CSV. `df_model_compilation` = capture phase (first repeated block); `df_model_trace` = replay phase (second repeated block). Trace ops show non-null `metal_trace_id` in `differentiating_trace_ops_from_normal_ops.md`.
-
-
+`guides/tt_transformers_op_trace/`
