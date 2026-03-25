@@ -250,3 +250,34 @@ This file tracks research topics that the Architect needs to investigate for mak
 **Findings:**
 `guides/tt_transformers_into_tt_symbiote/`
 
+---
+
+## Bailing Attention T3K Decode Tests HEIGHT_SHARDED Fix
+**Date:** 2026-03-25
+**Status:** Completed
+**Why Needed:** Bailing Attention T3K decode tests fail with `RuntimeError: head_dim % TILE_WIDTH == 0` because `rotary_embedding_llama` in decode mode requires HEIGHT_SHARDED memory layout, not DRAM interleaved.
+**Questions:**
+1. What memory layout does `rotary_embedding_llama` kernel require in decode mode?
+2. How does tt_transformers set up HEIGHT_SHARDED memory for the decode path?
+3. What changes are needed in `apply_partial_rope_decode()` function?
+
+**Findings:**
+1. `rotary_embedding_llama` with `is_decode_mode=True` requires ALL input tensors to be HEIGHT_SHARDED in L1:
+   - Input tensor (Q/K): HEIGHT_SHARDED
+   - cos tensor: HEIGHT_SHARDED
+   - sin tensor: HEIGHT_SHARDED
+   - trans_mat: HEIGHT_SHARDED
+   Source: `/home/ttuser/salnahari/tt-metal/ttnn/cpp/ttnn/operations/experimental/transformer/rotary_embedding_llama/device/rotary_embedding_llama_device_operation.cpp` lines 86-96
+
+2. tt_transformers uses `nlp_create_qkv_heads_decode` with `L1_HEIGHT_SHARDED_MEMORY_CONFIG` output:
+   - Q/K/V heads are already HEIGHT_SHARDED after QKV head creation
+   - `transformation_mats["decode"]` is created at model init with HEIGHT_SHARDED layout
+   - rot_mats (cos/sin) are passed already HEIGHT_SHARDED from the RotarySetup class
+   Source: `/home/ttuser/salnahari/tt-metal/models/tt_transformers/tt/attention.py` lines 554-582
+
+3. BailingRotarySetup needs to provide cos/sin in HEIGHT_SHARDED format for decode, not just TILE_LAYOUT.
+   The `_forward_decode_paged()` in attention.py needs to:
+   - Convert Q/K tensors to HEIGHT_SHARDED before calling `apply_partial_rope_decode()`
+   - Ensure cos/sin from BailingRotarySetup are HEIGHT_SHARDED
+   - Ensure trans_mat is HEIGHT_SHARDED
+
