@@ -250,3 +250,70 @@ This file tracks research topics that the Architect needs to investigate for mak
 **Findings:**
 `guides/tt_transformers_into_tt_symbiote/`
 
+---
+
+## Ling Linear PlacementReplicate Fix
+**Date:** 2026-03-25
+**Status:** Completed
+**Why Needed:** Ling attention tests on T3K fail with `AttributeError: 'PlacementReplicate' object has no attribute 'dim'` in the `TTNNLinearIColShardedWRowSharded.forward()` method. The code assumes input tensors have `PlacementShard` (which has `.dim`), but on T3K the KV tensors may be replicated.
+
+**Questions:**
+1. What is the difference between PlacementReplicate and PlacementShard?
+2. How should the linear forward method handle replicated inputs?
+3. Is it valid to pass replicated tensors to TTNNLinearIColShardedWRowSharded?
+
+**Findings:**
+- `PlacementShard` has a `.dim` attribute indicating the dimension along which the tensor is sharded
+- `PlacementReplicate` has no `.dim` attribute because the tensor is fully replicated across devices
+- The fix: Use `hasattr(placement, 'dim')` before accessing `.dim` to handle both cases
+- Replicated inputs are semantically valid for the linear operation (contain full tensor data)
+- Plan: `PLAN_ling_linear_placement_fix.md`
+
+---
+
+## Ling Attention Shape Mismatch Fix
+**Date:** 2026-03-25
+**Status:** Completed
+**Why Needed:** Ling attention tests on T3K fail with matmul shape mismatch: `width=2048 height=256`. The attention output has incorrect dimensions for the output projection on multi-device.
+
+**Questions:**
+1. What shape does `nlp_concat_heads_decode` output?
+2. What shape does the output projection (`self.dense`) expect?
+3. Is there a missing gather/all-gather operation before output projection?
+4. Should the output be reshaped differently?
+
+**Findings:**
+- **Root Cause 1**: `nlp_concat_heads_decode` is called with `num_heads=self.num_heads` (16 total heads) but should use `n_local_heads` (16/8 = 2 per device on T3K)
+- **Root Cause 2**: Missing `all_gather` operation before the dense (output) projection. TT-Transformers does all-gather to collect sharded attention outputs before output projection
+- **TT-Transformers Reference**: Uses `n_local_heads = n_heads // cluster_shape[1]` and does `all_gather_async` before dense projection
+- **Fix**: Use local head count for nlp_concat_heads_decode, add all-gather before dense projection
+- Plan: `PLAN_ling_shape_mismatch_fix.md`
+
+---
+
+## Bailing Attention T3K Prefill Shape Mismatch
+**Date:** 2026-03-25
+**Status:** Completed
+**Why Needed:** TTNNBailingMoEAttention fails on T3K during prefill with matmul shape error: `width=128 height=16`. The all-gather operation for K/V projections is not correctly reconstituting full tensors from 8-device shards.
+
+**Questions:**
+1. Why does the K tensor have incorrect shape after all-gather?
+2. Is the all-gather dimension correct for sharded projection outputs?
+3. Are there CCL synchronization issues on T3K affecting all-gather?
+4. How does TT-Transformers handle K/V when num_kv_heads < num_devices?
+
+**Findings:**
+- **Error**: `width=128 height=16` during `Q @ K^T` matmul - K tensor has wrong last dimension
+- **Root Cause**: K tensor after reshape shows `[1, 4, 16, 24]` instead of `[1, 4, S, 128]`
+- **Analysis**: The `_maybe_all_gather` on K projection output is not correctly gathering shards
+- **K projection flow**: Each device outputs `[B, S, 64]` (kv_size/8) -> all_gather -> `[B, S, 512]` -> reshape to `[B, S, 4, 128]` -> permute to `[B, 4, S, 128]`
+- **Likely causes**:
+  1. All-gather may be incomplete or happening on wrong dimension
+  2. CCL async all-gather may have synchronization issues
+  3. Tensor shape may already be reshaped before all-gather
+- **Fix approach**:
+  1. Add debug instrumentation to track shapes
+  2. Ensure all-gather happens on correct tensor format
+  3. Use synchronous all-gather with explicit sync
+  4. Consider replicated K/V weights as fallback
+- Plan: `PLAN_bailing_attention_fix.md`
