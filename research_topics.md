@@ -249,3 +249,19 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 **Findings:**
 [pending]
+
+---
+
+## Ling Attention Layer 10 Decode Degradation
+**Date:** 2026-03-25
+**Status:** Completed
+**Why Needed:** TTNNBailingMoEAttention decode path shows severe PCC degradation at Layer 10 (min PCC 0.5286) while Layer 0 remains stable (avg PCC 0.9687). Need to identify root cause and create fix plan.
+**Questions:**
+1. Why does Layer 10 specifically degrade while Layer 0 is stable?
+2. Is this a KV cache accumulation issue across layers?
+3. Is there a GQA padding bug affecting middle layers?
+4. Is the `cur_pos` handling correct for all layers?
+5. Are there block boundary issues in paged attention at certain positions?
+
+**Findings:**
+See `PLAN_ling_attention_decode_fix.md` for detailed analysis and implementation plan.
