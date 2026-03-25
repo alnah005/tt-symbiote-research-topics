@@ -206,8 +206,8 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ## TT Transformers Key Optimizations
 **Date:** 2026-03-23
-**Status:** Pending
-**Why Needed:** Need to understand the key optimizations done in tt-transformers for LLMs. This includes optimizations for attention, matmul, and other critical kernels. Understanding these optimizations will help in identifying potential areas for further improvement and ensuring that we are leveraging the full capabilities of the hardware. 
+**Status:** Completed
+**Why Needed:** Need to understand the key optimizations done in tt-transformers for LLMs. This includes optimizations for attention, matmul, and other critical kernels. Understanding these optimizations will help in identifying potential areas for further improvement and ensuring that we are leveraging the full capabilities of the hardware.
 
 **Questions:**
 1. What are the key optimizations implemented in tt-transformers for attention mechanisms?
@@ -217,7 +217,7 @@ This file tracks research topics that the Architect needs to investigate for mak
 5. What other optimizations are present in tt-transformers that are critical for LLM performance?
 
 **Findings:**
-[pending]
+`guides/tt_transformers_key_optimizations/`
 
 ## TT Symbiote
 **Date:** 2026-03-23
