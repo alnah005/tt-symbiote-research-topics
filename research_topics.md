@@ -250,21 +250,3 @@ This file tracks research topics that the Architect needs to investigate for mak
 **Findings:**
 `guides/tt_transformers_into_tt_symbiote/`
 
----
-
-## Ling Linear PlacementReplicate Fix
-**Date:** 2026-03-25
-**Status:** Completed
-**Why Needed:** Ling attention tests on T3K fail with `AttributeError: 'PlacementReplicate' object has no attribute 'dim'` in the `TTNNLinearIColShardedWRowSharded.forward()` method. The code assumes input tensors have `PlacementShard` (which has `.dim`), but on T3K the KV tensors may be replicated.
-
-**Questions:**
-1. What is the difference between PlacementReplicate and PlacementShard?
-2. How should the linear forward method handle replicated inputs?
-3. Is it valid to pass replicated tensors to TTNNLinearIColShardedWRowSharded?
-
-**Findings:**
-- `PlacementShard` has a `.dim` attribute indicating the dimension along which the tensor is sharded
-- `PlacementReplicate` has no `.dim` attribute because the tensor is fully replicated across devices
-- The fix: Use `hasattr(placement, 'dim')` before accessing `.dim` to handle both cases
-- Replicated inputs are semantically valid for the linear operation (contain full tensor data)
-- Plan: `PLAN_ling_linear_placement_fix.md`
