@@ -212,8 +212,4 @@ The following are the highest-impact items, in descending order of performance i
 
 ---
 
-## Navigation
-
-- [Index](index.md)
-- Previous: [Symbiote MLP](symbiote_mlp.md)
-- [TT Transformers MLP Reference](tt_transformers_mlp.md)
+**Next:** [Chapter 5 — Multi-Chip Parallelism and Collective Communication](../ch5_multi_chip/index.md)

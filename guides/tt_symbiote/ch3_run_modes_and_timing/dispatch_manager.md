@@ -286,4 +286,4 @@ print(slow_modules)
 
 ---
 
-Next: Chapter 4
+**Next:** [Chapter 4 — Module Replacement and Device Setup](../ch4_module_replacement_and_device/index.md)

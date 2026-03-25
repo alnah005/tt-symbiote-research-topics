@@ -349,9 +349,4 @@ method is written.
 
 ---
 
-## Navigation
-
-- [Chapter 4 index](index.md)
-- Previous: [Normalization Comparison](normalization_comparison.md)
-- [Integration Gaps](integration_gaps.md)
-- Guide root: [TT Transformers into TT Symbiote](../plan.md)
+**Next:** [`integration_gaps.md`](./integration_gaps.md)

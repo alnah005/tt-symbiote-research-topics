@@ -200,3 +200,7 @@ The rationale:
   `sampling_module.capture_trace`).
 - Gate behind `_supports_on_device_sampling`, matching the pattern in
   `prefill_forward_text`.
+
+---
+
+**Next:** [Chapter 7 — Worked Example — LLaMA 3.2-1B on Symbiote with TT Transformers Optimizations](../ch7_llama_worked_example/index.md)

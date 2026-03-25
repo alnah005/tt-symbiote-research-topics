@@ -191,3 +191,7 @@ For any vision model not yet covered by the test suite, the general pattern is:
 3. For convolutional backbones, use `TTNNBottleneck` if the architecture uses the standard ResNet bottleneck design, or build a custom `TTNNModule` subclass that chains `TTNNConv2dBNActivationNHWC` instances.
 4. For transformer vision encoders (ViT, DeiT, Swin variants), the `TTNNViTSelfAttention` + `TTNNViTIntermediate` pair covers the encoder block internals; apply `RewrittenViTLayer`-style wrappers to expose residual additions.
 5. Patch embedding for vision transformers is handled by `TTNNViTEmbeddings.from_torch`, which accepts a `ViTPatchEmbeddings` instance, a CLS token tensor, and a position embeddings tensor.
+
+---
+
+**Next:** [`speech_and_debugging.md`](./speech_and_debugging.md)

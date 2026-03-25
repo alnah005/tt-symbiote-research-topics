@@ -323,6 +323,4 @@ Set `MESH_DEVICE` to one of the string values in `MeshShapeToDeviceArch` (e.g., 
 
 ---
 
-**Navigation:**
-[^ Chapter index](index.md) |
-[Implementation Guide](implementation_guide.md)
+**Next:** [Chapter 7 — End-to-End Use Cases and Performance Benchmarking](../ch7_use_cases_and_benchmarking/index.md)

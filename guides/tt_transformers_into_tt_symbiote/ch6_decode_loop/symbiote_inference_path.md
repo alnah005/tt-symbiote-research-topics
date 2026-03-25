@@ -225,3 +225,7 @@ LM head) for each of hundreds or thousands of decode steps.
 | Sampling on device | `SamplingParams`; optional split-sampling trace for temperature/top-p | CPU sampling via `torch.argmax` / `torch.softmax` inside HF `generate()` |
 | Data-parallel sharding | `self.data_parallel`; `torch.chunk` splits batch across shards | No data-parallel decode; single model instance |
 | Decode trace reset | `prev_page_table` comparison; `reset_batch` on mode switch | Not applicable |
+
+---
+
+**Next:** [`integration_roadmap.md`](./integration_roadmap.md)

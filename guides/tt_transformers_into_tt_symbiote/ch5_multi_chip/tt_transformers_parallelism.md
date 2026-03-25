@@ -213,10 +213,4 @@ The MLP forward (`mlp.py` lines 118-324) contains the following CCL call sites i
 
 ---
 
-## Navigation
-
-| | |
-|---|---|
-| Previous | [index.md](index.md) |
-| Next | [symbiote_distributed_primitives.md](symbiote_distributed_primitives.md) |
-| Chapter home | [index.md](index.md) |
+**Next:** [`symbiote_distributed_primitives.md`](./symbiote_distributed_primitives.md)

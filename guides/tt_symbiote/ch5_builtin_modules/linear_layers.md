@@ -407,4 +407,4 @@ Does not override `preprocess_weights_impl`. Decorates `forward` with `@dealloca
 
 ---
 
-**Navigation:** [Chapter 5 Index](./index.md) | Linear Layers | [Normalization and Activation](./normalization_and_activation.md) | [Attention and Conv](./attention_and_conv.md)
+**Next:** [`normalization_and_activation.md`](./normalization_and_activation.md)

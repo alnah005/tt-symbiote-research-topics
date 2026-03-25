@@ -348,4 +348,4 @@ When `use_paged_kv_cache=False` and `paged_attention_config` is set, `init_kv_ca
 
 ---
 
-[Previous: Symbiote Attention Overview](symbiote_attention_overview.md) | [Next: Integration Gaps](integration_gaps.md)
+**Next:** [`integration_gaps.md`](./integration_gaps.md)

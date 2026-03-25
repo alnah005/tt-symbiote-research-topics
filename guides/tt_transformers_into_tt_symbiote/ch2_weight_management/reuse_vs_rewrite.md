@@ -130,4 +130,4 @@ Because the DRAM shard spec requires device-specific geometry, this configuratio
 
 ---
 
-**Next:** Chapter 3
+**Next:** [Chapter 3 — Attention — RoPE, KV Cache, and SDPA](../ch3_attention/index.md)

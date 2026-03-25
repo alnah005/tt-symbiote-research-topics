@@ -375,8 +375,4 @@ Steps 5 and 6 are separated to allow host-side preprocessing to happen in advanc
 
 ---
 
-## Navigation
-
-- [Index](index.md)
-- Previous: [TT Transformers MLP](tt_transformers_mlp.md)
-- Next: [Integration Gaps](integration_gaps.md)
+**Next:** [`normalization_comparison.md`](./normalization_comparison.md)

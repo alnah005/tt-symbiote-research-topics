@@ -137,3 +137,7 @@ The following modules are present in `LlamaForCausalLM` but are not touched by e
 | KV cache | HF `DynamicCache` | TT Transformers uses its own paged KV cache; Symbiote's `LlamaAttention` delegates to whatever `past_key_values` object HuggingFace passes (including `DynamicCache`) via `past_key_values.update(...)` |
 
 The absence of an `Embedding` replacement is significant: all embedding lookups during `model.generate` run on CPU in PyTorch. In TT Transformers the embedding table is loaded as a device tensor and the lookup is a TTNN gather. Bridging this gap is outside the scope of the current Symbiote test but would be required for full device-resident inference.
+
+---
+
+**Next:** [`step2_precision_config.md`](./step2_precision_config.md)

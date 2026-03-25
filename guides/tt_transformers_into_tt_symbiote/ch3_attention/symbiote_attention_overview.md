@@ -292,4 +292,4 @@ All cache tensors are allocated as `ttnn.bfloat16`, `TILE_LAYOUT`, `DRAM_MEMORY_
 
 ---
 
-[Previous: Chapter Index](index.md) | [Next: TT Transformers Attention Overview](transformers_attention_overview.md)
+**Next:** [`transformers_attention_overview.md`](./transformers_attention_overview.md)

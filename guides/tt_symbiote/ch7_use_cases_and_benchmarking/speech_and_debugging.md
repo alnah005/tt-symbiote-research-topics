@@ -209,3 +209,7 @@ The pivot table produced by `DispatchManager.save_stats_to_file("whisper_timing_
 ### First-token vs steady-state latency
 
 The `Min_Duration` and `Max_Duration` columns in the pivot show the range across all `Row_Count` invocations. For speech models that process variable-length audio, a large `Max_Duration` relative to `Min_Duration` on encoder attention layers typically reflects the first-call compilation overhead for a new sequence length. The `SmartTTNNLinear` prefill path caches its `MatmulMultiCoreReuseMultiCastProgramConfig` per `seq_len`, so after the first call for a given length the overhead disappears.
+
+---
+
+**End of guide.** Return to [Guide Index](../index.md)

@@ -161,3 +161,7 @@ None of the N300 variants are exercised by `test_llama.py` or `test_llama_intell
 2. Replacing the linear replacement entries in `nn_to_ttnn` with the sharded classes.
 3. Replacing `TTNNRMSNorm` with `TTNNDistributedRMSNorm` in `nn_to_ttnn`.
 4. Updating `LlamaAttention.init_fused_parameters` and `init_parameters` to use the sharded linear variants for the attention projections.
+
+---
+
+**End of guide.** Return to [Guide Index](../index.md)

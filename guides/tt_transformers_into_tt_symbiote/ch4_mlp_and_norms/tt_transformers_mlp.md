@@ -398,8 +398,4 @@ Weight dtype is `ttnn.bfloat16` (`model.py` line 117).
 
 ---
 
-## Navigation
-
-- [Index](index.md)
-- Next: [Symbiote MLP](symbiote_mlp.md)
-- [Integration Gaps](integration_gaps.md)
+**Next:** [`symbiote_mlp.md`](./symbiote_mlp.md)

@@ -154,3 +154,7 @@ Precision concerns for the LM head differ from the MLP and attention projections
 2. **Memory vs. correctness trade-off.** Keeping `lm_head` as a PyTorch `nn.Linear` avoids allocating the 128256 x 2048 weight on device. With `@deallocate_weights_after` this memory would be freed after each token generation step, but the per-step allocation and deallocation cost may be significant.
 
 The recommended approach for initial integration is to keep `exclude_replacement={"lm_head"}` (as `test_llama_intelligent` does) and validate generation quality on a held-out prompt set before considering whether device-resident LM head execution is needed for throughput.
+
+---
+
+**Next:** [`step3_validation_and_benchmarking.md`](./step3_validation_and_benchmarking.md)

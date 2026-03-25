@@ -111,4 +111,4 @@ Source: `models/experimental/tt_symbiote/modules/qwen_moe.py`
 
 ---
 
-**Navigation:** [Chapter 5 Index](./index.md) | [Linear Layers](./linear_layers.md) | [Normalization and Activation](./normalization_and_activation.md) | Attention and Conv
+**Next:** [Chapter 6 — Authoring a New TTNN Module](../ch6_authoring_modules/index.md)

@@ -118,10 +118,4 @@ TT Transformers creates DRAM-sharded memory configs via `args.create_dram_sharde
 
 ---
 
-## Navigation
-
-| | |
-|---|---|
-| Previous | [symbiote_distributed_primitives.md](symbiote_distributed_primitives.md) |
-| Chapter home | [index.md](index.md) |
-| Series plan | [../plan.md](../plan.md) |
+**Next:** [Chapter 6 — The Decode Loop — From Generator to Symbiote Inference](../ch6_decode_loop/index.md)

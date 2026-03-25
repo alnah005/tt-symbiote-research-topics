@@ -235,4 +235,4 @@ Fallback: `torch.nn.GELU()`.
 
 ---
 
-**Navigation:** [Chapter 5 Index](./index.md) | [Linear Layers](./linear_layers.md) | Normalization and Activation | [Attention and Conv](./attention_and_conv.md)
+**Next:** [`attention_and_conv.md`](./attention_and_conv.md)

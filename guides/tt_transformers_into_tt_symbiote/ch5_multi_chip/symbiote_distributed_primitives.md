@@ -247,10 +247,4 @@ All distributed forward methods in Symbiote (`TTNNLinearIColShardedWRowSharded.f
 
 ---
 
-## Navigation
-
-| | |
-|---|---|
-| Previous | [tt_transformers_parallelism.md](tt_transformers_parallelism.md) |
-| Next | [integration_strategy.md](integration_strategy.md) |
-| Chapter home | [index.md](index.md) |
+**Next:** [`integration_strategy.md`](./integration_strategy.md)

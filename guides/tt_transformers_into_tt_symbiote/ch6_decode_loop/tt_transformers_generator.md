@@ -381,3 +381,7 @@ Neither extension module adds scheduling or batch management logic; those respon
 remain in the respective serving frameworks. The extensions are thin factories that convert
 framework-level KV cache allocations and config objects into the `Generator` / `ModelArgs`
 types that `generator.py` consumes.
+
+---
+
+**Next:** [`symbiote_inference_path.md`](./symbiote_inference_path.md)

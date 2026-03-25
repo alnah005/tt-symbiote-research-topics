@@ -149,4 +149,4 @@ This produces a model where attention layers run on TTNN and MLP layers run on P
 
 ---
 
-**Navigation:** [Index](index.md) | [Device Setup](device_setup.md) | [Previous — Chapter 3](../ch3_run_modes_and_timing/index.md)
+**Next:** [`device_setup.md`](./device_setup.md)

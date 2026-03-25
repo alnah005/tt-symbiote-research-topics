@@ -284,9 +284,4 @@ modules requires implementing and wiring both manually.
 
 ---
 
-## Navigation
-
-- [Chapter 4 index](index.md)
-- Previous: [Integration Gaps](integration_gaps.md)
-- Next: [Decoder Block Assembly](decoder_block_assembly.md)
-- Guide root: [TT Transformers into TT Symbiote](../plan.md)
+**Next:** [`decoder_block_assembly.md`](./decoder_block_assembly.md)

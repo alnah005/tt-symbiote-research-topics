@@ -289,4 +289,4 @@ These pure functions are used to prepare tensors before passing them to a backen
 
 ---
 
-Next: [dispatch_manager.md](dispatch_manager.md)
+**Next:** [`dispatch_manager.md`](./dispatch_manager.md)

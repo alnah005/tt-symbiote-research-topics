@@ -496,6 +496,4 @@ The exclusion check is performed by name using the model's `named_modules()` map
 
 ---
 
-**Navigation:**
-[^ Chapter index](index.md) |
-[Fallback and Debugging](fallback_and_debugging.md)
+**Next:** [`fallback_and_debugging.md`](./fallback_and_debugging.md)

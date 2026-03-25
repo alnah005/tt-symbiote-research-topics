@@ -194,4 +194,4 @@ Gap 4 does not prevent functional correctness (the HuggingFace `Cache.update` fa
 
 ---
 
-[Previous: TT Transformers Attention Overview](transformers_attention_overview.md) | [Chapter Index](index.md)
+**Next:** [Chapter 4 — MLP Layers and Norms](../ch4_mlp_and_norms/index.md)

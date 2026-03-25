@@ -229,3 +229,7 @@ A non-zero `TorchModules` value with a zero `TTNN` value on a row where you expe
 The tests directory contains pre-generated output from actual runs:
 
 - `tests/llama_timing_stats.csv` and `tests/llama_timing_stats_pivot.csv` — from `test_llama`
+
+---
+
+**Next:** [`vision_and_multimodal.md`](./vision_and_multimodal.md)

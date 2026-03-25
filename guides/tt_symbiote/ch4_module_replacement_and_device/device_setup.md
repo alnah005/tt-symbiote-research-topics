@@ -547,4 +547,4 @@ The default `preprocess_weights_impl` and `move_weights_to_device_impl` recurse 
 
 ---
 
-**Navigation:** [Index](index.md) | [Module Replacement](module_replacement.md) | [Previous — Chapter 3](../ch3_run_modes_and_timing/index.md)
+**Next:** [Chapter 5 — Built-In TTNN Modules](../ch5_builtin_modules/index.md)
