@@ -249,3 +249,28 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 **Findings:**
 [pending]
+
+
+## Ling Attention Layer 10 Investigation
+**Date:** 2026-03-25
+**Status:** Completed
+**Why Needed:** Ling-mini-2.0 (BailingMoeV2) accuracy degrades after layer 10 in decode path. Layer 0 stable (PCC 0.97), Layer 10 degrades first (min PCC 0.53), Layer 19 secondary degradation. Need to understand why layer 10 specifically degrades and find the root cause.
+
+**Questions:**
+1. How do similar GQA attention implementations handle paged attention decode?
+2. What tensor shapes do working implementations use for K/V in paged_update_cache?
+3. How do they handle the GQA head expansion?
+4. Is there anything special about layer indexing in paged caches?
+5. Are there any known issues with certain layer indices?
+6. What are the key differences between tt-transformers and tt-symbiote attention implementations?
+
+**Findings:**
+`PLAN_ling_attention_layer10_investigation.md`
+
+Summary:
+- Layer 10 degradation is caused by **cumulative precision loss** from multiple ttnn.permute operations (4+ per layer), host round-trips for multi-device tensor replication, and dynamic memory config creation
+- tt-transformers uses `nlp_create_qkv_heads_decode` for efficient shape transformation, while tt-symbiote uses manual reshape/permute
+- tt-transformers uses `rotary_embedding_llama` optimized kernel, tt-symbiote uses separate RoPE implementation
+- The `_to_replicated` function in tt-symbiote performs host round-trip at every layer for multi-device
+- No layer-specific bugs in paged cache or SDPA kernel; the degradation is cumulative error crossing threshold at layer 10
+- Fix requires aligning tt-symbiote attention with tt-transformers pattern: fused QKV, nlp_create_qkv_heads_decode, eliminate host round-trips
