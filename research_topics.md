@@ -221,7 +221,7 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ## TT Symbiote
 **Date:** 2026-03-23
-**Status:** Pending
+**Status:** Completed
 **Why Needed:** Need to understand what TT Symbiote is, how it works, and how it can be used to optimize LLM performance on Tenstorrent hardware. This includes understanding the architecture of TT Symbiote, the types of optimizations it provides, and how it integrates with existing frameworks like tt-transformers. Additionally, I want to know about any specific use cases or scenarios where TT Symbiote has shown significant performance improvements.
 
 **Questions:**
@@ -232,12 +232,12 @@ This file tracks research topics that the Architect needs to investigate for mak
 5. How can I get started with using TT Symbiote for optimizing LLM performance?
 
 **Findings:**
-[pending]
+`guides/tt_symbiote/`
 
 
 ## TT Transformers Into TT Symbiote
 **Date:** 2026-03-23
-**Status:** Pending
+**Status:** Completed
 **Why Needed:** Need to understand how to integrate tt-transformers with TT Symbiote to leverage the optimizations from tt-transformers in tt-symbiote for LLMs running on Tenstorrent hardware. This includes understanding the steps required for integration, any potential challenges or considerations, and the expected performance benefits from using TT Symbiote with tt-transformers. Additionally, I want to know which features would need to be rewritten from scratch in tt-symbiote and which features can be reused from tt-transformers.
 
 **Questions:**
@@ -248,4 +248,4 @@ This file tracks research topics that the Architect needs to investigate for mak
 5. Are there any specific examples or case studies of successful integration of tt-transformers with TT Symbiote that I can reference?
 
 **Findings:**
-[pending]
+`guides/tt_transformers_into_tt_symbiote/`
