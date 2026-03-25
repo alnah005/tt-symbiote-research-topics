@@ -103,14 +103,14 @@ After reading the cache, you MUST report in this format:
 |-------|--------|--------|
 | [topic name] | Completed/Pending/Missing | Using findings / Best-effort / Adding |
 
-### Step 4: For topics with Status: Completed
-Copy the **Findings** section into your analysis. Do NOT re-research completed topics.
+### Step 4: For research questions with Status: Completed
+Copy the **Findings** section into your analysis. Do NOT re-research completed questions.
 
-### Step 5: For missing topics (cache miss)
-Add new topics and push:
+### Step 5: For missing research questions (cache miss)
+Add new research questions and push (DO NOT ADD PLAN FILES or ADD RESEARCH QUESTIONS THAT HAVE BEEN ANSWERED BY YOU):
 ```bash
 cd /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics
-# Edit research_topics.md to add new topic
+# Edit research_topics.md to add new research question
 git add research_topics.md
 git commit -m "team/architect: cache miss — add topic <topic-name>"
 git push
@@ -119,7 +119,7 @@ git push
 ## VERIFICATION CHECKLIST (Must complete before proceeding)
 - [ ] Executed `git pull` and showed output
 - [ ] Executed `cat research_topics.md` and showed output
-- [ ] Listed all relevant topics with their Status
+- [ ] Listed all relevant research questions with their Status
 - [ ] Used findings from Completed topics
 - [ ] Added and pushed any missing topics
 
@@ -190,7 +190,7 @@ After receiving the Architect's response, the Team Lead MUST verify:
 - `tt-smi -r` to reset chips before each test run
 - `pytest --timeout=0` to prevent timeouts
 - `MESH_DEVICE=T3K` for T3K mesh device tests
-- GLM passes at top of git tree - failures are from recent changes only
+- tt-symbiote by default shards the output of all TTNN modules on the last demension (check run_config.py). Expect to add an all gather if shape mismatches.
 - No need to run CPU mode (it's trivial and works)
 
 ---
