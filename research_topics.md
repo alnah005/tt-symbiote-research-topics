@@ -250,4 +250,25 @@ This file tracks research topics that the Architect needs to investigate for mak
 **Findings:**
 `guides/tt_transformers_into_tt_symbiote/`
 
+---
+
+## Bailing Attention T3K Prefill with DynamicCache
+**Date:** 2026-03-25
+**Status:** Completed
+**Why Needed:** TTNNBailingMoEAttention prefill fails on T3K (1x8 mesh, 8 devices) when using DynamicCache. SDPA receives K/V tensors with head_dim=16 instead of 128, appearing as if head_dim was incorrectly sharded across 8 devices.
+
+**Questions:**
+1. Why does K/V head_dim become 16 (128/8) on T3K with DynamicCache?
+2. Where in the code path does the tensor shape become incorrect?
+3. Why does TTNNPagedAttentionKVCache work but DynamicCache fails?
+4. How should ttnn.reshape/permute handle multi-device replicated tensors?
+
+**Findings:**
+Root cause is multi-device tensor handling in attention forward path:
+- `_split_qkv` and `_apply_qk_norm` use ttnn.reshape/permute on replicated tensors
+- Shape operations may interpret device-local shapes instead of global shapes
+- DynamicCache path converts tensors without mesh_composer, corrupting data
+
+Plan: `PLAN_bailing_attention_t3k_prefill_fix.md`
+
 
