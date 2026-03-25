@@ -250,42 +250,4 @@ This file tracks research topics that the Architect needs to investigate for mak
 **Findings:**
 `guides/tt_transformers_into_tt_symbiote/`
 
----
-
-## Ling Linear PlacementReplicate Fix
-**Date:** 2026-03-25
-**Status:** Completed
-**Why Needed:** Ling attention tests on T3K fail with `AttributeError: 'PlacementReplicate' object has no attribute 'dim'` in the `TTNNLinearIColShardedWRowSharded.forward()` method. The code assumes input tensors have `PlacementShard` (which has `.dim`), but on T3K the KV tensors may be replicated.
-
-**Questions:**
-1. What is the difference between PlacementReplicate and PlacementShard?
-2. How should the linear forward method handle replicated inputs?
-3. Is it valid to pass replicated tensors to TTNNLinearIColShardedWRowSharded?
-
-**Findings:**
-- `PlacementShard` has a `.dim` attribute indicating the dimension along which the tensor is sharded
-- `PlacementReplicate` has no `.dim` attribute because the tensor is fully replicated across devices
-- The fix: Use `hasattr(placement, 'dim')` before accessing `.dim` to handle both cases
-- Replicated inputs are semantically valid for the linear operation (contain full tensor data)
-- Plan: `PLAN_ling_linear_placement_fix.md`
-
----
-
-## Ling Attention Shape Mismatch Fix
-**Date:** 2026-03-25
-**Status:** Completed
-**Why Needed:** Ling attention tests on T3K fail with matmul shape mismatch: `width=2048 height=256`. The attention output has incorrect dimensions for the output projection on multi-device.
-
-**Questions:**
-1. What shape does `nlp_concat_heads_decode` output?
-2. What shape does the output projection (`self.dense`) expect?
-3. Is there a missing gather/all-gather operation before output projection?
-4. Should the output be reshaped differently?
-
-**Findings:**
-- **Root Cause 1**: `nlp_concat_heads_decode` is called with `num_heads=self.num_heads` (16 total heads) but should use `n_local_heads` (16/8 = 2 per device on T3K)
-- **Root Cause 2**: Missing `all_gather` operation before the dense (output) projection. TT-Transformers does all-gather to collect sharded attention outputs before output projection
-- **TT-Transformers Reference**: Uses `n_local_heads = n_heads // cluster_shape[1]` and does `all_gather_async` before dense projection
-- **Fix**: Use local head count for nlp_concat_heads_decode, add all-gather before dense projection
-- Plan: `PLAN_ling_shape_mismatch_fix.md`
 
