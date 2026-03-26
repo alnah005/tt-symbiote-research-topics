@@ -527,3 +527,226 @@ Run the model interactively and check that:
 | `/home/ttuser/salnahari/tt-metal/models/tt_transformers/tt/rope.py` | Reference `RotarySetup` class (lines 383-620) |
 | `/home/ttuser/salnahari/tt-metal/models/common/tensor_utils.py` | `get_rot_transformation_mat` utility |
 | `/home/ttuser/salnahari/tt-metal/models/experimental/tt_symbiote/tests/test_ling_mini_2_0.py` | End-to-end test |
+
+---
+
+## 12. Iteration 2 -- RoPE Decode Diagnosis (Root Cause of Garbled "aukee" Pattern)
+
+**Date:** 2026-03-26
+**Status:** Diagnosed -- Ready for Fix
+
+### 12.1 Symptom
+
+After implementing all changes from Sections 1-11 (nlp_create_qkv_heads_decode, partial RoPE decode, replicated topology fix, correct sharding), the model runs without crashes but produces repeating garbled tokens ("aukee" pattern). This strongly indicates every decode step receives identical or near-identical positional information, causing the model to get stuck in a loop.
+
+### 12.2 Root Cause: THREE Compounding RoPE Issues
+
+The investigation reveals **three independent bugs** that compound to produce completely wrong RoPE in decode mode:
+
+#### Bug 1: HuggingFace Format vs Meta Format Mismatch (CRITICAL)
+
+**The `rotary_embedding_llama` kernel expects cos/sin in Meta format (interleaved duplicate pairs), but the model receives HuggingFace format (sequential halves).**
+
+The Ling model's `rotary_emb.forward()` (HuggingFace implementation) produces:
+```
+cos_hf[position=5, :8] = [0.2837, -0.9876, -0.5697, 0.1340, 0.5835, 0.8107, 0.9161, 0.9632]
+```
+
+The `rotary_embedding_llama` kernel expects Meta format:
+```
+cos_meta[position=5, :8] = [0.2837, 0.2837, -0.9876, -0.9876, -0.5697, -0.5697, 0.1340, 0.1340]
+```
+
+These are NOT the same. Meta format duplicates each frequency into adjacent pairs `[cos_0, cos_0, cos_1, cos_1, ...]` to match the `rotate_half` operation used by `rotary_embedding_llama`. HuggingFace format uses the standard `[cos_0, cos_1, ..., cos_n/2, cos_0, cos_1, ...]` layout.
+
+**Evidence:** `BailingRotarySetup._compute_cos_sin_cache()` (rope.py lines 362-408) does the Meta permutation:
+```python
+cos = cos[:, : cos.shape[1] // 2]
+cos = torch.stack((cos, cos), dim=-1).flatten(-2)  # Meta interleaved format
+```
+But `BailingRotarySetup` is **NEVER actually instantiated** in the production code path. The `test_ling_mini_2_0.py` test calls `model.generate()` which uses HuggingFace's internal `rotary_emb.forward()` that does NOT apply Meta permutation.
+
+**Why the plan was wrong:** Section 5 stated "No changes needed to BailingRotarySetup or the position embedding pipeline." This assumed `BailingRotarySetup.get_cos_sin_for_decode()` was being called, but it is not. The position embeddings come from HuggingFace's native flow.
+
+#### Bug 2: Wrong Shape -- 3D vs 4D (CRITICAL)
+
+HuggingFace `rotary_emb.forward()` returns cos/sin with shape `[B, S, rotary_dim]` = `[1, 1, 64]` (3D).
+
+The `rotary_embedding_llama` kernel in decode mode expects `[1, B, 1, rotary_dim]` = `[1, 1, 1, 64]` (4D).
+
+The current code at line 2742 does:
+```python
+cos, sin = position_embeddings  # shape [1, 1, 64] from HuggingFace
+```
+Then at line 2574:
+```python
+rotary_dim = cos.shape[-1]  # 64 -- correct
+```
+But the 3D tensor is passed directly to `rotary_embedding_llama` which expects 4D. This will either silently misinterpret the dimensions or crash.
+
+#### Bug 3: Missing HEIGHT_SHARDED Memory Config (MODERATE)
+
+The `rotary_embedding_llama` kernel in decode mode requires ALL inputs to be HEIGHT_SHARDED (per the docstring at rope.py line 51-55 and confirmed by TT-Transformers RotarySetup pattern).
+
+**TT-Transformers pattern (rope.py lines 614-630):**
+```python
+mem_config = ttnn.create_sharded_memory_config(
+    shape=(ttnn.TILE_SIZE, self.head_dim),
+    core_grid=self.batch_grid,
+    strategy=ttnn.ShardStrategy.HEIGHT,
+    ...
+)
+cos = ttnn.interleaved_to_sharded(cos, mem_config)
+sin = ttnn.interleaved_to_sharded(sin, mem_config)
+```
+
+**Current tt-symbiote:** cos/sin are in DRAM_MEMORY_CONFIG (from HuggingFace -> `ttnn.from_torch`). The `_decode_trans_mat` is also in DRAM_MEMORY_CONFIG (line 2453). Q/K are in L1_MEMORY_CONFIG (L1 interleaved, not sharded).
+
+The `_apply_partial_rope_decode` method passes these directly to `rotary_embedding_llama` without converting to HEIGHT_SHARDED. This may produce silent incorrect results or crash depending on the kernel implementation.
+
+### 12.3 Why "aukee" Repeating Pattern Occurs
+
+With wrong-format cos/sin (Bug 1), the rotation applied to Q and K at each decode step is mathematically incorrect. Since the format error is systematic (not random), each position gets a similarly wrong rotation, making all positions "look the same" to the attention mechanism. This causes:
+
+1. Every decode step produces nearly identical attention outputs
+2. The model samples the same high-probability token repeatedly
+3. The token "aukee" emerges as the mode of the corrupted output distribution
+
+### 12.4 Required Fix
+
+The fix must address all three bugs. There are two approaches:
+
+#### Approach A: Intercept and Convert HuggingFace cos/sin in the Decode Path (RECOMMENDED)
+
+Add conversion logic at the beginning of `_forward_decode_paged()` to transform HuggingFace-format cos/sin into the format expected by `rotary_embedding_llama`:
+
+```python
+def _forward_decode_paged(self, hidden_states, position_embeddings, ...):
+    ...
+    # === Fix Bug 1 + Bug 2: Convert HF cos/sin to Meta format + correct shape ===
+    cos_hf, sin_hf = position_embeddings  # [B, S, rotary_dim] HF format
+
+    # Convert from HF format to Meta format (interleaved pairs)
+    # HF: [cos_0, cos_1, cos_2, ...] -> Meta: [cos_0, cos_0, cos_1, cos_1, ...]
+    cos_meta = cos_hf[..., :cos_hf.shape[-1] // 2]          # [B, S, rotary_dim/2]
+    cos_meta = torch.stack((cos_meta, cos_meta), dim=-1)      # [B, S, rotary_dim/2, 2]
+    cos_meta = cos_meta.flatten(-2)                            # [B, S, rotary_dim]
+
+    sin_meta = sin_hf[..., :sin_hf.shape[-1] // 2]
+    sin_meta = torch.stack((sin_meta, sin_meta), dim=-1)
+    sin_meta = sin_meta.flatten(-2)
+
+    # Reshape from [B, S, D] -> [1, B, 1, D] for decode mode
+    # For decode, S=1, so [B, 1, D] -> [1, B, 1, D]
+    B = cos_meta.shape[0]
+    cos_decode = cos_meta.reshape(1, B, 1, -1)  # [1, B, 1, rotary_dim]
+    sin_decode = sin_meta.reshape(1, B, 1, -1)
+
+    # Convert to TTNN with correct format
+    mesh_mapper = ttnn.ReplicateTensorToMesh(self.device) if self.device.get_num_devices() > 1 else None
+    cos_ttnn = ttnn.from_torch(
+        cos_decode.to(torch.bfloat16),
+        device=self.device,
+        layout=ttnn.TILE_LAYOUT,
+        dtype=ttnn.bfloat16,
+        memory_config=ttnn.DRAM_MEMORY_CONFIG,
+        mesh_mapper=mesh_mapper,
+    )
+    sin_ttnn = ttnn.from_torch(
+        sin_decode.to(torch.bfloat16),
+        device=self.device,
+        layout=ttnn.TILE_LAYOUT,
+        dtype=ttnn.bfloat16,
+        memory_config=ttnn.DRAM_MEMORY_CONFIG,
+        mesh_mapper=mesh_mapper,
+    )
+
+    # === Fix Bug 3: Convert to HEIGHT_SHARDED for rotary_embedding_llama ===
+    batch_grid = ttnn.num_cores_to_corerangeset(
+        batch_size, self.device.compute_with_storage_grid_size(), True
+    )
+    rope_shard_mem = ttnn.create_sharded_memory_config(
+        shape=(ttnn.TILE_SIZE, cos_ttnn.shape[-1]),  # (32, rotary_dim)
+        core_grid=batch_grid,
+        strategy=ttnn.ShardStrategy.HEIGHT,
+        orientation=ttnn.ShardOrientation.ROW_MAJOR,
+        use_height_and_width_as_shard_shape=True,
+    )
+    cos_ttnn = ttnn.to_memory_config(cos_ttnn, rope_shard_mem)
+    sin_ttnn = ttnn.to_memory_config(sin_ttnn, rope_shard_mem)
+
+    # Also shard trans_mat if not already sharded
+    if not self._decode_trans_mat_sharded:
+        trans_mat_mem = ttnn.create_sharded_memory_config(
+            shape=(ttnn.TILE_SIZE, ttnn.TILE_SIZE),
+            core_grid=batch_grid,
+            strategy=ttnn.ShardStrategy.HEIGHT,
+            orientation=ttnn.ShardOrientation.ROW_MAJOR,
+            use_height_and_width_as_shard_shape=True,
+        )
+        self._decode_trans_mat = ttnn.to_memory_config(
+            self._decode_trans_mat, trans_mat_mem
+        )
+        self._decode_trans_mat_sharded = True
+
+    # Now call _apply_partial_rope_decode with correctly formatted inputs
+    query_states, key_states = self._apply_partial_rope_decode(
+        query_states, key_states, cos_ttnn, sin_ttnn, self._decode_trans_mat
+    )
+```
+
+**IMPORTANT:** The cos/sin from HuggingFace may arrive as either torch.Tensor or ttnn.Tensor (wrapped via TorchTTNNTensor). The conversion must handle both cases by detecting the input type and converting to torch first if needed.
+
+#### Approach B: Replace HuggingFace rotary_emb with BailingRotarySetup (ALTERNATIVE)
+
+Instantiate `BailingRotarySetup` during `move_weights_to_device_impl()` and use it to generate cos/sin in the correct format during decode. This requires intercepting `position_embeddings` in the forward method and replacing them with `BailingRotarySetup.get_cos_sin_for_decode(position_ids)`.
+
+**Advantage:** The cos/sin would already be on-device in Meta format with replicated topology. No per-step host conversion needed.
+
+**Disadvantage:** Requires extracting position_ids from the HuggingFace flow (not straightforward since `model.generate` passes position_embeddings, not position_ids, to the attention layer).
+
+### 12.5 Why Approach A is Recommended
+
+1. **Minimal change:** Only modifies the beginning of `_forward_decode_paged()`, no changes to the model integration or HuggingFace flow.
+2. **Correctness:** Handles the format conversion explicitly and verifiably.
+3. **Sharding:** Adds the missing HEIGHT_SHARDED conversion for cos/sin/trans_mat.
+4. **Acceptable overhead:** For decode (batch=1, seq=1), the cos/sin tensors are tiny (64 elements). The host conversion adds negligible latency compared to the existing `_to_replicated` host round-trip for the fused QKV tensor.
+
+### 12.6 Updated Changes to `_forward_decode_paged` (Sections 3+12 Combined)
+
+| Line Range | Action | Description |
+|------------|--------|-------------|
+| 2692-2713 | KEEP | QKV projection and fusing (already correct from Section 3) |
+| 2719-2721 | KEEP | `_to_replicated()` on fused tensor (needed for topology) |
+| 2723-2728 | KEEP | `nlp_create_qkv_heads_decode` (already correct from Section 3) |
+| 2730-2735 | KEEP | L1 interleaved + QK norm (already correct from Section 3) |
+| 2737-2745 | **REPLACE** | Convert HF cos/sin to Meta format + 4D shape + HEIGHT_SHARDED, then call `_apply_partial_rope_decode` |
+| 2747-2843 | KEEP | Paged cache update, SDPA, concat heads, dense (already correct) |
+
+### 12.7 trans_mat Sharding at Init Time
+
+The `_decode_trans_mat` should be pre-sharded during `move_weights_to_device_impl()` to avoid per-step sharding overhead. Update the init code:
+
+```python
+# In move_weights_to_device_impl(), after creating _decode_trans_mat:
+# Pre-shard trans_mat for batch_size=1 (will need to be re-done if batch size changes)
+batch_grid = ttnn.num_cores_to_corerangeset(1, self.device.compute_with_storage_grid_size(), True)
+trans_mat_mem = ttnn.create_sharded_memory_config(
+    shape=(ttnn.TILE_SIZE, ttnn.TILE_SIZE),
+    core_grid=batch_grid,
+    strategy=ttnn.ShardStrategy.HEIGHT,
+    orientation=ttnn.ShardOrientation.ROW_MAJOR,
+    use_height_and_width_as_shard_shape=True,
+)
+self._decode_trans_mat = ttnn.to_memory_config(self._decode_trans_mat, trans_mat_mem)
+```
+
+### 12.8 Verification Checklist
+
+- [ ] cos/sin arrive at `rotary_embedding_llama` in Meta format (interleaved pairs)
+- [ ] cos/sin shape is `[1, B, 1, rotary_dim]` (4D)
+- [ ] cos/sin are HEIGHT_SHARDED in L1
+- [ ] trans_mat is HEIGHT_SHARDED in L1
+- [ ] Q/K inputs to `rotary_embedding_llama` are HEIGHT_SHARDED (or convert them in `_apply_partial_rope_decode`)
+- [ ] For partial RoPE: Q/K are split to rotary_dim before RoPE, concatenated after
+- [ ] Output text is coherent (not repeating tokens)
