@@ -266,3 +266,21 @@ This file tracks research topics that the Architect needs to investigate for mak
 3. **tt-symbiote's BailingMoEAttention uses a different sharding strategy**: Q uses `TTNNLinearIColShardedWRowSharded` (with reduce_scatter), K/V use `TTNNLinearIReplicatedWColSharded` (column-sharded weights). Then all three are all-gathered to full size on every device, creating all-gathered topology that differs from replicated.
 4. **cache_position can stay as torch.** It arrives as Optional[torch.LongTensor] in the function signature and is only used to: (a) create cache_position_tensor (torch), (b) index cos/sin via `get_cos_sin_for_decode(cache_position_tensor)`, (c) create cur_pos_tt via `ttnn.from_torch`. The ttnn->torch->ttnn round-trip only happens when cache_position arrives as a ttnn.Tensor (from the model runner), but the caller could pass it as torch directly.
 
+## BailingAttention Performance Profiling Methods
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** Need a comprehensive plan for profiling TTNNBailingMoEAttention in the Ling-mini-2.0 test to identify performance bottlenecks across prefill and decode paths.
+**Questions:**
+1. What profiling tools are available in the tt-metal/TTNN ecosystem for attention modules?
+2. How should DispatchManager timing, Tracy profiling, and TTNN config overrides be combined?
+3. What is the recommended approach for different profiling goals (latency breakdown, op-level timing, device utilization)?
+
+**Findings:**
+Plan file: `PLAN_profile_bailing_attention.md`
+Key methods identified:
+1. **DispatchManager timing** (already built into test) - host-side wall-clock per-module/per-op timing, outputs CSV with pivot table
+2. **Tracy device profiler** - device-side cycle-accurate op timing via `TT_METAL_DEVICE_PROFILER=1` + `tracy-capture`, outputs `ops_perf_results.csv` with DEVICE KERNEL DURATION, FPU UTIL, NOC BW UTIL
+3. **TTNN Config Overrides** - logging/buffer/tensor reports via `TTNN_CONFIG_OVERRIDES` env var JSON
+4. **Tracy signposts** - tt-symbiote already has `signpost()` integration via `TT_SYMBIOTE_SIGNPOST_MODE` env var for marking module boundaries in Tracy timeline
+5. **python3 -m tracy** alias (`pytest_full`) - full Tracy integration with pytest
+
