@@ -278,3 +278,22 @@ Key results: Steady-state decode = 9.7ms wall clock. Only 24.5% is sub-module de
 **Findings:**
 `PLAN_profile_bailing_attention_v2.md`
 Key results: Buffer size is controlled by `TT_METAL_PROFILER_PROGRAM_SUPPORT_COUNT` env var (default 1000, set to 2000 to double buffer). Buffer overflow caused by 32 decode iterations x ~20 ops/iter x 5 RISCs x 2 markers. Fix: reduce `num_decode_tokens` to 8 AND set `TT_METAL_PROFILER_PROGRAM_SUPPORT_COUNT=2000`. The per-op CSV with op names is `cpp_device_perf_report.csv`, generated when `TT_METAL_PROFILER_CPP_POST_PROCESS=1` is set. Columns include OP NAME, DEVICE KERNEL DURATION, per-RISC durations (BRISC/NCRISC/TRISC), and OP TO OP LATENCY.
+
+## BailingAttention Decode Path Optimization Plan
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** Decode path is 72% data-movement-bound. Top bottlenecks: AllGather 28.9%, ReshapeView 20.5%, ReduceScatter 14.1%, Matmul 13.2%. Need concrete optimization plan to reduce from ~9.5ms to 3-5ms target.
+**Questions:**
+1. How to reduce 4 all_gathers to fewer?
+2. How to eliminate unnecessary reshapes (328 per decode)?
+3. Can reduce_scatter be combined with all_gather (all_reduce)?
+4. What is the optimal QKV projection sharding strategy?
+5. How does tt-transformers (LLaMA-70B) handle this?
+
+**Findings:**
+`PLAN_optimize_bailing_attention.md`
+Key results: 3-phase plan targeting ~6ms savings total.
+- Phase 1 (low-hanging fruit): Use nlp_create_qkv_heads_decode, eliminate linear 4D reshapes, pre-cache cos/sin sharded, test 4D QK norm. Saves 0.7-1.0ms.
+- Phase 2 (fused QKV): Create TTNNLinearIColShardedWAllReduced, fuse Q+K+V into single matmul + all_reduce. Eliminates 3 all_gathers + 3 matmuls + 1 reduce_scatter, replaces with 1 matmul + 1 all_reduce. Saves 2-3ms.
+- Phase 3 (trace capture): Enable TTNN trace for decode path. Saves 2-3ms.
+Reference: LLaMA-70B uses fused QKV matmul + nlp_create_qkv_heads_decode + column-parallel sharding. BailingMoE needs all_reduce (not reduce_scatter) due to 4 KV heads < 8 devices.
