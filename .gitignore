@@ -6,3 +6,4 @@ PLAN_*
 !PLAN_optimize_bailing_attention.md
 !PLAN_fused_qkv_allreduce.md
 !PLAN_profile_ttnn_moe.md
+!PLAN_optimize_bailing_moe.md

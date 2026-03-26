@@ -335,3 +335,23 @@ Key results:
 **Findings:**
 `PLAN_profile_ttnn_moe.md`
 Key results: TTNNBailingMoE inherits from TTNNMoE. Forward pass: all_gather_async -> float32 gate matmul -> TTNNMoERouterDecode (3-pass topk routing with 30+ TTNN ops) -> TTNNExperts (all_to_all_dispatch, 3x sparse_matmul, silu, all_to_all_combine, weight application) -> reduce_scatter_minimal_async -> shared_experts (3 matmuls + silu). Two profiling methods: (1) DispatchManager host-level timing (built into test), (2) Device-level Tracy profiling with TT_METAL_DEVICE_PROFILER=1 + TT_METAL_PROFILER_CPP_POST_PROCESS=1. Buffer overflow likely with 128 decode tokens; reduce to 8-16 and set TT_METAL_PROFILER_PROGRAM_SUPPORT_COUNT=4000. Expected bottlenecks: routing overhead (many small ops), CCL ops (all_gather + reduce_scatter), sparse_matmul efficiency.
+
+## BailingMoE (TTNNBailingMoE / TTNNMoE) Decode Path Optimization
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** The MoE module in Ling-mini-2.0 has multiple performance bottlenecks: CPU fallback in the router sort, 3-pass topk with excessive typecasts, expensive weight application pattern (permute/unsqueeze/repeat), and sequential shared expert execution. Need a detailed optimization plan.
+**Questions:**
+1. What is the full op sequence and cost breakdown for TTNNMoE.forward() decode path?
+2. How can the CPU fallback sort in TTNNMoERouterDecode be eliminated?
+3. Can the 3-pass topk centering approach be simplified or eliminated for Ling-mini-2.0 (64 experts, n_group=1)?
+4. How can the weight application pattern (permute/unsqueeze/repeat/broadcast multiply/sum) be optimized?
+5. Can shared expert computation overlap with routed expert computation?
+6. What layout conversions (ROW_MAJOR <-> TILE_LAYOUT) can be eliminated?
+
+**Findings:**
+`PLAN_optimize_bailing_moe.md`
+Key results: 4-phase plan targeting significant latency reduction.
+- Phase 1 (Router): Eliminate CPU sort fallback, simplify 3-pass topk to 1-pass (n_group <= topk_group), eliminate unnecessary f32 typecasts. Saves ~2-4ms.
+- Phase 2 (Expert pipeline): Optimize weight application with ttnn.embedding_with_broadcast or in-place weighted accumulation, reduce ROW_MAJOR<->TILE conversions. Saves ~1-2ms.
+- Phase 3 (Shared experts): Overlap shared expert MLP with routed expert dispatch/compute using async ops. Saves ~0.5-1ms.
+- Phase 4 (Trace capture): Enable TTNN trace for full MoE decode. Saves ~2-3ms.
