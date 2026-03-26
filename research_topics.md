@@ -321,3 +321,17 @@ Key results:
 - RISK: T3K test skips 8-device all_reduce due to "hang in all gather"; fallback is composite RS+AG (2 ops, still saves 3)
 - Estimated savings: 2.0-2.7ms per decode (4 fewer CCL host dispatches + 2 fewer matmuls)
 - Memory cost: +12.6MB/layer (403MB total for 32 layers, 3.4% of T3K DRAM)
+
+## TTNNMoE / TTNNBailingMoE Profiling Plan
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** Need to profile TTNNMoE (TTNNBailingMoE) module used in test_ling_mini_2_0.py to understand per-op performance breakdown, identify bottlenecks in the MoE forward pass (all_gather, routing, sparse_matmul experts, all_to_all dispatch/combine, reduce_scatter, shared experts).
+**Questions:**
+1. What is the TTNNMoE/TTNNBailingMoE architecture and its op composition?
+2. How to profile the full MoE forward pass with device-level Tracy profiling?
+3. What are the expected bottlenecks (routing, expert compute, CCL ops, host overhead)?
+4. How to set up environment and run profiling for test_ling_mini_2_0.py?
+
+**Findings:**
+`PLAN_profile_ttnn_moe.md`
+Key results: TTNNBailingMoE inherits from TTNNMoE. Forward pass: all_gather_async -> float32 gate matmul -> TTNNMoERouterDecode (3-pass topk routing with 30+ TTNN ops) -> TTNNExperts (all_to_all_dispatch, 3x sparse_matmul, silu, all_to_all_combine, weight application) -> reduce_scatter_minimal_async -> shared_experts (3 matmuls + silu). Two profiling methods: (1) DispatchManager host-level timing (built into test), (2) Device-level Tracy profiling with TT_METAL_DEVICE_PROFILER=1 + TT_METAL_PROFILER_CPP_POST_PROCESS=1. Buffer overflow likely with 128 decode tokens; reduce to 8-16 and set TT_METAL_PROFILER_PROGRAM_SUPPORT_COUNT=4000. Expected bottlenecks: routing overhead (many small ops), CCL ops (all_gather + reduce_scatter), sparse_matmul efficiency.
