@@ -720,3 +720,308 @@ trans_mat = self._rotary_setup.get_trans_mat_decode_sharded(batch_size)
 1. Run `pytest models/experimental/tt_symbiote/tests/test_ling_mini_2_0.py -v --timeout=0`
 2. Confirm the `TT_FATAL @ rotary_embedding_llama_device_operation.cpp:153` error is gone
 3. Confirm decode output is coherent text (not garbled or repetitive)
+
+## 17. Iteration 7 - Garbled Output After RoPE Unification
+
+### 17.1 Symptom
+
+After unifying RoPE format (both prefill and decode now use `BailingRotarySetup` with
+Meta-format cos/sin and `rotary_embedding_llama`), the test passes but produces garbled
+output that starts somewhat sensibly then degenerates:
+
+```
+"I'm a big fan of the taste of the taste of the best way to make a list of 10000000000000000000000000..."
+```
+
+The prompt was "What is your favorite condiment?" - the first few tokens ("I'm a big fan")
+are plausible, but the output quickly degenerates into repetition and then numeric garbage.
+
+### 17.2 ROOT CAUSE: Missing Q/K Weight Permutation (HF-to-Meta Layout)
+
+**The `rotary_embedding_llama` kernel expects Q/K values in Meta (interleaved) layout,
+but tt-symbiote feeds them in HF (split-half) layout because the Q/K projection weights
+are not permuted.**
+
+#### The Two Data Layouts
+
+The HuggingFace RoPE format and the Meta (llama) RoPE format represent the same mathematical
+rotation but operate on **different data layouts**:
+
+**HF Layout (split-half):**
+For head_dim=128 with rotary_dim=64, the Q/K projection output has pairs at positions
+`(i, i+32)` for `i = 0..31`. The `rotate_half` function splits at `dim//2`:
+- Input: `[x0, x1, ..., x31, x32, x33, ..., x63]`
+- rotate_half: `[-x32, -x33, ..., -x63, x0, x1, ..., x31]`
+- Pairs: `(x[i], x[i+32])` are treated as complex numbers
+
+**Meta Layout (interleaved):**
+Pairs are at adjacent positions `(2i, 2i+1)` for `i = 0..31`. The trans_mat swaps adjacent
+elements:
+- Input: `[x0, x1, x2, x3, ..., x62, x63]`
+- trans_mat: `[-x1, x0, -x3, x2, ..., -x63, x62]`
+- Pairs: `(x[2i], x[2i+1])` are treated as complex numbers
+
+#### How tt-transformers Handles This
+
+In `models/tt_transformers/tt/load_checkpoints.py` (lines 365-374), when loading HuggingFace
+checkpoints, tt-transformers **permutes the Q/K weights** to convert from HF layout to Meta
+layout:
+
+```python
+elif "q_proj.weight" in key or "k_proj.weight" in key:
+    n_heads = tensor.shape[0] // head_dim
+    converted_weights[key] = reverse_permute(tensor, n_heads, tensor.shape[0], tensor.shape[1])
+elif "q_proj.bias" in key or "k_proj.bias" in key:
+    n_heads = tensor.shape[0] // head_dim
+    converted_weights[key] = reverse_permute(tensor.unsqueeze(-1), n_heads, tensor.shape[0], 1).squeeze(-1)
+elif "q_norm.weight" in key or "k_norm.weight" in key:
+    converted_weights[key] = reverse_permute_1d(tensor)
+```
+
+The `reverse_permute` function (line 785-786):
+```python
+def reverse_permute(tensor, n_heads, dim1, dim2):
+    return tensor.view(n_heads, 2, dim1 // n_heads // 2, dim2).transpose(1, 2).reshape(dim1, dim2)
+```
+
+And `reverse_permute_1d` (lines 793-801):
+```python
+def reverse_permute_1d(tensor):
+    """Convert the last dim from separate real and imaginary parts
+    (r1, r2, i1, i2, ...) to interleaved rope format (r1, i1, r2, i2, ...)"""
+    shape = tensor.shape
+    dim = shape[-1]
+    reals = tensor[..., : dim // 2]
+    imags = tensor[..., dim // 2 :]
+    interleaved = torch.stack((reals, imags), dim=-1).flatten(start_dim=len(shape) - 1)
+    return interleaved
+```
+
+The `reverse_permute_1d` docstring spells it out explicitly: it converts from
+"separate real and imaginary parts (r1, r2, i1, i2)" to "interleaved rope format
+(r1, i1, r2, i2)".
+
+#### What tt-symbiote Is Missing
+
+tt-symbiote uses HuggingFace model weights **without any permutation**. The Q/K projection
+weights produce outputs in HF layout (split-half pairs at `(i, i+head_dim/2)`), but
+`rotary_embedding_llama` applies rotation to Meta layout (adjacent pairs at `(2i, 2i+1)`).
+This means:
+- **Wrong dimension pairs are being rotated together**
+- The rotation is mathematically incoherent
+- The first few tokens may appear plausible because position 0 has all-ones cos and all-zeros sin (identity rotation)
+- As positions increase, the rotation errors compound, leading to degeneration
+
+Similarly, Q/K norm weights (if `use_qk_norm=True`) also need to be permuted because the
+norm is applied per-dimension before rotation.
+
+### 17.3 Additional Confirmation: trans_mat Size Is Correct
+
+An earlier concern was that the prefill trans_mat was changed from `head_dim x head_dim`
+(128x128) to `TILE_SIZE x TILE_SIZE` (32x32). Investigation confirms this is **correct**:
+
+1. **tt-transformers `get_rot_transformation_mat`** (in `common.py` line 473-475) always
+   forces `dhead = 32` regardless of the input parameter:
+   ```python
+   def get_rot_transformation_mat(dhead=32):
+       # ROPE op uses a single tile
+       dhead = 32
+       return get_rot_transformation_mat_v2(dhead)
+   ```
+   Even though callers pass `head_dim` (e.g., 128), the function ignores it and always
+   returns a 32x32 matrix.
+
+2. **The C++ kernel** (`rotary_embedding_llama.cpp` line 42) loads exactly one tile of
+   trans_mat: `cb_wait_front(trans_mat_cb, onetile)`. On line 72, it does
+   `matmul_tiles(in_cb, trans_mat_cb, j, in1_index, j)` where `in1_index` stays 0.
+   The kernel applies the **same single 32x32 tile** to each tile column across the
+   width dimension (Wt tiles). For head_dim=128, Wt=4, so the 32x32 trans_mat is
+   applied 4 times independently.
+
+3. **The C++ validation** (line 152-155) for prefill mode explicitly asserts:
+   ```cpp
+   trans_mat.logical_shape()[-2] == TILE_HEIGHT  // 32
+   trans_mat.logical_shape()[-1] == TILE_WIDTH   // 32
+   ```
+
+4. **The TODO comment** in tt-transformers `rope.py` line 492 asks:
+   ```python
+   # TODO: Colman, should this be TILE_SIZE or head_dim?
+   ```
+   The answer is: it should be TILE_SIZE (32). The function that was being called
+   (`get_rot_transformation_mat`) always returned 32x32 anyway.
+
+### 17.4 cos/sin Format Verification
+
+The cos/sin computation in `_compute_cos_sin_cache` was verified to match the tt-transformers
+reference (`gather_cos_sin` and `permute_to_meta_format`):
+
+Both produce Meta format by:
+1. Computing `freqs = outer(positions, inv_freq)` (shape `[seq, rotary_dim/2]`)
+2. Doubling: `emb = cat(freqs, freqs)` (shape `[seq, rotary_dim]`)
+3. Taking cos/sin of `emb`
+4. Taking first half: `cos[:, :dim//2]`
+5. Interleaving pairs: `stack([cos, cos], dim=-1).flatten(-2)`
+
+The `inv_freq` computation also matches HuggingFace exactly:
+- HF: `inv_freq = 1/(base^(arange(0, dim, 2) / dim))` where `dim = head_dim * partial_rotary_factor`
+- Ours: `inv_freq = 1/(theta^(arange(0, rotary_dim, 2) / rotary_dim))` -- identical
+
+### 17.5 Why the Output Starts Somewhat Sensibly
+
+At position 0, `cos(0 * freq) = 1.0` and `sin(0 * freq) = 0.0` for all frequencies.
+This means position 0 is an identity transformation regardless of data layout, so the
+first token's prefill attention is approximately correct. As positions increase, the
+rotation angles grow, and the mismatch between HF and Meta layouts causes increasingly
+wrong rotations. This explains the pattern: somewhat sensible start, rapid degeneration.
+
+### 17.6 Fix Plan
+
+#### Fix 1 (CRITICAL): Permute Q/K Projection Weights to Meta Layout
+
+When `rotary_embedding_llama` is used (i.e., always in the T3K path), the Q/K projection
+weights must be permuted from HF layout to Meta layout. This must happen during weight
+loading, before any forward pass.
+
+**Where to apply:** In `TTNNBailingMoEAttention.from_torch()` or in the weight loading
+pipeline, add weight permutation for Q and K projections.
+
+**Implementation:**
+
+Add these utility functions (following tt-transformers pattern):
+
+```python
+def _reverse_permute_weight(tensor: torch.Tensor, n_heads: int) -> torch.Tensor:
+    """Permute Q/K projection weight from HF (split-half) to Meta (interleaved) layout.
+
+    HF layout pairs elements at (i, i+head_dim//2).
+    Meta layout pairs elements at (2i, 2i+1).
+
+    This permutation rearranges the output dimension of the weight matrix so that
+    when the projection is applied, the result is in Meta interleaved layout.
+    """
+    dim1, dim2 = tensor.shape[0], tensor.shape[1]
+    return tensor.view(n_heads, 2, dim1 // n_heads // 2, dim2).transpose(1, 2).reshape(dim1, dim2)
+
+
+def _reverse_permute_1d(tensor: torch.Tensor) -> torch.Tensor:
+    """Permute 1D tensor (bias or norm weight) from HF to Meta layout.
+
+    Converts (r1, r2, ..., i1, i2, ...) to (r1, i1, r2, i2, ...).
+    """
+    dim = tensor.shape[-1]
+    reals = tensor[..., : dim // 2]
+    imags = tensor[..., dim // 2 :]
+    return torch.stack((reals, imags), dim=-1).flatten(start_dim=len(tensor.shape) - 1)
+```
+
+**Apply in `from_torch()` or `move_weights_to_device_impl()`:**
+
+After loading the HF model's Q/K weights, before converting to TTNN:
+
+```python
+# Get the underlying torch Q/K projection weights
+q_weight = self._fallback_torch_layer.query_key_value.weight  # or q_proj.weight
+# Determine the Q/K portion dimensions
+n_q_heads = self.num_heads
+n_kv_heads = self.num_kv_heads
+head_dim = self.head_dim
+
+# Permute Q portion of the fused QKV weight
+q_dim = n_q_heads * head_dim
+k_dim = n_kv_heads * head_dim
+# If weights are fused as [Q | K | V]:
+fused_weight = self._fallback_torch_layer.query_key_value.weight
+q_weight = fused_weight[:q_dim, :]
+k_weight = fused_weight[q_dim:q_dim+k_dim, :]
+v_weight = fused_weight[q_dim+k_dim:, :]
+
+q_weight_permuted = _reverse_permute_weight(q_weight, n_q_heads)
+k_weight_permuted = _reverse_permute_weight(k_weight, n_kv_heads)
+fused_weight_permuted = torch.cat([q_weight_permuted, k_weight_permuted, v_weight], dim=0)
+
+# Similarly for biases if present
+# Similarly for q_norm/k_norm weights if use_qk_norm=True
+```
+
+**IMPORTANT:** The Q/K norm weights (if `use_qk_norm=True`) must ALSO be permuted using
+`_reverse_permute_1d`, because the norm is applied in the dimension that is being permuted.
+
+#### Fix 2 (ALTERNATIVE): Use HF-Format RoPE Instead
+
+If permuting weights is too invasive, an alternative is to NOT use `rotary_embedding_llama`
+and instead:
+- Use `ttnn.experimental.rotary_embedding` (HF format) for prefill
+- Implement decode RoPE using pure TTNN ops (element-wise multiply + add) in HF format
+
+However, this is NOT recommended because:
+1. `rotary_embedding` does not support the decode tensor layout `[1, B, H, D]`
+2. It would diverge from the proven tt-transformers pattern
+3. `rotary_embedding_llama` is specifically optimized for this use case
+
+#### Fix 3 (REQUIRED): Verify Q/K Norm Permutation
+
+If `use_qk_norm=True` (which it is for Ling-mini-2.0 based on the `_apply_qk_norm` calls),
+the Q/K RMS norm weights must also be permuted. RMS norm operates element-wise:
+`norm(x) = x / rms(x) * weight`, so the weight vector must be in the same layout as the
+data it multiplies.
+
+Check what `_apply_qk_norm` does and ensure the norm weight is permuted:
+
+```python
+# In from_torch() or move_weights_to_device_impl():
+if self.use_qk_norm:
+    q_norm_weight = self._fallback_torch_layer.q_norm.weight  # shape [head_dim]
+    k_norm_weight = self._fallback_torch_layer.k_norm.weight  # shape [head_dim]
+    q_norm_weight_permuted = _reverse_permute_1d(q_norm_weight)
+    k_norm_weight_permuted = _reverse_permute_1d(k_norm_weight)
+    # ... update the norm weights
+```
+
+### 17.7 Why This Wasn't Caught Earlier
+
+The RoPE format mismatch was diagnosed in Iteration 5 (Section 15), but the diagnosis
+focused on **cos/sin format** (HF vs Meta) between prefill and decode paths. The solution
+in Iteration 6 was to unify cos/sin to Meta format and use `rotary_embedding_llama` for
+both paths. This was correct and necessary.
+
+However, using `rotary_embedding_llama` with Meta-format cos/sin is only half the story.
+The **other half** is that the Q/K data itself must be in Meta (interleaved) layout for
+the rotation to be applied to the correct dimension pairs. This requires permuting the
+Q/K projection weights, which is a weight-loading concern, not a cos/sin concern.
+
+The tt-transformers codebase handles this in `load_checkpoints.py` using `reverse_permute`,
+which is separate from the RoPE code. This separation made it easy to miss.
+
+### 17.8 Summary
+
+| Finding | Detail |
+|---------|--------|
+| **Root cause** | Q/K projection weights not permuted from HF to Meta layout |
+| **Evidence** | tt-transformers `load_checkpoints.py:365-374` permutes Q/K weights with `reverse_permute()` |
+| **Why it matters** | `rotary_embedding_llama` rotates adjacent pairs `(x[2i], x[2i+1])`, but HF weights produce split-half pairs `(x[i], x[i+dim/2])` |
+| **Why output starts OK** | Position 0 is identity rotation (cos=1, sin=0) regardless of layout |
+| **Why output degenerates** | Rotation errors compound as position increases |
+| **trans_mat 32x32** | CONFIRMED correct -- kernel always uses single tile, tt-transformers also forces dhead=32 |
+| **cos/sin format** | CONFIRMED correct -- matches tt-transformers Meta format exactly |
+| **Fix** | Add `reverse_permute` for Q/K weights and `reverse_permute_1d` for Q/K norm weights |
+| **Reference code** | `models/tt_transformers/tt/load_checkpoints.py` lines 365-374, 785-801 |
+
+### 17.9 Implementation Order
+
+1. **Add `_reverse_permute_weight` and `_reverse_permute_1d` utility functions** to
+   `rope.py` or a new `weight_utils.py`
+2. **Permute Q/K projection weights** in the weight loading path (before TTNN conversion)
+3. **Permute Q/K norm weights** if `use_qk_norm=True`
+4. **Permute Q/K projection biases** if present (Ling uses `bias=True` for attention)
+5. **Run test** and verify coherent output
+6. **Verify numerically**: Compare a single layer's Q output (after projection + norm +
+   RoPE) between HF reference and TTNN, for both prefill and decode at a few positions
+
+### 17.10 Key Files
+
+| File | What to change |
+|------|---------------|
+| `models/experimental/tt_symbiote/modules/attention.py` | Add weight permutation in `from_torch()` or `move_weights_to_device_impl()` |
+| `models/experimental/tt_symbiote/modules/rope.py` | (No changes needed -- cos/sin and trans_mat are correct) |
+| `models/tt_transformers/tt/load_checkpoints.py` | Reference only -- `reverse_permute` and `reverse_permute_1d` implementations |
