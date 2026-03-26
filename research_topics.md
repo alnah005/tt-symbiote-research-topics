@@ -249,22 +249,3 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 **Findings:**
 `guides/tt_transformers_into_tt_symbiote/`
-
-
-## Ling-mini-2.0 Decode RoPE Bug: HEIGHT_SHARDED Slicing and Identity Padding
-**Date:** 2026-03-26
-**Status:** Completed
-**Why Needed:** Ling-mini-2.0 produces "aukee" repeating tokens during decode despite fixing RoPE format/shape/sharding. Needed deeper debugging to find the actual root cause.
-**Questions:**
-1. Why does the model still produce garbled output after fixing RoPE format/shape/sharding?
-2. Is the HF-to-Meta cos/sin conversion correct?
-3. What does the standard TT-Transformers pattern do for partial RoPE in decode mode?
-
-**Findings:**
-Three critical bugs found in the decode path of `_forward_decode_paged()` in `attention.py`:
-1. **Slicing HEIGHT_SHARDED tensors (CRITICAL)**: `_apply_partial_rope_decode()` receives HEIGHT_SHARDED Q/K tensors and slices them along dim=-1 (`q[:,:,:,:64]`). Slicing HEIGHT_SHARDED tensors along the width dimension is ILLEGAL in TTNN and produces garbage data silently.
-2. **trans_mat shard grid mismatch (CRITICAL)**: `_decode_trans_mat` is pre-sharded on 1 core during init, but Q/K/cos/sin are sharded on `batch_size` cores at runtime. `rotary_embedding_llama` requires ALL inputs on the same shard grid.
-3. **Redundant inline cos/sin conversion**: ~60 lines of host round-trip code converts HF cos/sin to Meta format. The math is correct but the approach is fragile and unnecessary.
-
-**Fix**: Use identity-padded cos/sin at full head_dim (128) with cos=1.0, sin=0.0 for non-rotary dims (64-127). This eliminates ALL tensor slicing in the decode RoPE path. Use `BailingRotarySetup` which already computes Meta-format cos/sin. Full plan in `PLAN_ling_2_0_correct_text.md` Section 13.
-
