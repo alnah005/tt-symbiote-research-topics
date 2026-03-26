@@ -250,3 +250,17 @@ This file tracks research topics that the Architect needs to investigate for mak
 **Findings:**
 `guides/tt_transformers_into_tt_symbiote/`
 
+## BailingAttention Decode Path Profiling Analysis
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** Need op-level profiling breakdown of BailingAttention standalone decode to identify bottlenecks and prioritize optimizations.
+**Questions:**
+1. Which ops dominate decode time?
+2. How much time is host overhead vs device compute?
+3. Where are the `_to_replicated` host round-trips showing up?
+4. How many `all_gather` and `to_memory_config` ops per decode iteration and their total cost?
+5. What fraction of time is spent in actual compute (matmul, SDPA) vs data movement?
+
+**Findings:**
+`ANALYSIS_bailing_attention_profiling.md`
+Key results: Steady-state decode = 9.7ms wall clock. Only 24.5% is sub-module device compute (matmuls, RMSNorm). 70.1% is inline attention ops (all_gather x4, to_memory_config x9, _to_replicated host round-trip, RoPE, paged SDPA). ~35% is host/wrapper overhead. Top optimizations: eliminate _to_replicated (-1-2ms), reduce all_gather 4->1 (-1.5-2ms), trace capture (-2-3ms). Target: 3-5ms per decode with all optimizations.
