@@ -249,3 +249,20 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 **Findings:**
 `guides/tt_transformers_into_tt_symbiote/`
+
+## Minimize Ling-mini-2.0 Diff
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** Current working tree has 993 insertions / 425 deletions across 7 files. Need to identify minimal set of changes for correct text generation.
+**Questions:**
+1. Can the original decode path (permute-based) work with only the RoPE format fix?
+2. Are the compute_kernel_config changes (HiFi2/fp32) needed for correct text?
+3. Can we keep the original _ensure_replicated_tensor inline?
+4. Is the CPU-side KV cache truly needed?
+
+**Findings:**
+See `PLAN_minimize_ling_changes.md` for full analysis. Key answers:
+1. No - rotary_embedding_llama decode mode requires HEIGHT_SHARDED inputs, original path only shards K/V
+2. Unknown - needs testing. Recommend testing without first.
+3. No - BailingRotarySetup pre-computes position embeddings internally, replacing the inline function
+4. Yes - PyTorch fallback layers need CPU-side concatenation for DynamicCache semantics
