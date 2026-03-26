@@ -297,3 +297,27 @@ Key results: 3-phase plan targeting ~6ms savings total.
 - Phase 2 (fused QKV): Create TTNNLinearIColShardedWAllReduced, fuse Q+K+V into single matmul + all_reduce. Eliminates 3 all_gathers + 3 matmuls + 1 reduce_scatter, replaces with 1 matmul + 1 all_reduce. Saves 2-3ms.
 - Phase 3 (trace capture): Enable TTNN trace for decode path. Saves 2-3ms.
 Reference: LLaMA-70B uses fused QKV matmul + nlp_create_qkv_heads_decode + column-parallel sharding. BailingMoE needs all_reduce (not reduce_scatter) due to 4 KV heads < 8 devices.
+
+## Fused QKV + AllReduce Detailed Implementation Plan
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** Phase 1 (nlp_create_qkv_heads_decode) REGRESSED -- host dispatch overhead dominates, not device op count. Must reduce 5 CCL ops to 1 by fusing Q/K/V projections into a single column-parallel matmul + all_reduce.
+**Questions:**
+1. Which CCL pattern to use? (all_reduce vs reduce_scatter+all_gather vs hybrid)
+2. How to handle GQA (4 KV heads < 8 devices) with reduce_scatter?
+3. Does ttnn.all_reduce work on T3K (1x8 mesh)?
+4. What weight preparation changes are needed for fused QKV?
+5. Can all_reduce_create_qkv_heads (Galaxy op) be used on T3K?
+6. How does bias handling change with all_reduce vs reduce_scatter?
+
+**Findings:**
+`PLAN_fused_qkv_allreduce.md`
+Key results:
+- Use `ttnn.all_reduce` (not reduce_scatter) because KV heads (4) < devices (8) doesn't divide for reduce_scatter
+- all_reduce replicates full 3072-dim output on all devices; tiny tensors in decode so bandwidth waste is negligible
+- `all_reduce_create_qkv_heads` is Galaxy-only (TG 8x4), not suitable for T3K
+- New linear class `TTNNLinearIColShardedWAllReduced`: matmul + all_reduce, bias must be replicated (not sharded)
+- Prefill path unchanged (keeps separate Q/K/V projections)
+- RISK: T3K test skips 8-device all_reduce due to "hang in all gather"; fallback is composite RS+AG (2 ops, still saves 3)
+- Estimated savings: 2.0-2.7ms per decode (4 fewer CCL host dispatches + 2 fewer matmuls)
+- Memory cost: +12.6MB/layer (403MB total for 32 layers, 3.4% of T3K DRAM)

@@ -4,3 +4,4 @@ PLAN_*
 !PLAN_profile_bailing_attention.md
 !PLAN_profile_bailing_attention_v2.md
 !PLAN_optimize_bailing_attention.md
+!PLAN_fused_qkv_allreduce.md
