@@ -1025,3 +1025,921 @@ which is separate from the RoPE code. This separation made it easy to miss.
 | `models/experimental/tt_symbiote/modules/attention.py` | Add weight permutation in `from_torch()` or `move_weights_to_device_impl()` |
 | `models/experimental/tt_symbiote/modules/rope.py` | (No changes needed -- cos/sin and trans_mat are correct) |
 | `models/tt_transformers/tt/load_checkpoints.py` | Reference only -- `reverse_permute` and `reverse_permute_1d` implementations |
+
+## 18. Iteration 8 - Deep Decode Diagnosis
+
+### 18.1 Symptom Recap
+
+After all previous fixes (RoPE unification, weight permutation, trans_mat, _seq_lengths):
+```
+"It seems like to me, I'm not sure what you're asking about, but I'll try to help you
+with your favorite thing. I'll be to you. I your favorite thing. I'll be to be to you're..."
+```
+
+Output starts somewhat sensibly but degenerates rapidly during decode.
+
+### 18.2 CPU Baseline Verification
+
+**Result: CPU baseline produces PERFECT output.**
+```
+"As an AI, I don't have personal preferences or taste buds, so I don't have a favorite
+condiment. However, I can certainly help you explore different condiments and their uses!"
+```
+
+This confirms the HuggingFace model weights and tokenizer are correct. The bug is
+exclusively in the TTNN/paged-attention integration.
+
+### 18.3 Systematic Analysis of Decode Path
+
+The following components were verified as CORRECT:
+
+| Component | Status | Reasoning |
+|-----------|--------|-----------|
+| Weight permutation (reverse_permute) | CORRECT | Q/K weights permuted to Meta layout, V/dense NOT permuted (correct) |
+| QK norm weight permutation | CORRECT | _reverse_permute_1d produces matching Meta layout for element-wise scaling |
+| RoPE cos/sin computation | CORRECT | _compute_cos_sin_cache matches Meta interleaved-pair format |
+| attention_scaling factor | N/A | Value is 1.0 for default rope_type (no scaling needed) |
+| Prefill RoPE | CORRECT | Uses rotary_embedding_llama with Meta-format cos/sin from BailingRotarySetup |
+| Decode RoPE | CORRECT | Same BailingRotarySetup, HEIGHT_SHARDED trans_mat via get_trans_mat_decode_sharded() |
+| _project_qkv_t3k | CORRECT | Q col-sharded + reduce_scatter, K/V replicated input + col-sharded weight; all_gather produces replicated output |
+| QKV concat + _to_replicated | CORRECT | Data is identical on all devices after all_gather; host round-trip preserves data |
+| nlp_create_qkv_heads_decode split | CORRECT | Splits [Q(2048), K(512), V(512)] matching concat order |
+| _seq_lengths tracking | CORRECT | Prefill adds seq_len, decode adds 1; cur_pos read before update |
+| cache_position handling | CORRECT | HF BailingMoeV2 does not pass cache_position; falls back to get_seq_length() |
+| KV cache format compatibility | CORRECT | paged_fill_cache [B,H,S,D] and paged_update_cache [1,B,H,D] both write to [blocks,H,block_size,D] |
+| nlp_concat_heads_decode + dense | CORRECT | Output [1,1,32,H*D] -> dense -> slice to batch=1 -> reshape |
+| SDPAProgramConfig for decode | CORRECT | q_chunk_size=0, k_chunk_size=0 matches tt-transformers convention |
+
+### 18.4 ROOT CAUSE FOUND: TTNNPagedAttentionKVCache.update() Does Not Accumulate K/V History
+
+**File:** `models/experimental/tt_symbiote/modules/attention.py`, lines 239-260
+
+**The Bug:**
+
+The test replaces only layer 0's attention with TTNN (`TTNNBailingMoEAttention`). Layers 1-23
+remain as standard PyTorch `BailingMoeV2Attention`. However, the test passes a single
+`TTNNPagedAttentionKVCache` as `past_key_values` to `model.generate()`, which feeds it to ALL
+24 layers.
+
+Layer 0 (TTNN) correctly uses `paged_fill_on_device()` and `paged_update_on_device()` to
+store K/V in the on-device paged cache. It reads from this cache via `paged_sdpa_decode()`.
+
+Layers 1-23 (PyTorch) call `past_key_value.update(key_states, value_states, layer_idx, ...)`,
+which is the standard HuggingFace Cache interface. The HF contract requires `update()` to:
+1. **Accumulate** the new K/V with all previously cached K/V
+2. **Return** the full accumulated K/V tensors
+
+`DynamicCache.update()` does this correctly:
+```python
+self.key_cache[layer_idx] = torch.cat([self.key_cache[layer_idx], key_states], dim=-2)
+return self.key_cache[layer_idx], self.value_cache[layer_idx]
+```
+
+But `TTNNPagedAttentionKVCache.update()` is BROKEN:
+```python
+def update(self, key_states, value_states, layer_idx, cache_kwargs=None):
+    # ... just converts types and increments _seq_lengths ...
+    return key_states, value_states  # <-- Returns ONLY current token's K/V!
+```
+
+**Impact:**
+- During **prefill**, layers 1-23 call `update()` with the full prompt K/V. Since there's no
+  prior cache, the returned K/V IS the full prefill K/V. Prefill works correctly.
+- During **decode**, layers 1-23 call `update()` with just the current token's K/V (shape
+  `[B, H, 1, D]`). The method returns this single token, NOT the accumulated history.
+  Therefore `attn_weights = Q @ K^T` at line 529 of the HF model only computes attention
+  over the current token, not over the full context.
+- The attention mechanism degenerates because each decode step only attends to itself for
+  23 out of 24 layers.
+
+**Why output starts somewhat sensibly:**
+- The first decode token benefits from the prefill computation: all 24 layers processed the
+  full prompt during prefill, producing a reasonable hidden state. The LM head then picks
+  a plausible next token from this hidden state.
+- From the 2nd decode token onward, layers 1-23 only attend to the current token. The hidden
+  state progressively loses context, causing rapid degeneration.
+
+### 18.5 The Fix
+
+`TTNNPagedAttentionKVCache.update()` must accumulate K/V for PyTorch layers. Two approaches:
+
+**Option A (Recommended): Maintain a CPU-side DynamicCache for PyTorch layers**
+
+Add an internal `DynamicCache` for layers that use the `update()` path (PyTorch layers).
+The paged on-device cache continues to be used for TTNN layers via the
+`paged_fill_on_device()` / `paged_update_on_device()` path.
+
+```python
+class TTNNPagedAttentionKVCache(Cache):
+    def __init__(self, ...):
+        ...
+        # CPU-side cache for PyTorch layers that call update()
+        self._cpu_key_cache: list[Optional[torch.Tensor]] = [None] * num_layers
+        self._cpu_value_cache: list[Optional[torch.Tensor]] = [None] * num_layers
+
+    def update(self, key_states, value_states, layer_idx, cache_kwargs=None):
+        # Convert to torch if needed
+        if isinstance(key_states, TorchTTNNTensor):
+            key_states = key_states.to_torch
+        if isinstance(value_states, TorchTTNNTensor):
+            value_states = value_states.to_torch
+        if isinstance(key_states, ttnn.Tensor):
+            key_states = ttnn.to_torch(key_states)
+        if isinstance(value_states, ttnn.Tensor):
+            value_states = ttnn.to_torch(value_states)
+
+        seq_len = key_states.shape[2]
+        self._seq_lengths[layer_idx] += seq_len
+        if layer_idx == 0:
+            self._seen_tokens += seq_len
+
+        # Accumulate K/V history for PyTorch layers
+        if self._cpu_key_cache[layer_idx] is None:
+            self._cpu_key_cache[layer_idx] = key_states
+            self._cpu_value_cache[layer_idx] = value_states
+        else:
+            self._cpu_key_cache[layer_idx] = torch.cat(
+                [self._cpu_key_cache[layer_idx], key_states], dim=-2
+            )
+            self._cpu_value_cache[layer_idx] = torch.cat(
+                [self._cpu_value_cache[layer_idx], value_states], dim=-2
+            )
+
+        return self._cpu_key_cache[layer_idx], self._cpu_value_cache[layer_idx]
+```
+
+**Option B (Alternative): Use a DynamicCache for non-TTNN layers + TTNNPagedAttentionKVCache for TTNN layers**
+
+Create a hybrid cache that delegates to `DynamicCache` for PyTorch layers and to the
+paged cache for TTNN layers. This requires a way to know which layers are TTNN vs PyTorch.
+
+**Recommendation: Option A** is simpler and more robust. It keeps the API the same and
+just fixes the `update()` method to match HF's `DynamicCache` contract.
+
+### 18.6 Secondary Considerations
+
+Once the `update()` bug is fixed, verify:
+
+1. **Numerical accuracy**: Compare TTNN layer 0 output vs PyTorch layer 0 output for the same
+   input at various decode positions. PCC > 0.99 expected.
+2. **Memory**: The CPU-side cache grows linearly with sequence length for 23 layers. For
+   max_seq_len=2048, each layer stores `[B, H, S, D]` = `[1, 4, 2048, 128]` = 1MB for K+V.
+   Total for 23 layers: ~23MB. This is negligible.
+3. **Performance**: The CPU-side cache uses `torch.cat()` which copies data every step.
+   For long sequences, consider pre-allocating the cache tensors.
+
+### 18.7 Why Previous Iterations Missed This
+
+- Previous debugging focused on the TTNN layer 0 internals (RoPE format, weight permutation,
+  trans_mat, etc.) because the symptom ("output degenerates") seemed like a RoPE/attention bug.
+- The `update()` method was assumed correct because it "just passes data through" and the
+  focus was on the more complex TTNN code paths.
+- The bug is actually in the SIMPLEST code (3 lines of Python) rather than the complex TTNN
+  kernels. This is a classic case of "looked too deep, missed the obvious."
+
+### 18.8 Summary
+
+| Finding | Detail |
+|---------|--------|
+| **Root cause** | `TTNNPagedAttentionKVCache.update()` does NOT accumulate K/V history |
+| **Evidence** | HF `DynamicCache.update()` concatenates `[cached_K, new_K]` and returns full tensor; our `update()` returns only `new_K` |
+| **Impact** | Layers 1-23 (PyTorch) only attend to current token during decode (no history) |
+| **Why prefill works** | First call to `update()` has no prior cache, so returned K/V = full prefill K/V |
+| **Why output starts OK** | First decode token uses prefill hidden states from all 24 layers |
+| **Why it degenerates** | From token 2+, 23/24 layers see only 1-token context |
+| **Fix** | Add CPU-side K/V accumulation in `update()` to match `DynamicCache` contract |
+| **Complexity** | ~15 lines of code change |
+
+### 18.9 Implementation Order
+
+1. **Fix `TTNNPagedAttentionKVCache.update()`** -- add `_cpu_key_cache` / `_cpu_value_cache`
+   lists and concatenate K/V in `update()`, returning accumulated tensors
+2. **Run test** -- verify coherent multi-sentence output matching CPU baseline quality
+3. **Numerical validation** -- compare TTNN layer 0 vs PyTorch layer 0 at decode positions
+4. **Clean up** -- remove debug prints, add docstring explaining the dual-cache design
+
+### 18.10 Key Files
+
+| File | What to change |
+|------|---------------|
+| `models/experimental/tt_symbiote/modules/attention.py` | Fix `TTNNPagedAttentionKVCache.update()` to accumulate K/V (lines 239-260) |
+| `models/experimental/tt_symbiote/tests/test_ling_mini_2_0.py` | Add output quality assertion (not just non-empty) |
+
+## 19. Iteration 9 - Corrected Decode Diagnosis (All 20 Layers Are TTNN)
+
+### 19.1 Critical Correction
+
+The Section 18 diagnosis was **WRONG**. It assumed some layers use PyTorch attention and
+call `update()`. In reality, **all 20 attention layers** are replaced with
+`TTNNBailingMoEAttention`. The `update()` method is never called. The CPU-side
+`_cpu_key_cache` / `_cpu_value_cache` fix from Section 18 was correct code but irrelevant
+because no code path ever reaches `update()`.
+
+The degenerate output ("It seems like to me, I'm not sure what you're asking about...")
+must be caused by something in the TTNN paged decode path itself.
+
+### 19.2 Investigation: Position Tracking for All 20 Layers
+
+**Finding: Position tracking is CORRECT.**
+
+The flow for each layer:
+
+1. **After prefill**: `_seq_lengths[0..19]` = 25 (each layer calls `paged_fill_on_device`
+   which does `_seq_lengths[layer_idx] += seq_len`)
+2. **First decode, layer N**: `cur_pos = get_seq_length(N) = 25`. RoPE applied at position 25.
+   After `paged_update_on_device`, `_seq_lengths[N] = 26`.
+3. **Second decode, layer N**: `cur_pos = get_seq_length(N) = 26`. Correct.
+
+Each layer tracks its own `_seq_lengths[layer_idx]` independently. Since all layers
+process the same token in sequence within a forward pass, all 20 layers stay perfectly
+synchronized (all increment by 1 per decode step).
+
+`_seen_tokens` is only updated for `layer_idx == 0` and is used by HF's
+`get_seq_length()` (default layer_idx=0) to compute `past_seen_tokens` for position_ids.
+This is also correct.
+
+### 19.3 Investigation: cache_position Is Always None
+
+**Finding: `cache_position` is NEVER passed to TTNNBailingMoEAttention.**
+
+The call chain:
+1. HF `generate()` -> `prepare_inputs_for_generation()` adds `cache_position` to model_inputs
+2. `BailingMoeV2ForCausalLM.forward(**kwargs)` -> `self.model(**kwargs)` passes it through
+3. `BailingMoeV2Model.forward(**kwargs)` captures `cache_position` in its `**kwargs` but
+   **never passes it to decoder layers** (line 1292-1301 of modeling_bailing_moe_v2.py)
+4. `BailingMoeV2DecoderLayer.forward()` -> `self.attention()` never receives `cache_position`
+5. `TTNNBailingMoEAttention.forward(cache_position=None)` always hits the fallback:
+   ```python
+   cur_pos = past_key_values.get_seq_length(layer_idx)
+   ```
+
+This is actually fine because `get_seq_length(layer_idx)` returns the correct value (see 19.2).
+
+### 19.4 Investigation: HF Model Does NOT Call update() Outside Attention
+
+**Finding: The decoder layer does NOT call `past_key_value.update()` externally.**
+
+```python
+# BailingMoeV2DecoderLayer.forward() (line 998):
+hidden_states, self_attn_weights, present_key_value = self.attention(
+    hidden_states=..., past_key_value=past_key_values, ...
+)
+# No additional cache operations after this
+```
+
+The original HF attention (`BailingMoeV2Attention.forward()`, line 524) calls
+`past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)` internally.
+But since we replaced the attention module entirely, this call is replaced by our
+`paged_fill_on_device` / `paged_update_on_device` calls. Correct.
+
+### 19.5 Investigation: RoPE Format Consistency
+
+**Finding: RoPE format is consistent between prefill and decode.**
+
+Both prefill and decode use `BailingRotarySetup` which computes cos/sin in Meta
+(interleaved) format:
+- `_compute_cos_sin_cache`: `torch.stack((cos, cos), dim=-1).flatten(-2)` produces
+  `[f0, f0, f1, f1, ...]` interleaved format
+- Q/K weights are permuted from HF to Meta layout via `_reverse_permute_weight()` in
+  `from_torch()` (line 2389-2390)
+- Both paths use `rotary_embedding_llama` kernel (just different `is_decode_mode` flag)
+
+The HF model's `position_embeddings` (computed by `BailingMoeV2RotaryEmbedding` in HF
+split-half format) are **ignored** in decode mode. Instead, our code recomputes cos/sin
+from `BailingRotarySetup` using the same Meta format as prefill. This is correct.
+
+`attention_scaling` from HF is 1.0 for the default rope type, so no scaling mismatch.
+
+### 19.6 Investigation: inv_freq Computation Match
+
+**Finding: Frequency computation matches between HF and BailingRotarySetup.**
+
+Both use the same formula:
+```python
+inv_freq = 1.0 / (rope_theta ** (torch.arange(0, rotary_dim, 2).float() / rotary_dim))
+```
+where `rotary_dim = head_dim * partial_rotary_factor = 128 * 0.5 = 64`.
+
+The only difference is the output format (HF split-half vs Meta interleaved), which is
+intentional and matched by the Q/K weight permutation.
+
+### 19.7 Investigation: Dense Projection in Decode Mode
+
+**Finding: Dense projection flow looks correct but has a topology concern.**
+
+After `nlp_concat_heads_decode` (output: `[1, 1, 32, 2048]`), the dense layer
+(`TTNNLinearIReplicatedWColSharded`) applies a col-sharded linear. The output is
+col-sharded across 8 devices (each device has 256 dims of the 2048 hidden_size).
+
+After slicing to `[1, 1, 1, 2048]` and reshaping to `[1, 1, 2048]`, this is returned
+to the HF decoder layer for the residual connection: `hidden_states = residual + hidden_states`.
+
+**Question**: Is the tensor topology of the dense output compatible with the residual?
+The residual comes from the input_layernorm path. If the residual is replicated but the
+attention output is col-sharded, the addition would produce garbage.
+
+### 19.8 Likely Root Causes (Prioritized)
+
+#### Hypothesis A: Topology/Sharding Mismatch in Residual Connection
+
+The TTNN attention's decode path returns a tensor that went through:
+1. `_to_replicated` (for fused QKV input)
+2. `nlp_create_qkv_heads_decode` (HEIGHT_SHARDED output)
+3. `rotary_embedding_llama` (HEIGHT_SHARDED)
+4. `paged_update_on_device` (writes to KV cache)
+5. `paged_sdpa_decode` (outputs DRAM)
+6. `nlp_concat_heads_decode` (outputs in some topology)
+7. `dense` projection with col-sharded weights
+
+The output topology after step 7 is col-sharded. But the HF decoder layer adds this
+to `residual` which may have a different topology (e.g., replicated from the input
+layernorm). On a mesh device, if one tensor is col-sharded and the other is replicated,
+`ttnn.add` may produce incorrect results silently or the element-wise add may happen
+between misaligned data.
+
+**However**, this same issue would exist in prefill too, not just decode. So if prefill
+produces reasonable first tokens, this might not be the root cause.
+
+#### Hypothesis B: Cumulative Numerical Error from bfloat16
+
+With all 20 layers running on-device in bfloat16, cumulative numerical errors across
+layers could cause drift. The `HiFi2` math fidelity in the dense projection
+(line 297 of linear.py) is lower precision than `HiFi4`. Each layer compounds the error.
+
+For a 20-layer model with bfloat16, small errors in attention outputs propagate through
+the residual stream and get amplified by the MLP (which may still be running on CPU/PyTorch).
+
+**This is a plausible cause** of degenerate output. The first few tokens would be
+reasonable (attention values based on prefill context) but errors would accumulate over
+decode steps.
+
+#### Hypothesis C: SDPA Decode Seeing Stale/Zero KV Entries
+
+The `paged_scaled_dot_product_attention_decode` kernel uses `cur_pos_tensor` to determine
+how many KV entries to attend over. After prefill stores 25 entries and decode stores 1
+more at position 25, the SDPA with `cur_pos=25` should attend over positions 0..25.
+
+But what if the kernel interprets `cur_pos` differently? If it uses `cur_pos` as a
+count (exclusive bound) rather than an index (inclusive bound), then on the first decode
+step with `cur_pos=25`, SDPA would attend over 0..24 (missing the just-stored decode
+token at position 25).
+
+The decode token's Q would still attend to the full prefill context (0..24), so it would
+produce a reasonable output. But the Q for the decode token was computed from the just-
+generated embedding, so missing its own KV entry shouldn't matter (self-attention on a
+single new token doesn't add much information). This is likely NOT the cause.
+
+#### Hypothesis D: MoE Layers Running on CPU with Wrong Input Format
+
+The test code (line 86) has `TTNNBailingMoE` commented out:
+```python
+# model.model.layers[1].mlp.__class__: TTNNBailingMoE,
+```
+
+So all MoE/MLP layers run in PyTorch on CPU. The attention output from TTNN (a mesh
+tensor) gets passed to the PyTorch MLP. The `TorchTTNNTensor` wrapper should handle
+the conversion, but if the data arrives col-sharded and the conversion produces only
+1/8 of the hidden dimensions, the MLP would receive garbage.
+
+**This is the MOST LIKELY root cause.** Let me trace:
+1. TTNN attention returns `attn_output` shaped `[1, 1, 2048]` as a mesh tensor
+2. The HF decoder layer does `hidden_states = residual + hidden_states`
+3. `residual` is a PyTorch tensor (the MLP from the previous layer returned PyTorch)
+4. Adding a mesh tensor to a PyTorch tensor goes through TorchTTNNTensor conversion
+5. If the mesh tensor is col-sharded, converting to PyTorch might produce `[1, 1, 256]`
+   per device, and concatenation might not happen correctly
+
+### 19.9 Recommended Next Steps
+
+1. **Instrument the decode path**: After `_forward_decode_paged` returns, print the shape
+   and values of `attn_output` after converting to PyTorch. Check if it's the full 2048
+   dims or only 256.
+
+2. **Check topology after dense**: Add a debug print to verify the topology of the dense
+   output. Is it replicated or col-sharded?
+
+3. **Test with explicit all-gather**: After `self.dense(attn_output)`, add an all-gather
+   and `_to_replicated()` call to ensure the output has replicated topology before
+   returning to PyTorch land.
+
+4. **Compare single-layer output**: Run a single TTNN attention layer (layer 0 only) with
+   all others in PyTorch. If the output is coherent, the issue is cumulative. If it's
+   still degenerate, the issue is in the single-layer decode path.
+
+5. **Check bfloat16 precision**: Compare TTNN decode output vs PyTorch decode output for
+   a single layer at multiple decode positions. Measure PCC (Pearson Correlation Coefficient).
+
+### 19.10 Key Insight About Mixed TTNN/PyTorch Execution
+
+The attention layers run on TTNN (T3K mesh, 8 devices) while MLP/MoE layers run on
+CPU (PyTorch). Every layer boundary involves:
+- TTNN -> PyTorch conversion (after attention, before residual add + MLP)
+- PyTorch -> TTNN conversion (after MLP, before next layer's attention)
+
+These conversions must handle mesh topology correctly. If the TTNN attention output
+is col-sharded across 8 devices, the PyTorch conversion must all-gather to produce
+the full tensor. The `TorchTTNNTensor` wrapper's `to_torch` property handles this,
+but it may use `ConcatMeshToTensor` which concatenates device shards. If the shards
+are col-sharded (each device has 256 dims), concatenation on dim 0 would be wrong;
+it needs to concatenate on dim -1. Concatenation on the wrong dim would produce a
+tensor with correct total elements but scrambled data.
+
+### 19.11 Summary
+
+| Investigation Area | Finding |
+|---|---|
+| Position tracking (`_seq_lengths`) | CORRECT - each layer tracks independently, all stay in sync |
+| `cache_position` parameter | Always None (not passed by HF model), but fallback to `get_seq_length` is correct |
+| `update()` called outside attention? | NO - decoder layer only calls `self.attention(...)` |
+| RoPE format (prefill vs decode) | CONSISTENT - both use Meta format via BailingRotarySetup |
+| inv_freq computation | MATCHES between HF and BailingRotarySetup |
+| Dense projection topology | CONCERN - output may be col-sharded, incompatible with PyTorch residual |
+| **Most likely root cause** | **Mesh tensor topology mismatch at TTNN->PyTorch boundary** - col-sharded attention output gets incorrectly converted when adding to PyTorch residual tensor |
+
+### 19.12 Key Files
+
+| File | Relevance |
+|------|-----------|
+| `modules/attention.py` lines 2684-2893 | `_forward_decode_paged` - the decode path under investigation |
+| `modules/attention.py` lines 2895-2960 | `forward()` - routing between prefill and decode |
+| `modules/attention.py` lines 80-284 | `TTNNPagedAttentionKVCache` - position tracking (`_seq_lengths`) |
+| `modules/linear.py` lines 304-329 | `TTNNLinearIReplicatedWColSharded` - dense projection (col-sharded output) |
+| `modules/rope.py` lines 421-709 | `BailingRotarySetup` - RoPE for decode (Meta format) |
+| `modeling_bailing_moe_v2.py` lines 1187-1301 | HF model forward - does NOT pass `cache_position` to layers |
+| `modeling_bailing_moe_v2.py` lines 960-1030 | HF decoder layer - does NOT call `update()` outside attention |
+
+## 20. Iteration 10 - Weight Permutation Verification
+
+### 20.1 The Core Question
+
+The model output improved slightly after adding weight permutation (Iteration 5) but remains
+degenerate. The question is: is the weight permutation correct, or is it making things worse?
+
+Two hypotheses:
+- **H1:** Weight permutation is correct, but another bug (e.g., topology mismatch at TTNN/PyTorch
+  boundary) is causing degenerate output
+- **H2:** Weight permutation is WRONG, either because it is the wrong transformation or because
+  the cos/sin cache format does not match the permuted weight layout
+
+### 20.2 HuggingFace Bailing RoPE Analysis
+
+The HF model code (`modeling_bailing_moe_v2.py`) uses the standard Llama-style RoPE:
+
+**HF Rotary Embedding** (lines 216-227):
+```python
+freqs = inv_freq_expanded @ position_ids_expanded  # shape: [B, rotary_dim//2, seq]
+freqs = freqs.transpose(1, 2)                       # shape: [B, seq, rotary_dim//2]
+emb = torch.cat((freqs, freqs), dim=-1)             # shape: [B, seq, rotary_dim]
+cos = emb.cos()   # cos[..., i] == cos[..., i + rotary_dim//2] for i < rotary_dim//2
+sin = emb.sin()
+```
+
+**HF apply_rotary_pos_emb** (lines 239-272):
+```python
+rotary_dim = cos.shape[-1]   # = 64 for Ling-mini-2.0 (head_dim=128, partial_rotary=0.5)
+q_rot = q[..., :rotary_dim]  # first 64 dims
+q_pass = q[..., rotary_dim:] # last 64 dims (passed through unchanged)
+q_embed = (q_rot * cos) + (rotate_half(q_rot) * sin)
+# where rotate_half splits at dim//2 = 32: (-x2, x1)
+```
+
+So HF RoPE pairs element `i` with element `i + rotary_dim//2`:
+- `q_new[i] = q[i] * cos[i] - q[i + 32] * sin[i]`  (for i in [0, 32))
+- `q_new[i] = q[i] * cos[i] + q[i - 32] * sin[i]`  (for i in [32, 64))
+
+The HF weight layout is "split-half": frequencies are organized so that the first half
+of rotary dims and the second half form paired groups.
+
+### 20.3 Meta (rotary_embedding_llama) RoPE Analysis
+
+The TTNN `rotary_embedding_llama` kernel operates on adjacent pairs:
+- `q_new[2i] = q[2i] * cos[2i] - q[2i+1] * sin[2i]`
+- `q_new[2i+1] = q[2i+1] * cos[2i+1] + q[2i] * sin[2i+1]`
+
+This is the "interleaved" layout where elements (2i, 2i+1) are a rotation pair.
+
+### 20.4 Weight Permutation Correctness Analysis
+
+**`_reverse_permute_weight`** (attention.py line 2220):
+```python
+tensor.view(n_heads, 2, dim1 // n_heads // 2, dim2).transpose(1, 2).reshape(dim1, dim2)
+```
+
+For Ling-mini-2.0 Q weights (dim1=2048, n_heads=16, head_dim=128):
+- View as `[16, 2, 64, 2048]` - each head's output has 2 halves of 64 dims
+- Transpose dims 1,2 to get `[16, 64, 2, 2048]` - interleave the halves
+- Reshape to `[2048, 2048]`
+
+This transforms each head's output from `[r0, r1, ..., r63, i0, i1, ..., i63]`
+to `[r0, i0, r1, i1, ..., r63, i63]` - which is exactly the split-half to
+interleaved conversion needed.
+
+**The weight permutation itself is CORRECT** - it properly converts from HF split-half
+layout to Meta interleaved layout.
+
+### 20.5 Cos/Sin Cache Format Analysis
+
+**`_compute_cos_sin_cache`** (rope.py lines 362-418) for partial_rotary_factor=0.5:
+```python
+rotary_dim = 64     # int(128 * 0.5)
+inv_freq = ...      # shape: [32]  (rotary_dim // 2 = 32 frequencies)
+freqs = outer(t, inv_freq)  # shape: [max_seq_len, 32]
+emb = cat((freqs, freqs), dim=-1)  # shape: [max_seq_len, 64]
+cos = emb.cos()  # shape: [max_seq_len, 64]
+sin = emb.sin()
+
+# Then permute to Meta format:
+cos = cos[:, :32]                               # take first half: [seq, 32]
+cos = stack((cos, cos), dim=-1).flatten(-2)     # duplicate each: [seq, 64]
+# Result: cos[pos, 2i] == cos[pos, 2i+1] == cos_freq_i(pos)
+```
+
+After this permutation, `cos[2i] == cos[2i+1]` for each frequency index i.
+This is correct for `rotary_embedding_llama` which needs identical cos/sin
+values at adjacent pair positions (2i, 2i+1).
+
+**Identity padding** (lines 411-416): Beyond the 64 rotary dims, cos is padded with 1.0
+and sin with 0.0, so `q_new[j] = q[j]*1 + q[j']*0 = q[j]` for j >= 64. This correctly
+passes non-rotary dims through unchanged.
+
+### 20.6 CRITICAL FINDING: The Cos/Sin Cache Has a Bug
+
+Wait - let me re-examine more carefully.
+
+**HF format:** `emb = cat(freqs, freqs)` where `freqs[i] = position * inv_freq[i]`.
+So `cos_hf[i] = cos(position * inv_freq[i])` for i in [0, 32) and
+`cos_hf[i] = cos(position * inv_freq[i-32])` for i in [32, 64).
+
+The HF `rotate_half` pairs element `i` with element `i+32`. Both elements in the pair
+see the SAME cos value: `cos_hf[i] == cos_hf[i+32]` since both are `cos(pos * inv_freq[i])`.
+
+**Meta format in `_compute_cos_sin_cache`:**
+```python
+emb = cat((freqs, freqs), dim=-1)    # [seq, 64], same as HF
+cos = emb.cos()                       # [seq, 64]
+cos = cos[:, :32]                     # first 32 cols: cos(pos * inv_freq[0..31])
+cos = stack((cos, cos), dim=-1).flatten(-2)  # [seq, 64]: duplicated pairs
+```
+
+Result: `cos_meta[2i] = cos_meta[2i+1] = cos(pos * inv_freq[i])` for i in [0, 32).
+
+After weight permutation, what was HF element `i` (for i in [0, 32)) is now at Meta
+position `2i`, and what was HF element `i+32` is now at Meta position `2i+1`.
+
+Check:
+- HF: `q_new[i] = q[i] * cos(pos*inv_freq[i]) - q[i+32] * sin(pos*inv_freq[i])`
+- Meta: `q_new[2i] = q[2i] * cos_meta[2i] - q[2i+1] * sin_meta[2i]`
+  = `q_orig[i] * cos(pos*inv_freq[i]) - q_orig[i+32] * sin(pos*inv_freq[i])`
+
+These are identical. The math checks out.
+
+**CONCLUSION: The weight permutation AND cos/sin cache are both correct.**
+
+### 20.7 So Why is Output Still Degenerate?
+
+Since the weight permutation and RoPE format are mathematically correct, the degenerate
+output must come from a different source. The most likely candidates from Iteration 9 are:
+
+1. **Mesh tensor topology mismatch at TTNN/PyTorch boundary** (Iteration 9, Section 19.10):
+   The `dense` (output) projection uses `TTNNLinearIReplicatedWColSharded` which produces
+   col-sharded output across 8 devices. When this output passes back to PyTorch (for the
+   residual add with the non-replaced decoder layer), the `TorchTTNNTensor.to_torch`
+   conversion may incorrectly concatenate device shards on the wrong dimension.
+
+2. **QK Norm weight permutation**: The QK norm weights are also permuted with
+   `_reverse_permute_1d`. If QK norm expects split-half data layout but receives
+   interleaved data (post-permutation), the normalization would be applied to the wrong
+   paired dimensions. However, RMSNorm is element-wise (sqrt of mean of squares),
+   so permuting the weights should not matter for RMSNorm. The normalization weight
+   is just a per-element scale. **This is fine.**
+
+3. **`_to_replicated` round-trip for decode fused QKV tensor**: In the decode path
+   (line 2726), `xqkv_fused = self._to_replicated(xqkv_fused)` does a host round-trip
+   to fix mesh topology. If `to_replicated_topology` uses `ConcatMeshToTensor` to gather
+   and then re-distributes, the concatenation may scramble data from col-sharded tensors.
+
+### 20.8 Recommended Debug Test: Single-Layer Attention Comparison
+
+To definitively isolate the problem, we need a debug test that compares TTNN attention
+output against PyTorch CPU attention output for a single layer. Here is the approach:
+
+**Test Design:**
+```
+For layer 0, at decode step 1 (after prefilling with 2 tokens):
+1. Capture the hidden_states input to the attention layer
+2. Run it through BOTH:
+   a. TTNNBailingMoEAttention (the replaced module)
+   b. BailingMoeV2SdpaAttention (the original PyTorch module)
+3. Compare outputs using PCC
+```
+
+**Implementation approach - hook-based comparison:**
+
+Add a forward hook on the first decoder layer that:
+1. Before the TTNN attention call, saves `hidden_states` as a CPU tensor
+2. After the TTNN attention call, saves the output as a CPU tensor
+3. Also runs the ORIGINAL PyTorch attention with the SAME inputs
+4. Computes PCC between TTNN output and PyTorch output
+
+**The hook should be added in the test file** (`test_ling_mini_2_0.py`), not in the
+module itself. This keeps the module clean and makes the test self-contained.
+
+```python
+# Pseudocode for the debug hook:
+class AttentionComparisonHook:
+    def __init__(self, original_torch_attn, layer_idx):
+        self.original_attn = original_torch_attn
+        self.layer_idx = layer_idx
+        self.results = []
+
+    def __call__(self, module, args, kwargs, output):
+        # Only check on decode steps (seq_len == 1)
+        hidden_states = args[0]
+        if isinstance(hidden_states, TorchTTNNTensor):
+            hs_torch = hidden_states.to_torch.float()
+        elif isinstance(hidden_states, ttnn.Tensor):
+            hs_torch = ttnn.to_torch(hidden_states).float()
+        else:
+            hs_torch = hidden_states.float()
+
+        if hs_torch.shape[1] != 1:  # not decode
+            return output
+
+        # Get position_embeddings from kwargs
+        position_embeddings = kwargs.get('position_embeddings', args[1] if len(args) > 1 else None)
+
+        # Run original PyTorch attention with same inputs
+        with torch.no_grad():
+            ref_output, _, _ = self.original_attn(
+                hidden_states=hs_torch,
+                position_embeddings=position_embeddings,  # need CPU cos/sin
+                past_key_value=...,  # need PyTorch DynamicCache
+            )
+
+        # Compare
+        ttnn_out = output[0]
+        if isinstance(ttnn_out, TorchTTNNTensor):
+            ttnn_out = ttnn_out.to_torch.float()
+        elif isinstance(ttnn_out, ttnn.Tensor):
+            ttnn_out = ttnn.to_torch(ttnn_out).float()
+
+        pcc = torch.corrcoef(torch.stack([
+            ttnn_out.flatten(), ref_output.flatten()
+        ]))[0, 1].item()
+        print(f"[LAYER {self.layer_idx}] TTNN vs PyTorch attention PCC: {pcc}")
+        self.results.append(pcc)
+        return output
+```
+
+**Challenge:** The PyTorch reference attention needs its own KV cache (DynamicCache), which
+must be populated with the same prefill data. This makes the comparison complex.
+
+### 20.9 Simpler Alternative: Compare Pre-RoPE Q/K Values
+
+A simpler diagnostic that does not require managing two KV caches:
+
+1. Before RoPE is applied in `_forward_decode_paged`, capture Q and K values
+2. In the HF attention, capture Q and K values at the same point
+3. If the weight permutation is correct AND the QKV projection is correct,
+   the pre-RoPE Q/K values should match (up to the permutation mapping)
+
+Specifically:
+- TTNN Q at position 2i should equal HF Q at position i
+- TTNN Q at position 2i+1 should equal HF Q at position i+32
+(within each head)
+
+**This is the cleanest test** because it isolates the weight projection from the RoPE
+and from the KV cache, narrowing down where the mismatch occurs.
+
+### 20.10 Simplest Possible Test: Offline Weight Permutation Verification
+
+The simplest test requires no hardware at all:
+
+```python
+import torch
+
+# Simulate one head with head_dim=8 (4 rotary dims for partial_rotary_factor=0.5)
+head_dim = 8
+rotary_dim = 4
+hidden_dim = 16
+
+# Create a random weight matrix for one head: [head_dim, hidden_dim]
+W_hf = torch.randn(head_dim, hidden_dim)
+
+# Create a random input
+x = torch.randn(1, 1, hidden_dim)
+
+# --- HF path ---
+q_hf = x @ W_hf.T  # [1, 1, head_dim=8]
+q_rot_hf = q_hf[..., :rotary_dim]  # first 4 dims
+q_pass_hf = q_hf[..., rotary_dim:]  # last 4 dims
+
+# HF RoPE (split-half)
+pos = 5
+inv_freq = 1.0 / (10000 ** (torch.arange(0, rotary_dim, 2).float() / rotary_dim))
+freqs = pos * inv_freq  # [rotary_dim//2 = 2]
+cos_hf = torch.cat([freqs.cos(), freqs.cos()])  # [4]
+sin_hf = torch.cat([freqs.sin(), freqs.sin()])  # [4]
+x1 = q_rot_hf[..., :rotary_dim//2]
+x2 = q_rot_hf[..., rotary_dim//2:]
+rot_half = torch.cat([-x2, x1], dim=-1)
+q_rot_result_hf = q_rot_hf * cos_hf + rot_half * sin_hf
+q_result_hf = torch.cat([q_rot_result_hf, q_pass_hf], dim=-1)
+
+# --- Meta path ---
+# Permute weight
+W_meta = W_hf.view(1, 2, head_dim // 2, hidden_dim).transpose(1, 2).reshape(head_dim, hidden_dim)
+# BUT WAIT - this permutation is for the FULL head_dim, not just the rotary part.
+# For partial rotary, the permutation still operates on the full weight matrix.
+```
+
+**CRITICAL INSIGHT:** The `_reverse_permute_weight` permutes the ENTIRE weight matrix
+(all head_dim=128 dimensions per head), not just the rotary dimensions (64).
+
+This means:
+- HF element [0..63] are the rotary dims, [64..127] are pass-through dims
+- After permutation, the interleaving mixes rotary and pass-through dims!
+
+Specifically, for head_dim=128 viewed as `[2, 64]`:
+- First half (indices 0..63) = rotary dimensions
+- Second half (indices 64..127) = pass-through dimensions
+
+After `transpose(1, 2).reshape`:
+- Position 0 = original position 0 (rotary)
+- Position 1 = original position 64 (pass-through!)
+- Position 2 = original position 1 (rotary)
+- Position 3 = original position 65 (pass-through!)
+- ...
+
+**THIS IS THE BUG.** The weight permutation interleaves rotary and non-rotary dimensions.
+The `rotary_embedding_llama` kernel then rotates adjacent pairs (0,1), (2,3), etc.
+So it rotates pairs like (rotary_dim_0, pass_through_dim_0) instead of
+(rotary_dim_0, rotary_dim_1). This is completely wrong for partial rotary.
+
+### 20.11 Root Cause: Weight Permutation Is Wrong for Partial Rotary
+
+When `partial_rotary_factor = 0.5` (as in Ling-mini-2.0):
+- `head_dim = 128`
+- `rotary_dim = 64` (only first 64 dims are rotated)
+- The remaining 64 dims should pass through unchanged
+
+The `_reverse_permute_weight` function views each head as `[2, head_dim//2]` and transposes.
+This treats the FULL head dimension as split-half pairs, but for partial rotary models,
+only the FIRST `rotary_dim` dimensions form rotation pairs. The last `head_dim - rotary_dim`
+dimensions are not part of any rotation pair and should NOT be permuted.
+
+**Correct approach for partial rotary:**
+```python
+def _reverse_permute_weight_partial(tensor, n_heads, rotary_dim):
+    """Permute only the rotary portion of Q/K weights from HF to Meta layout."""
+    dim1, dim2 = tensor.shape
+    head_dim = dim1 // n_heads
+    pass_dim = head_dim - rotary_dim
+
+    # Reshape to per-head view
+    t = tensor.view(n_heads, head_dim, dim2)
+
+    # Split into rotary and pass-through portions
+    t_rot = t[:, :rotary_dim, :]    # [n_heads, rotary_dim, hidden]
+    t_pass = t[:, rotary_dim:, :]   # [n_heads, pass_dim, hidden]
+
+    # Only permute the rotary portion: split-half -> interleaved
+    t_rot = t_rot.view(n_heads, 2, rotary_dim // 2, dim2).transpose(1, 2).reshape(n_heads, rotary_dim, dim2)
+
+    # Concatenate back: rotary (interleaved) + pass-through (unchanged)
+    result = torch.cat([t_rot, t_pass], dim=1)
+    return result.reshape(dim1, dim2)
+```
+
+The identity-padding in `_compute_cos_sin_cache` (cos=1, sin=0 for dims >= rotary_dim)
+is designed to handle the pass-through dimensions, BUT only when those dimensions are
+contiguous at the END of each head. The current weight permutation scatters them into
+odd positions throughout the head, breaking this assumption.
+
+### 20.12 Impact Analysis
+
+With the WRONG permutation (current code):
+- Elements that should be pass-through (dims 64-127) are scattered into odd positions
+  throughout the head
+- The identity-padded cos/sin values (cos=1, sin=0) are at positions 64-127, but the
+  pass-through elements are now at positions 1, 3, 5, ... (the odd positions)
+- Result: pass-through elements get rotated (wrong), and some rotary elements get
+  identity-treated (also wrong)
+- The attention computation is corrupted at every layer, every position
+
+With the CORRECT permutation (proposed fix):
+- Rotary dims 0-63 are interleaved to form adjacent pairs
+- Pass-through dims 64-127 remain contiguous at the end
+- Identity padding at positions 64-127 correctly leaves pass-through dims alone
+- The `rotary_embedding_llama` kernel correctly rotates pairs in dims 0-63
+
+### 20.13 Verification: Does This Explain the Observed Behavior?
+
+**Before weight permutation (Iteration 4):**
+- HF weights with Meta-format RoPE: complete mismatch between weight layout and RoPE format
+- Output: "I'm a big fan of the taste of the taste..." (degenerate repetition)
+
+**After WRONG weight permutation (Iteration 5-9):**
+- Interleaved rotary+pass-through dims with Meta-format RoPE
+- The rotary dims that happen to land on even positions (0, 2, 4, ...) are correct
+- That is 50% of the rotary dims correct, 50% wrong, plus 50% of pass-through dims wrong
+- Output: "It seems like to me, I'm not sure what you're asking about..." (less degenerate
+  but still incoherent, which matches partial correctness)
+
+**With CORRECT weight permutation (proposed):**
+- Rotary dims correctly interleaved in first 64 positions
+- Pass-through dims correctly contiguous in last 64 positions
+- Should produce coherent output (if no other bugs remain)
+
+### 20.14 Additional Fix Needed: QK Norm and Bias Permutation
+
+The `_reverse_permute_1d` function (line 2231) has the same issue for partial rotary.
+It permutes the ENTIRE vector, interleaving what should be rotary and pass-through
+dimensions.
+
+For QK norm weights and bias vectors, the fix is the same principle: only permute
+the rotary portion, leave the pass-through portion contiguous.
+
+```python
+def _reverse_permute_1d_partial(tensor, rotary_dim):
+    """Permute only the rotary portion of a 1D tensor from HF to Meta layout."""
+    dim = tensor.shape[-1]
+    pass_dim = dim - rotary_dim
+
+    rot = tensor[..., :rotary_dim]
+    pas = tensor[..., rotary_dim:]
+
+    # Interleave rotary portion
+    reals = rot[..., :rotary_dim // 2]
+    imags = rot[..., rotary_dim // 2:]
+    rot_interleaved = torch.stack((reals, imags), dim=-1).flatten(start_dim=len(tensor.shape) - 1)
+
+    return torch.cat([rot_interleaved, pas], dim=-1)
+```
+
+### 20.15 The Fix
+
+In `attention.py`, the `from_torch` method of `TTNNBailingMoEAttention` (line 2342):
+
+1. Replace `_reverse_permute_weight(q_weight, new_attn.num_heads)` with a
+   partial-rotary-aware version that only permutes the first `rotary_dim` dimensions
+   per head.
+
+2. Replace `_reverse_permute_weight(k_weight, new_attn.num_kv_heads)` similarly.
+
+3. Replace `_reverse_permute_1d(qkv_bias[:q_size])` with a partial-rotary-aware version.
+
+4. Replace `_reverse_permute_1d(torch_attn.query_layernorm.weight)` and
+   `_reverse_permute_1d(torch_attn.key_layernorm.weight)` similarly.
+
+The `rotary_dim` value is `int(head_dim * partial_rotary_factor)` and is already computed
+in `from_torch` as `new_attn.partial_rotary_factor * new_attn.head_dim`.
+
+### 20.16 Numerical Verification (CONFIRMED)
+
+Ran a numerical test comparing Q@K^T attention scores between HF and Meta paths for
+partial rotary (rotary_dim=4, head_dim=8):
+
+```
+WRONG permutation (current code):
+  HF attn[0,0] = 18.79, Meta attn[0,0] = 18.79   (diagonal matches by chance)
+  HF attn[0,1] = -29.52, Meta attn[0,1] = -26.79  (OFF by 2.7)
+  HF attn[1,0] = 5.17, Meta attn[1,0] = 29.76     (OFF by 24.6!)
+  Max absolute difference: 24.59
+
+CORRECT permutation (proposed fix):
+  Max absolute difference: 0.000000
+  All attention scores match EXACTLY.
+```
+
+The current code produces attention scores that are COMPLETELY WRONG for every
+off-diagonal entry. This corrupts the attention weights (softmax probabilities),
+which cascades through all 20 layers to produce garbled output.
+
+**Full rotary case** (tested separately): Both current and proposed permutations
+produce identical results, confirming the bug is specific to partial_rotary_factor < 1.0.
+
+### 20.17 Confidence Assessment
+
+**CONFIRMED BUG via numerical verification.**
+
+The wrong permutation interleaves rotary dims with pass-through dims. The identity
+padding (cos=1, sin=0) at positions 64-127 does NOT compensate because the pass-through
+elements are scattered at odd positions 1, 3, 5, ... throughout the head.
+
+**Remaining risk:**
+- Even after this fix, the topology mismatch at the TTNN/PyTorch boundary (Iteration 9,
+  Section 19.10) may still cause issues
+- The fix should be tested to confirm whether it produces coherent output or if additional
+  bugs remain
+
+### 20.17 Key Files
+
+| File | Lines | What to Change |
+|------|-------|----------------|
+| `modules/attention.py` | 2220-2228 | `_reverse_permute_weight` - needs partial rotary variant |
+| `modules/attention.py` | 2231-2241 | `_reverse_permute_1d` - needs partial rotary variant |
+| `modules/attention.py` | 2386-2390 | `from_torch` Q/K weight permutation calls |
+| `modules/attention.py` | 2396-2398 | `from_torch` Q/K bias permutation calls |
+| `modules/attention.py` | 2436-2442 | `from_torch` QK norm weight permutation calls |
+| `modules/rope.py` | 362-418 | `_compute_cos_sin_cache` - identity padding assumes contiguous pass-through dims (correct after fix) |
