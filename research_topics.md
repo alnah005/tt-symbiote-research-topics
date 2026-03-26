@@ -274,7 +274,7 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ## TTNNBailingMoEAttention Performance Optimization
 **Date:** 2026-03-26
-**Status:** Pending
+**Status:** Completed
 **Why Needed:** `TTNNBailingMoEAttention` is used for every attention layer in the Bailing MoE model and its performance directly impacts overall model throughput. We need to understand where time is spent in the attention forward pass and what the best optimization opportunities are.
 **Questions:**
 - What are the dominant latency contributors in `TTNNBailingMoEAttention.forward` at batch=1 decode on T3K, and how do collective communication ops compare to compute ops?
@@ -287,7 +287,7 @@ This file tracks research topics that the Architect needs to investigate for mak
 - Are there attention implementations in other models in the tt-symbiote or tt-transformers codebase that handle similar GQA configurations more efficiently, and what specific techniques do they use that could be applied to `TTNNBailingMoEAttention`?
 
 **Findings:**
-[Pending]
+`guides/ttnnbailingmoeattention_performance_optimization/`
 
 ## BailingAttention Decode Path Optimization Plan
 **Date:** 2026-03-26
