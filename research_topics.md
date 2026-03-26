@@ -355,3 +355,24 @@ Key results: 4-phase plan targeting significant latency reduction.
 - Phase 2 (Expert pipeline): Optimize weight application with ttnn.embedding_with_broadcast or in-place weighted accumulation, reduce ROW_MAJOR<->TILE conversions. Saves ~1-2ms.
 - Phase 3 (Shared experts): Overlap shared expert MLP with routed expert dispatch/compute using async ops. Saves ~0.5-1ms.
 - Phase 4 (Trace capture): Enable TTNN trace for full MoE decode. Saves ~2-3ms.
+
+## TT-Symbiote Wrapper Overhead Analysis (Ling-mini-2.0 Decode)
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** Need to quantify exactly where the TorchTTNNTensor wrapper overhead and other host-side overhead occurs in the full Ling-mini-2.0 decode path, to prioritize optimizations.
+**Questions:**
+1. How many wrapper calls (wrap_to_torch_ttnn_tensor, _set_device_wrap, _unwrap_to_torch) per decode token?
+2. What is the total time in wrapper overhead vs actual TTNN compute dispatch?
+3. Which modules/layers contribute the most wrapper overhead?
+4. What are the root causes (compose_transforms, device sync, output wrapping)?
+5. What specific optimizations can reduce each overhead source?
+
+**Findings:**
+`REPORT_wrapper_overhead.md`
+Key results: Single decode token = 942ms wall clock. 50.5% is overhead (wrapper + Python), 49.5% is TTNN op dispatch. Breakdown:
+- Input wrapping (compose_transforms): 158.9ms (16.9%), 594 calls
+- Output unwrapping (_unwrap_to_torch + device sync): 76.6ms (8.1%), 84 calls at 42 sync points
+- Output wrapping (wrap_to_torch_ttnn_tensor): 60.6ms (6.4%), 297 calls
+- Print statements + Python control flow: 165.1ms (17.5%), 363 prints
+- Distributed config + aten ops: 13ms (1.4%)
+Top optimizations: (1) Eliminate _unwrap_to_torch by doing residual adds in TTNN on-device (-80ms), (2) Remove print statements (-150ms), (3) Fast-path compose_transforms for already-wrapped tensors (-140ms), (4) Flatten module dispatch nesting (-60ms). Combined: ~450ms savings (47%).
