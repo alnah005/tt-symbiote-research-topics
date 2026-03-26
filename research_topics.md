@@ -264,3 +264,17 @@ This file tracks research topics that the Architect needs to investigate for mak
 **Findings:**
 `ANALYSIS_bailing_attention_profiling.md`
 Key results: Steady-state decode = 9.7ms wall clock. Only 24.5% is sub-module device compute (matmuls, RMSNorm). 70.1% is inline attention ops (all_gather x4, to_memory_config x9, _to_replicated host round-trip, RoPE, paged SDPA). ~35% is host/wrapper overhead. Top optimizations: eliminate _to_replicated (-1-2ms), reduce all_gather 4->1 (-1.5-2ms), trace capture (-2-3ms). Target: 3-5ms per decode with all optimizations.
+
+## Tracy Profiler DRAM Buffer Configuration
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** Device profiler DRAM buffer overflowed at ~12,000 markers when profiling 32 decode iterations, dropping markers and producing incomplete data. Need to understand buffer sizing and how to increase it.
+**Questions:**
+1. What controls the profiler DRAM buffer size?
+2. What env vars can increase the buffer?
+3. How to get the full ops_perf_results CSV with op names from device profiling?
+4. What is the right combination of buffer size increase + iteration reduction?
+
+**Findings:**
+`PLAN_profile_bailing_attention_v2.md`
+Key results: Buffer size is controlled by `TT_METAL_PROFILER_PROGRAM_SUPPORT_COUNT` env var (default 1000, set to 2000 to double buffer). Buffer overflow caused by 32 decode iterations x ~20 ops/iter x 5 RISCs x 2 markers. Fix: reduce `num_decode_tokens` to 8 AND set `TT_METAL_PROFILER_PROGRAM_SUPPORT_COUNT=2000`. The per-op CSV with op names is `cpp_device_perf_report.csv`, generated when `TT_METAL_PROFILER_CPP_POST_PROCESS=1` is set. Columns include OP NAME, DEVICE KERNEL DURATION, per-RISC durations (BRISC/NCRISC/TRISC), and OP TO OP LATENCY.
