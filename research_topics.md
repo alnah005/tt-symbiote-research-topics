@@ -250,3 +250,19 @@ This file tracks research topics that the Architect needs to investigate for mak
 **Findings:**
 `guides/tt_transformers_into_tt_symbiote/`
 
+## Removing torch round-trips from TTNNBailingMoEAttention decode path
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** TTNNBailingMoEAttention._forward_decode_paged has two ttnn<->torch round-trip conversions: (1) _to_replicated converts all-gathered topology to replicated via host, (2) cache_position is converted ttnn->torch->ttnn. Both add host overhead that should be eliminated.
+**Questions:**
+1. Does TTNN have a native on-device API to change mesh topology from all-gathered to replicated?
+2. Can we restructure the decode path to use column-parallel QKV (local heads per device) like tt-transformers, avoiding the topology mismatch entirely?
+3. How does tt-transformers handle QKV for paged attention decode (sharding, head splitting)?
+4. Can cache_position remain as torch throughout (it only feeds into cur_pos_tt creation)?
+
+**Findings:**
+1. **No native topology change API exists.** There is no `ttnn.set_topology()` or similar. The `ttnn.distribute` context manager only wraps `from_torch`/`to_torch`. The only way to change topology metadata today is via host round-trip.
+2. **tt-transformers avoids the problem entirely** by using column-parallel QKV weights (sharded along output dim across devices). Each device computes only its local heads (e.g., 2 of 16 Q heads, 0.5 of 4 KV heads). `nlp_create_qkv_heads_decode` receives `num_local_heads`. No all-gather or topology change is needed.
+3. **tt-symbiote's BailingMoEAttention uses a different sharding strategy**: Q uses `TTNNLinearIColShardedWRowSharded` (with reduce_scatter), K/V use `TTNNLinearIReplicatedWColSharded` (column-sharded weights). Then all three are all-gathered to full size on every device, creating all-gathered topology that differs from replicated.
+4. **cache_position can stay as torch.** It arrives as Optional[torch.LongTensor] in the function signature and is only used to: (a) create cache_position_tensor (torch), (b) index cos/sin via `get_cos_sin_for_decode(cache_position_tensor)`, (c) create cur_pos_tt via `ttnn.from_torch`. The ttnn->torch->ttnn round-trip only happens when cache_position arrives as a ttnn.Tensor (from the model runner), but the caller could pass it as torch directly.
+
