@@ -1,3 +1,4 @@
 PLAN_*
 !PLAN_ling_2_0_correct_text.md
 !PLAN_bailing_attention_remove_torch_roundtrip.md
+!PLAN_profile_bailing_attention.md
