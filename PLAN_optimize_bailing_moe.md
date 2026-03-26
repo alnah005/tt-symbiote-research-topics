@@ -1,6 +1,6 @@
 # Optimization Plan: BailingMoE (TTNNBailingMoE) Decode Path
 
-**Date:** 2026-03-26
+**Date:** 2026-03-26 (Updated with DeepSeek V3 analysis)
 **Target:** `TTNNMoE.forward()` in `models/experimental/tt_symbiote/modules/moe.py`
 (TTNNBailingMoE inherits from TTNNMoE, no forward override)
 
@@ -13,6 +13,62 @@
 - `hidden_size=2048`, `moe_intermediate_size=1536`
 - `routed_scaling_factor=1.8`, `norm_topk_prob=True`
 - T3K mesh: 8 devices, 8 experts per device
+
+---
+
+## DeepSeek V3 Reference Implementation Comparison
+
+The DeepSeek V3 (DS V3) official implementation in tt-metal provides a production-validated reference for MoE optimization on Tenstorrent hardware. Key differences are analyzed below to inform optimization priorities.
+
+### Router (moe_gate.py vs TTNNMoERouterDecode)
+
+| Aspect | Symbiote (Current) | DeepSeek V3 | Implication |
+|--------|-------------------|-------------|-------------|
+| Topk approach | 3-pass centering (topk + center + topk + center + topk) | Single-pass topk per stage | **Confirms single-pass is production-viable** |
+| Data types | f32 throughout router, 9 bf16<->f32 typecasts | bf16 throughout, bias stored f32 on device | **bf16 is sufficient for routing** |
+| Gate precision | HiFi4 with fp32 accumulation | HiFi2 precision | Lower precision is acceptable |
+| Sort fallback | No CPU sort in TTNNMoERouterDecode | `topk_fallback` option with bitonic sort on CPU, `use_bitonic_sort=True` default | DS V3 acknowledges ttnn.topk can be unreliable |
+| Memory config | DRAM (default) | L1_MEMORY_CONFIG everywhere in decode | **L1 is the production standard for decode** |
+
+### Expert Pipeline (experts.py vs TTNNExperts)
+
+| Aspect | Symbiote (Current) | DeepSeek V3 | Implication |
+|--------|-------------------|-------------|-------------|
+| Matmul type | sparse_matmul | Regular ttnn.linear | DS V3 does NOT use sparse_matmul |
+| SiLU activation | Separate `ttnn.silu(w1_out)` then `ttnn.mul(w1_activated, w3_out)` | Fused: `ttnn.mul(w1_out, w3_out, input_tensor_a_activations=[ttnn.UnaryOpType.SILU])` | **Fused SiLU eliminates one op** |
+| Weight quantization | bf16 for all projections | bfloat4_b (gate/down_proj), bfloat8_b (up_proj) | Quantization possible but not priority for Ling |
+| Compute kernel | Default / HiFi2 | COMPUTE_KERNEL_CONFIG_LOFI with packer_l1_acc | LoFi is production choice |
+| Memory config | DRAM (default) | L1_MEMORY_CONFIG | **L1 is the production standard** |
+
+### Weight Application (moe.py)
+
+| Aspect | Symbiote (Current) | DeepSeek V3 | Implication |
+|--------|-------------------|-------------|-------------|
+| Pattern | repeat(hidden_size) -> permute -> to_layout -> mul -> sum | **IDENTICAL**: repeat(hidden_size) -> permute -> to_layout -> mul -> sum | **This is the accepted production approach** |
+| Function | Inline in TTNNExperts.forward() | `_fwd_repeat_permute_expert_weights()` | Same algorithm, just extracted |
+
+**Key finding:** The repeat(hidden_size) weight application pattern is NOT a symbiote bug -- it is the accepted production approach in DS V3. Optimization effort should be redirected to higher-impact areas.
+
+### MoE Decoder Block (moe_decoder_block_2d.py vs TTNNBailingMoEBlock)
+
+| Aspect | Symbiote (Current) | DeepSeek V3 | Implication |
+|--------|-------------------|-------------|-------------|
+| Shared expert input | Uses residual (column-sharded) | Uses x_gathered (same as routed experts) | Different approach, both valid |
+| Reduce pattern | reduce_scatter(routed_out), shared_experts has internal reduce_scatter, then add | **add(moe_out, shared_out) -> single reduce_scatter** | **KEY OPTIMIZATION: one RS instead of two** |
+| Dispatch cluster_axis | cluster_axis=1 (default?) | cluster_axis=0 | May affect performance on T3K |
+| num_links | Default | num_links=4 for all_to_all ops | **Higher link count = more bandwidth** |
+
+### Custom Kernel (deepseek_moe_gate.hpp)
+
+DS V3 b1 variant has a **custom Tensix kernel** that fuses: sigmoid + bias add + sorting + normalization into a single kernel. This eliminates ALL individual routing ops. This is the most aggressive optimization path but requires kernel development expertise.
+
+### Memory Strategy
+
+DS V3 decode uses:
+- **L1_MEMORY_CONFIG** everywhere (gate, experts, combine, routing)
+- **Sharded memory config** for input/output: `create_sharded_memory_config(shape=(32, hidden_size//8), core_grid=CoreGrid(y=7, x=4), strategy=WIDTH)`
+
+Symbiote currently uses DRAM (default) for most operations.
 
 ---
 
@@ -121,6 +177,8 @@ Step 8: squeeze(output, 1)
 
 The router performs **9 typecast operations** and **3 topk passes** even though Ling-mini-2.0 has `n_group=1, topk_group=1`, meaning no group-based routing is needed. The 3-pass topk centering was designed to work around bf16 precision limitations in topk, but with only 64 experts (vs 256), the dynamic range is much smaller.
 
+**DS V3 validation:** DS V3 uses single-pass topk per stage and works in bf16 throughout the router. This confirms single-pass topk is production-viable and f32 typecasts are unnecessary.
+
 **Op count in router (current):**
 - typecast: 9 (bf16->f32, f32->bf16 round-trips)
 - topk: 3 (k+1, k+1, k)
@@ -152,9 +210,7 @@ weighted = ttnn.mul(combined_output, topk_weights)                 # broadcast m
 final = ttnn.sum(weighted, dim=0)                                  # reduce
 ```
 
-The `repeat(topk_weights, (hidden_size, 1, 1, 1))` with `hidden_size=2048` creates a tensor that is 2048x larger than necessary. For decode with 1 token: shape goes from `(1, 1, 1, 4)` to `(2048, 1, 1, 4)` then permuted to `(4, 1, 1, 2048)`. This is a bandwidth-bound operation that copies 2048 * 4 * 2 bytes = 16KB of bf16 data -- but the repeat itself allocates a new tensor and copies weight values 2048 times.
-
-The multiply + sum pattern `sum(combined * weights, dim=0)` is effectively a weighted reduction that could be done more efficiently.
+**DS V3 validation:** DS V3 uses the **IDENTICAL pattern** in `_fwd_repeat_permute_expert_weights()`. This is the accepted production approach. **De-prioritized** -- optimization effort should go elsewhere.
 
 ### Bottleneck 3: Layout Conversions (ROW_MAJOR <-> TILE_LAYOUT)
 
@@ -166,20 +222,31 @@ The expert forward path has **at least 6 explicit layout conversions:**
 5. `to_layout(topk_weights, ROW_MAJOR)` -- weight application (Step 4aa)
 6. `to_layout(topk_weights, TILE_LAYOUT)` -- weight application (Step 4af)
 
-Conversions 1-4 are required by all_to_all_dispatch/combine (ROW_MAJOR) and sparse_matmul (TILE_LAYOUT). These are structural constraints.
-Conversions 5-6 for weight application could be avoided with a different approach.
+Conversions 1-4 are required by API constraints. Conversions 5-6 are part of the accepted weight application pattern (same in DS V3).
 
-### Bottleneck 4: Sequential Shared Expert Execution (Steps 5-6)
+### Bottleneck 4: Two Reduce-Scatters Instead of One (Steps 5-7)
+
+**This is a newly identified HIGH-IMPACT bottleneck based on DS V3 analysis.**
 
 Currently:
 ```
-routed_output = experts(x, ...)          # Step 4
-routed_output = reduce_scatter(routed_output)  # Step 5
-shared_output = shared_experts(residual) # Step 6  <-- SEQUENTIAL
-output = add(routed_output, shared_output)
+routed_output = experts(x, ...)                      # Step 4
+routed_output = reduce_scatter(routed_output)         # Step 5 -- reduce_scatter #1
+shared_output = shared_experts(residual)              # Step 6 -- contains internal reduce_scatter #2
+output = add(routed_output, shared_output)            # Step 7
 ```
 
-The shared expert computation (gate_proj, up_proj, mul, down_proj -- 4 matmuls) is independent of the routed expert output and could start as soon as the residual is available (after Step 1's all_gather).
+The shared_experts module (`TTNNGlm4MoeMLP`) uses `TTNNLinearIColShardedWRowSharded` for down_proj, which internally does a reduce_scatter. So there are **two reduce_scatter operations** total.
+
+DS V3 approach:
+```
+routed_output = experts(x_gathered, ...)
+shared_output = shared_experts(x_gathered)
+combined = add(routed_output, shared_output)           # Add BEFORE reduce_scatter
+output = reduce_scatter(combined)                      # Single reduce_scatter
+```
+
+By adding the routed and shared outputs BEFORE reduce_scatter, DS V3 uses a **single reduce_scatter** instead of two. This saves one full CCL operation per MoE layer.
 
 ### Bottleneck 5: Gate Projection Precision Chain (Step 2)
 
@@ -196,7 +263,28 @@ logits_f32 = typecast(logits_bf16, float32)  # bf16 -> f32 again!
 scores_f32 = sigmoid(logits_f32)
 ```
 
-This round-trips through bf16 unnecessarily. The gate could output f32 directly to the router.
+**DS V3 validation:** DS V3 does the entire gate in bf16 with HiFi2. No f32 typecasts at all.
+
+### Bottleneck 6: Separate SiLU Call (Step 4p-4q)
+
+Currently:
+```python
+w1_out = sparse_matmul(x, w1, sparsity)   # gate projection
+w3_out = sparse_matmul(x, w3, sparsity)   # up projection
+w1_activated = ttnn.silu(w1_out)            # separate SiLU op
+intermediate = ttnn.mul(w1_activated, w3_out)
+```
+
+DS V3 fuses SiLU into the multiply:
+```python
+intermediate = ttnn.mul(w1_out, w3_out, input_tensor_a_activations=[ttnn.UnaryOpType.SILU])
+```
+
+This eliminates one op and one intermediate tensor allocation.
+
+### Bottleneck 7: DRAM Memory Config (All Steps)
+
+Symbiote uses DRAM (default memory config) for most operations. DS V3 uses **L1_MEMORY_CONFIG** everywhere in decode mode. For small decode tensors (T=1), L1 eliminates DRAM round-trips and reduces latency for every op.
 
 ---
 
@@ -206,64 +294,56 @@ This round-trips through bf16 unnecessarily. The gate could output f32 directly 
 
 **Problem:** Gate outputs f32 logits, typecasts to bf16, router typecasts back to f32.
 
-**Solution:** Pass f32 logits directly from gate to router. Remove the intermediate typecast.
+**DS V3 approach:** Gate operates entirely in bf16. No f32 at all.
 
-**Code changes:**
+**Solution (conservative):** Pass f32 logits directly from gate to router. Remove the intermediate typecast.
+**Solution (aggressive, DS V3 style):** Run gate in bf16 with HiFi2. Eliminate all f32 from the gate path.
+
+**Code changes (conservative):**
 - In `TTNNMoE.forward()` (line ~1458-1460): Remove `typecast(router_logits_f32, bf16)`. Pass `router_logits_f32` directly to `route_tokens_to_experts()`.
 - In `TTNNMoERouterDecode.forward()` (lines 897-901): The input is already f32, skip the `typecast(logits, float32)` step.
 
-**Saves:** 2 typecast ops per iteration.
+**Saves:** 2 typecast ops per iteration (conservative), or 4+ typecasts (aggressive).
 
-### Optimization 1.2: Simplify 3-Pass Topk to 1-Pass for n_group <= topk_group
+### Optimization 1.2: Simplify 3-Pass Topk to 1-Pass
 
-**Problem:** When `n_group <= topk_group` (true for Ling-mini-2.0 where both equal 1), all groups are selected, so no group masking is needed. The 3-pass topk centering exists to handle bf16 precision issues, but for 64 experts with sigmoid scores in [0,1], the precision is adequate for a single-pass topk.
+**Problem:** When `n_group <= topk_group` (true for Ling-mini-2.0 where both equal 1), all groups are selected. The 3-pass topk centering exists to handle bf16 precision issues, but DS V3 demonstrates single-pass topk works in production with 256 experts (more than our 64).
 
-**Analysis:** Sigmoid outputs are in [0,1]. With 64 experts and top-4 selection, the decision boundary is typically around the 4th-5th ranked score. Bf16 has ~3 decimal digits of precision near 0.5, meaning scores differing by < 0.001 could be misranked. However:
-- The correction bias (e_score_correction_bias) spreads scores apart deliberately
-- The scoring function uses sigmoid (not softmax), so scores are independent per expert
-- For 64 experts, the top-4 margin is typically >0.01 after training with load-balancing loss
+**DS V3 validation:** DS V3 uses single-pass topk per stage. With 64 experts and sigmoid scores in [0,1], bf16 precision is more than adequate.
 
-**Solution:** Replace the 3-pass centering with a single f32 topk:
+**Solution:** Replace the 3-pass centering with a single bf16 topk (following DS V3's approach):
 ```python
 # Instead of 3-pass centering:
-# Just do topk on scores_with_bias_f32 directly
-topk_values_f32, topk_expert_idx = ttnn.topk(scores_with_bias_f32, k=top_k, dim=3)
-```
-
-**Caveat:** ttnn.topk may require bf16 input. If so, the single-pass approach is:
-```python
-scores_bf16 = typecast(scores_with_bias_f32, bf16)
+scores_bf16 = typecast(scores_with_bias_f32, bf16)  # or keep in bf16 throughout
 _, topk_expert_idx = ttnn.topk(scores_bf16, k=top_k, dim=3)
 ```
 
 This is 1 typecast + 1 topk instead of 6 typecasts + 3 topks + 2 slices + 2 subs.
 
-**Risk:** If the bf16 precision limitation genuinely causes incorrect topk for some edge-case tokens, accuracy could degrade. Mitigation: Run the test suite (`test_moe.py`) comparing 1-pass vs 3-pass topk outputs across 1000+ random inputs to measure agreement rate.
+**Risk:** Low. DS V3 validates this approach in production with 4x more experts. Mitigation: Run the test suite comparing 1-pass vs 3-pass topk outputs across 1000+ random inputs.
 
 **Saves:** ~20 ops per router call (6 typecasts, 2 topks, 2 slices, 2 subs, several deallocates).
 
-### Optimization 1.3: Reduce Remaining Typecasts in Router
+### Optimization 1.3: Pre-Store Bias and Scale as f32 on Device
 
-After Optimizations 1.1 and 1.2, the remaining typecast operations in the router are:
-1. `scores_f32 = sigmoid(logits_f32)` -- already f32, no cast needed
-2. `bias: bf16 -> f32` for addition with scores
-3. `scale: bf16 -> f32` for multiplication with weights
+**Problem:** Bias and scale stored as bf16, typecast to f32 at runtime.
 
-**Solution:** Pre-compute bias and scale in f32 during `preprocess_weights_impl()` and `move_weights_to_device_impl()` instead of storing them in bf16 and casting at runtime.
+**DS V3 approach:** Score correction bias stored in **float32 on device** (scores stay bf16).
+
+**Solution:** Pre-compute bias and scale in f32 during `preprocess_weights_impl()` and `move_weights_to_device_impl()`.
 
 **Code changes:**
 - In `TTNNMoERouterDecode.preprocess_weights_impl()`: Store `_bias_torch` and `_scale_torch` as float32 tensors
 - In `TTNNMoERouterDecode.move_weights_to_device_impl()`: Use `dtype=ttnn.float32` when creating device tensors
 
-**Saves:** 2 typecast ops per iteration (bias bf16->f32, scale bf16->f32).
+**Saves:** 2 typecast ops per iteration.
 
 ### Optimization 1.4: Eliminate Unnecessary repeat + to_layout for Bias and Scale
 
-**Problem:** The bias and scale tensors are stored as shape `(1,1,1,64)` and `(1,1,1,4)` respectively, then `_safe_repeat`-ed along the T dimension every forward call. For decode with T=1, the repeat is `(1,1,1,1)` -- a no-op that triggers a `ttnn.clone()`.
+**Problem:** For decode with T=1, the repeat is `(1,1,1,1)` -- a no-op that triggers `ttnn.clone()`.
 
-**Solution:** For decode mode (T=1), skip the repeat entirely since the bias shape `(1,1,1,64)` already broadcasts with `(1,1,1,64)` scores, and scale `(1,1,1,4)` broadcasts with `(1,1,1,4)` weights.
+**Solution:** For decode mode (T=1), skip the repeat entirely since broadcasting suffices.
 
-**Code changes:** Add a T=1 fast path:
 ```python
 if T == 1:
     bias = self._bias_dev  # Already (1,1,1,64), broadcasts with (1,1,1,64)
@@ -271,17 +351,15 @@ else:
     bias = _safe_repeat(self._bias_dev, ttnn.Shape((1,1,T,1)))
 ```
 
-Similarly for scale.
-
 **Saves:** 2 repeat/clone ops + 2 to_layout calls per iteration for decode.
 
 ### Phase 1 Summary
 
 | Optimization | Ops Removed | Description |
 |-------------|------------|-------------|
-| 1.1 Gate->Router handoff | 2 typecast | Pass f32 directly |
-| 1.2 1-pass topk | ~20 ops | Eliminate 2 extra topk passes + centering |
-| 1.3 Pre-store f32 constants | 2 typecast | Bias/scale already f32 on device |
+| 1.1 Gate->Router handoff | 2-4 typecast | Pass f32 directly (or go full bf16 like DS V3) |
+| 1.2 1-pass topk | ~20 ops | Eliminate 2 extra topk passes + centering (DS V3 validated) |
+| 1.3 Pre-store f32 constants | 2 typecast | Bias/scale already f32 on device (matches DS V3) |
 | 1.4 Skip repeat for T=1 | 2 repeat + 2 to_layout | Broadcasting suffices |
 | **Total** | **~28 ops** | Router: ~30 ops -> ~5-7 ops |
 
@@ -289,275 +367,285 @@ Similarly for scale.
 
 ---
 
-## Phase 2: Expert Pipeline Optimization (Medium Impact, Medium Effort)
+## Phase 2: Fused Shared Expert + Single Reduce-Scatter (HIGH Impact, Medium Effort)
 
-### Optimization 2.1: Optimize Weight Application Pattern
+**This is the highest-impact structural optimization, derived from DS V3 analysis.**
 
-**Problem:** The current pattern for applying routing weights is:
+### Optimization 2.1: Combine Routed + Shared Output Before Reduce-Scatter
+
+**Problem:** Currently there are TWO reduce_scatter operations per MoE layer:
+1. `reduce_scatter(routed_output)` -- explicit after expert combine
+2. `reduce_scatter` inside `shared_experts.down_proj` (TTNNLinearIColShardedWRowSharded)
+
+**DS V3 approach:** Both routed and shared experts use the gathered (replicated) input. Their outputs are added together, then a SINGLE reduce_scatter is performed.
+
+**Solution:** Restructure the MoE forward pass to match DS V3:
 ```python
-weights -> ROW_MAJOR -> unsqueeze -> unsqueeze -> repeat(hidden_size,1,1,1) -> permute -> TILE_LAYOUT -> mul -> sum
+# Current (two reduce-scatters):
+x_gathered = all_gather(x, dim=-1)
+routed_output = experts(x_gathered, ...)
+routed_output = reduce_scatter(routed_output)       # RS #1
+shared_output = shared_experts(residual)             # Contains internal RS #2
+output = add(routed_output, shared_output)
+
+# Proposed (single reduce-scatter, DS V3 style):
+x_gathered = all_gather(x, dim=-1)
+routed_output = experts(x_gathered, ...)
+shared_output = shared_experts_no_rs(x_gathered)     # NEW: shared experts without reduce_scatter
+combined = add(routed_output, shared_output)          # Add in replicated space
+output = reduce_scatter(combined)                     # Single RS
 ```
 
-This creates a temporary tensor of shape `(hidden_size, 1, T, top_k)` = `(2048, 1, 1, 4)` just to do a weighted sum over the expert dimension.
+**Implementation:**
+1. Create a variant of shared_experts that outputs replicated (not column-sharded) result. This means using `TTNNLinear` (without reduce_scatter) for down_proj instead of `TTNNLinearIColShardedWRowSharded`.
+2. Feed `x_gathered` (replicated) to shared_experts instead of `residual` (column-sharded). This changes the shared expert input from column-parallel to replicated.
+3. Add routed + shared outputs, then do a single reduce_scatter.
 
-**Solution A: Use ttnn.matmul for weighted sum**
+**Challenges:**
+- Shared expert weights currently assume column-parallel input (gate_proj, up_proj split across devices). For replicated input, weights need to be replicated too, or the shared expert needs to be re-sharded.
+- Alternative: Keep shared expert column-parallel but delay its reduce_scatter. The shared expert does: gate_proj (col-parallel) -> up_proj (col-parallel) -> mul -> down_proj (row-parallel, no RS). Then add the row-parallel shared output with the routed output (also replicated), then RS once.
 
-Reshape combined_output from `(top_k, 1, T, hidden_size)` to `(1, T, top_k, hidden_size)`, treat the expert dimension as a dot-product dimension:
-
+**Simpler variant (recommended):** Modify only the reduce_scatter placement:
 ```python
-# combined_output: (4, 1, T, 2048) -> (1, 1, T*4, 2048) via reshape is wrong
-# Better: reshape to (1, T, 4, 2048), weights as (1, T, 4, 1)
-# Then: output = sum(combined_output * weights, dim=2) == (1, T, 2048)
+x_gathered = all_gather(x, dim=-1)
+routed_output = experts(x_gathered, ...)              # replicated output
+shared_output = shared_experts_inner(x_gathered)      # replicated output (no RS)
+combined = add(routed_output, shared_output)
+output = reduce_scatter(combined)                     # Single RS
 ```
 
-Actually, the most efficient approach: loop over the 4 experts and accumulate:
+Where `shared_experts_inner` is the shared expert MLP without the final reduce_scatter in down_proj. This requires using a non-reducing linear for down_proj.
+
+**Estimated savings:** 1-2ms (eliminates one full reduce_scatter CCL operation + its host dispatch overhead).
+
+### Optimization 2.2: Use num_links=4 for all_to_all Operations
+
+**Problem:** Symbiote uses default num_links for all_to_all_dispatch/combine.
+
+**DS V3 approach:** Explicitly sets `num_links=4` for all all_to_all operations.
+
+**Solution:** Add `num_links=4` to all_to_all_dispatch and all_to_all_combine calls.
+
+**Code change:**
 ```python
-# topk_weights shape: (T, 4)
-# combined_output shape: (4, 1, T, hidden_size)
-result = ttnn.zeros((1, 1, T, hidden_size))
-for k in range(top_k):
-    w_k = ttnn.slice(topk_weights, [0, k], [T, k+1])  # (T, 1)
-    w_k = ttnn.reshape(w_k, (1, 1, T, 1))  # broadcasts over hidden_size
-    e_k = ttnn.slice(combined_output, [k, 0, 0, 0], [k+1, 1, T, hidden_size])
-    result = ttnn.add(result, ttnn.mul(e_k, w_k))
+# In TTNNExperts.forward():
+dispatched = ttnn.experimental.all_to_all_dispatch(x, indices, mapping, num_links=4)
+# ...
+combined = ttnn.experimental.all_to_all_combine(output, metadata, mapping, num_links=4)
 ```
 
-This uses 4 slices + 4 reshapes + 4 muls + 4 adds = 16 ops, but avoids the massive repeat(2048) and the permute. Each mul is a simple broadcast (1,1,T,1) * (1,1,T,2048).
-
-**Solution B: Use in-place weighted accumulation on device**
-
-If `ttnn.addcmul` or similar fused multiply-accumulate exists:
-```python
-result = ttnn.zeros(...)
-for k in range(top_k):
-    result = ttnn.addcmul(result, combined_output[k], weights[k])
-```
-
-**Solution C: Restructure as batch matmul**
-
-Reshape routing weights to `(1, 1, 1, 4)` and combined output to `(1, 1, 4, hidden_size)`, then:
-```python
-# weights: (1, 1, 1, 4) @ combined: (1, 1, 4, 2048) -> (1, 1, 1, 2048)
-result = ttnn.matmul(weights_reshaped, combined_reshaped)
-```
-
-This is a single matmul op that does the weighted sum. For T=1 decode, this is a `(1,1,1,4) x (1,1,4,2048)` matmul -- very efficient.
-
-**Recommended: Solution C (batch matmul)** for decode. For T>1, extend to `(1,T,1,4) x (1,T,4,2048)`.
-
-**Code changes in TTNNExperts.forward():**
-```python
-# Replace lines 1321-1335 with:
-topk_weights_reshaped = ttnn.reshape(topk_experts_weights, (1, 1, T, self.num_experts_per_tok))
-topk_weights_reshaped = ttnn.permute(topk_weights_reshaped, (0, 2, 1, 3))  # (1, T, 1, 4)
-combined_permuted = ttnn.permute(combined_output, (1, 2, 0, 3))  # (1, T, 4, hidden_size)
-final_output = ttnn.matmul(topk_weights_reshaped, combined_permuted)  # (1, T, 1, hidden_size)
-final_output = ttnn.reshape(final_output, (1, 1, T, hidden_size))
-```
-
-**Saves:** Eliminates repeat(2048), 2 to_layout conversions, 2 unsqueezes, 1 permute, 1 broadcast mul, 1 sum. Replaces with 2 reshapes + 1 permute + 1 matmul.
-Net reduction: ~4 ops eliminated, major bandwidth savings from removing repeat(2048).
-
-### Optimization 2.2: Reduce Layout Conversions in Expert Pipeline
-
-**Problem:** 6 layout conversions between ROW_MAJOR and TILE_LAYOUT.
-
-**Analysis:**
-- Conversions 1-2 (x to ROW_MAJOR for dispatch, back to TILE for sparse_matmul): Required by API constraints. all_to_all_dispatch requires ROW_MAJOR input; sparse_matmul requires TILE.
-- Conversions 3-4 (expert output to ROW_MAJOR for combine, back to TILE after): Same structural constraint.
-- Conversions 5-6 (weight application): Eliminated by Optimization 2.1.
-
-**Possible improvement for conversions 1-4:** Check if all_to_all_dispatch/combine can accept TILE_LAYOUT input. If a newer TTNN version supports this, 4 conversions can be eliminated. If not, these are structural and must remain.
-
-**Fallback optimization:** Ensure layout conversions use optimal memory configs. Currently they default to DRAM. For small decode tensors (T=1), L1 would be faster:
-```python
-x_rm = ttnn.to_layout(x, ROW_MAJOR, memory_config=ttnn.L1_MEMORY_CONFIG)
-```
-
-**Saves:** Potentially 4 to_layout ops if API supports TILE all_to_all, otherwise minor latency improvement from L1 memory config.
-
-### Optimization 2.3: Eliminate Redundant Padding for Decode
-
-**Problem:** For decode with T=1, the code pads to SPARSITY_BLOCK_SIZE=32:
-```python
-if num_tokens % SPARSITY_BLOCK_SIZE != 0:
-    pad_amount = SPARSITY_BLOCK_SIZE - (num_tokens % 32)  # = 31 for T=1
-```
-
-This pads 31 zero tokens, making the effective batch 32x larger for sparse_matmul. The sparse_matmul then processes a 32-token block where 31 tokens are zeros.
-
-**Analysis:** This padding is required by the sparse_matmul tile size constraint. The padding itself is unavoidable, but the slice at the end to remove padding could be eliminated if downstream ops can handle the padded tensor and the padding naturally disappears through reduce_scatter.
-
-**Investigation needed:** Whether the padding survives through all_to_all_combine and affects the reduce_scatter result. If padding zeros don't contribute to the reduction, the final slice can be deferred or eliminated.
+**Estimated savings:** 0.3-0.5ms (more Ethernet bandwidth for dispatch/combine).
 
 ### Phase 2 Summary
 
 | Optimization | Description | Est. Savings |
 |-------------|-------------|-------------|
-| 2.1 Weight application via matmul | Replace repeat+permute+mul+sum with single matmul | ~1-2ms (bandwidth savings) |
-| 2.2 L1 memory config for layout conversions | Faster to_layout for small tensors | ~0.2-0.5ms |
-| 2.3 Eliminate redundant slice | Defer/remove final padding slice | ~0.1ms |
-| **Total** | | **~1-2.5ms** |
+| 2.1 Single reduce_scatter (DS V3 pattern) | Add routed+shared before RS | ~1-2ms |
+| 2.2 num_links=4 for all_to_all | More Ethernet bandwidth | ~0.3-0.5ms |
+| **Total** | | **~1.5-2.5ms** |
 
 ---
 
-## Phase 3: Shared Expert Overlap (Medium Impact, High Effort)
+## Phase 3: L1 Memory Config for Decode (Medium Impact, Low Effort)
 
-### Optimization 3.1: Overlap Shared Expert with Routed Expert Computation
+**Derived entirely from DS V3 analysis. DS V3 uses L1_MEMORY_CONFIG everywhere in decode.**
 
-**Problem:** Shared experts run after reduce_scatter completes, adding their full latency serially.
+### Optimization 3.1: Switch All Decode Ops to L1_MEMORY_CONFIG
 
-**Current:**
-```
-all_gather -> gate -> router -> experts(dispatch+compute+combine) -> reduce_scatter -> shared_experts -> add
-                                                                       |               |
-                                                                    sequential      sequential
-```
+**Problem:** Symbiote uses DRAM (default) for most operations. For decode with T=1, tensors are small enough to fit in L1. DRAM round-trips add latency for every op.
 
-**Proposed:**
-```
-all_gather -> gate -> router -> experts(dispatch+compute+combine) -> reduce_scatter ---> add
-         \                                                                               /
-          \--> shared_experts(residual) ----------------------------------------->------/
-```
+**DS V3 approach:** All decode ops use `ttnn.L1_MEMORY_CONFIG`:
+- Gate projection output
+- Router intermediate tensors
+- Expert dispatch/combine
+- Weight application
+- Shared expert intermediates
 
-The shared expert computation depends only on `residual` (= the original input `x` before all_gather), which is available at the very beginning. The shared expert output is only needed at the final add.
-
-**Implementation:**
-
-Using TTNN async command queues:
+**Solution:** Add `memory_config=ttnn.L1_MEMORY_CONFIG` to all ops in decode path:
 ```python
-# In TTNNMoE.forward():
-residual = x  # column-sharded input
-
-# Start shared experts on a separate command queue (if supported)
-# Or simply reorder: compute shared experts BEFORE routed experts
-shared_output = self.shared_experts(residual)  # Can start immediately
-
-# Then do routed experts
-x = ttnn.experimental.all_gather_async(x, dim=-1, ...)
-# ... gate, router, experts ...
-routed_output = ttnn.experimental.reduce_scatter_minimal_async(routed_out, ...)
-
-# Overlap happens naturally if using async ops
-output = ttnn.add(routed_output, shared_output.to_ttnn)
+# Examples:
+router_logits = ttnn.linear(x, gate_weight, memory_config=ttnn.L1_MEMORY_CONFIG)
+scores = ttnn.sigmoid(logits, memory_config=ttnn.L1_MEMORY_CONFIG)
+x_rm = ttnn.to_layout(x, ROW_MAJOR, memory_config=ttnn.L1_MEMORY_CONFIG)
 ```
 
-**Simpler approach: Compute shared experts first**
+**Implementation:** Systematic pass through all ops in:
+- `TTNNMoE.forward()` -- gate projection, router call, expert call
+- `TTNNMoERouterDecode.forward()` -- all intermediate ops
+- `TTNNExperts.forward()` -- layout conversions, weight application
+- Shared expert MLP -- all matmul outputs
 
-Since shared_experts takes column-sharded input (no all_gather needed) and routed experts need the all_gather result, compute shared_experts BEFORE the all_gather:
+**Estimated savings:** 0.5-1ms (eliminates DRAM round-trips for ~50+ small-tensor ops).
 
+### Optimization 3.2: Sharded Memory Config for Input/Output
+
+**DS V3 approach:** Uses width-sharded memory config for MoE block input/output:
 ```python
-residual = x
-# Shared experts can run on column-sharded input directly
-shared_output = self.shared_experts(residual)
-
-# Then all_gather and do routed path
-x = all_gather_async(x, dim=-1, ...)
-# ... gate, router, experts, reduce_scatter ...
-output = add(routed_output, shared_output.to_ttnn)
+create_sharded_memory_config(
+    shape=(32, hidden_size // 8),
+    core_grid=CoreGrid(y=7, x=4),
+    strategy=WIDTH
+)
 ```
 
-**Wait:** The shared_experts' `TTNNGlm4MoeMLP` uses `TTNNLinearIColShardedWRowSharded` which internally does reduce_scatter. So shared_experts already operates on column-sharded input.
+This distributes the tensor across 28 cores (7x4 grid) for parallel processing.
 
-However, the shared expert weights are currently set up to operate on column-sharded input producing column-sharded output (with reduce_scatter inside each linear). The routed output after reduce_scatter is also column-sharded. So the add is column-sharded + column-sharded = column-sharded. This should work correctly.
+**Solution:** Investigate applying sharded memory config to BailingMoE decode input/output. This requires:
+1. Understanding the core grid constraints for Ling-mini-2.0 dimensions
+2. Ensuring upstream/downstream ops can consume sharded tensors
+3. May require `ttnn.to_memory_config()` calls at boundaries
 
-**The key insight:** Computing shared_experts(residual) before the all_gather means the shared expert matmuls can potentially overlap with the all_gather's data transfer on the Ethernet links (matmul uses Tensix cores, all_gather uses Ethernet cores).
-
-**Estimated savings:** 0.5-1ms (partial or full overlap of shared expert computation with routed expert pipeline).
+**Estimated savings:** 0.2-0.5ms (reduced L1 bank conflicts, better parallelism).
 
 ### Phase 3 Summary
 
 | Optimization | Description | Est. Savings |
 |-------------|-------------|-------------|
-| 3.1 Reorder shared experts before all_gather | Allow matmul/Ethernet overlap | ~0.5-1ms |
+| 3.1 L1_MEMORY_CONFIG everywhere | Eliminate DRAM round-trips | ~0.5-1ms |
+| 3.2 Sharded memory config | Width-sharded I/O | ~0.2-0.5ms |
+| **Total** | | **~0.7-1.5ms** |
 
 ---
 
-## Phase 4: Trace Capture (High Impact, Medium Effort)
+## Phase 4: Fused SiLU and Expert Compute Optimizations (Medium Impact, Low Effort)
 
-### Optimization 4.1: Enable TTNN Trace Capture for MoE Decode
+### Optimization 4.1: Fuse SiLU into Multiply
+
+**Problem:** Current code has two separate ops:
+```python
+w1_activated = ttnn.silu(w1_out)
+intermediate = ttnn.mul(w1_activated, w3_out)
+```
+
+**DS V3 approach:** Fused into a single op:
+```python
+intermediate = ttnn.mul(w1_out, w3_out, input_tensor_a_activations=[ttnn.UnaryOpType.SILU])
+```
+
+**Solution:** Replace the separate silu + mul with fused mul in `TTNNExperts.forward()`.
+
+**Saves:** 1 op + 1 intermediate tensor allocation per expert computation.
+
+**Estimated savings:** 0.1-0.3ms.
+
+### Optimization 4.2: Evaluate LoFi Compute Kernel for Expert Matmuls
+
+**DS V3 approach:** Uses COMPUTE_KERNEL_CONFIG_LOFI with `packer_l1_acc=True` for expert computation.
+
+**Solution:** Test LoFi compute config for expert matmuls:
+```python
+lofi_config = ttnn.WormholeComputeKernelConfig(
+    math_fidelity=ttnn.MathFidelity.LoFi,
+    math_approx_mode=True,
+    fp32_dest_acc_en=False,
+    packer_l1_acc=True,
+)
+```
+
+**Risk:** Potential accuracy impact. Requires validation against reference outputs.
+
+**Estimated savings:** 0.2-0.5ms (faster compute, though experts may already be bandwidth-bound).
+
+### Phase 4 Summary
+
+| Optimization | Description | Est. Savings |
+|-------------|-------------|-------------|
+| 4.1 Fused SiLU | Eliminate separate silu op | ~0.1-0.3ms |
+| 4.2 LoFi compute kernel | Faster expert matmuls | ~0.2-0.5ms |
+| **Total** | | **~0.3-0.8ms** |
+
+---
+
+## Phase 5: Trace Capture (High Impact, Medium Effort)
+
+### Optimization 5.1: Enable TTNN Trace Capture for MoE Decode
 
 **Problem:** Every iteration, the host dispatches ~50+ ops to the device, paying host dispatch overhead (~100-200us per op for small tensors). With trace capture, the op sequence is recorded once and replayed from device memory, eliminating host dispatch entirely.
 
 **Requirements for trace capture:**
 1. Deterministic tensor shapes across iterations (satisfied for decode: T=1, batch=1)
 2. No data-dependent control flow (satisfied: n_group=1 path is fixed)
-3. No CPU fallbacks (the TTNNMoERouterDecode does NOT have the CPU sort -- it was only in TTNNGlm4MoeRouteTokenToExperts. Verified by code reading.)
+3. No CPU fallbacks (the TTNNMoERouterDecode does NOT have the CPU sort -- verified by code reading)
 4. Pre-allocated persistent output buffers
 
-**Note on CPU sort:** The `_to_torch_any` CPU sort (lines 806-813) exists in `TTNNGlm4MoeRouteTokenToExperts.forward()`, NOT in `TTNNMoERouterDecode.forward()`. Since `TTNNMoE` uses `TTNNMoERouterDecode`, there is **no CPU fallback** in the path we are optimizing. This is good -- trace capture is feasible without fixing the sort.
-
-However, if the older `TTNNGlm4MoeMoE` class is used instead of `TTNNMoE`, the CPU sort IS present. For that path, the sort would need to be replaced with:
-```python
-# Device-side sort replacement:
-# topk with sorted=True already returns sorted indices
-# The sort in TTNNGlm4MoeRouteTokenToExperts is sorting by WEIGHT descending
-# This can be done with another topk call:
-sorted_weights, sort_idx = ttnn.topk(topk_weights, k=top_k, dim=1, largest=True, sorted=True)
-sorted_indices = ttnn.gather(topk_expert_idx, dim=1, index=sort_idx)
-```
+**Note:** DS V3's `topk_fallback` with CPU bitonic sort would break trace capture. Our path (TTNNMoERouterDecode) does not have this issue.
 
 **Implementation steps:**
-1. Ensure the `@disable_trace` decorator is NOT present on `TTNNMoE.forward()` (it is not, based on code reading -- only `TTNNGlm4MoeExpertLayers.forward` has it)
-2. Add trace capture wrapper at the model level (not the MoE module level) following the tt-transformers pattern:
+1. Ensure the `@disable_trace` decorator is NOT present on `TTNNMoE.forward()`
+2. Add trace capture wrapper at the model level following the tt-transformers pattern:
    ```python
-   # First iteration: record trace
    trace_id = ttnn.begin_trace_capture(device)
    output = model.moe_forward(x)
    ttnn.end_trace_capture(device, trace_id)
-
-   # Subsequent iterations: replay trace
+   # Subsequent iterations:
    ttnn.execute_trace(device, trace_id)
    ```
 
 **Estimated savings:** 2-3ms per MoE layer (eliminates host dispatch overhead for ~50+ ops).
 
-### Phase 4 Summary
+### Phase 5 Summary
 
 | Optimization | Description | Est. Savings |
 |-------------|-------------|-------------|
-| 4.1 Trace capture for MoE decode | Eliminate host dispatch overhead | ~2-3ms |
+| 5.1 Trace capture for MoE decode | Eliminate host dispatch overhead | ~2-3ms |
 
 ---
 
-## Summary: Optimization Priority and Impact
+## Summary: Optimization Priority and Impact (Revised with DS V3 Findings)
 
-| Phase | Optimization | Est. Savings | Effort | Risk |
-|-------|-------------|-------------|--------|------|
-| **1** | Router simplification (1-pass topk, eliminate typecasts, skip repeats) | 2-4ms | Medium | Low-Medium (validate accuracy) |
-| **2** | Expert pipeline (matmul weight application, L1 layout, reduce padding) | 1-2.5ms | Medium | Low |
-| **3** | Shared expert overlap (reorder before all_gather) | 0.5-1ms | Low | Low |
-| **4** | Trace capture | 2-3ms | Medium | Low (no CPU fallback in this path) |
-| **Total** | | **5.5-10.5ms** | | |
+| Phase | Optimization | Est. Savings | Effort | Risk | DS V3 Validated |
+|-------|-------------|-------------|--------|------|-----------------|
+| **1** | Router simplification (1-pass topk, eliminate typecasts, skip repeats) | 2-4ms | Medium | Low (DS V3 validates) | Yes |
+| **2** | Single reduce_scatter (add before RS) + num_links=4 | 1.5-2.5ms | Medium | Low-Medium | Yes |
+| **3** | L1 memory config everywhere in decode | 0.7-1.5ms | Low | Low | Yes |
+| **4** | Fused SiLU + LoFi compute kernel | 0.3-0.8ms | Low | Low-Medium | Yes |
+| **5** | Trace capture | 2-3ms | Medium | Low | N/A (arch level) |
+| **Total** | | **6.5-11.8ms** | | | |
 
-Note: Some savings overlap (trace capture subsumes some of the per-op dispatch overhead savings from Phases 1-2). Realistic combined savings: **5-8ms per MoE layer**.
+Note: Some savings overlap (trace capture subsumes some per-op dispatch overhead from Phases 1-4). Realistic combined savings: **5-9ms per MoE layer**.
+
+### Key changes from original plan:
+
+1. **Weight application de-prioritized:** DS V3 uses the identical repeat+permute pattern. This is the accepted production approach, not a bug to fix. Original Phase 2.1 (matmul-based weight application) is removed.
+2. **Single reduce_scatter elevated to Phase 2:** DS V3's `add(moe_out, shared_out) -> single RS` pattern is a high-impact structural optimization that replaces the original "overlap shared expert" approach.
+3. **L1 memory config added as Phase 3:** DS V3 uses L1_MEMORY_CONFIG everywhere in decode. This is a systematic, low-effort optimization.
+4. **Fused SiLU added as Phase 4:** DS V3's fused `mul(..., activations=[SiLU])` eliminates one op per expert computation.
+5. **num_links=4 added to Phase 2:** DS V3 explicitly uses 4 links for all_to_all operations.
+6. **Router risk lowered:** DS V3 validates single-pass topk in production with 256 experts, making our 64-expert simplification very safe.
 
 ---
 
-## Implementation Order
+## Implementation Order (Revised)
 
 ### Step 1: Validate Baseline (no code changes)
 - Run `test_moe.py` with timing instrumentation to measure current MoE decode latency
 - Capture Tracy profile of MoE forward pass to get per-op breakdown
-- Confirm Ling-mini-2.0 uses `TTNNMoE` (not `TTNNGlm4MoeMoE`) and thus has no CPU sort
+- Confirm Ling-mini-2.0 uses `TTNNMoE` (not `TTNNGlm4MoeMoE`)
 
-### Step 2: Phase 1 (Router) -- Highest ROI
+### Step 2: Phase 1 (Router) -- Highest ROI, DS V3 Validated
 1. **1.1:** Remove bf16 round-trip in gate->router handoff
 2. **1.4:** Add T=1 fast path to skip repeat/to_layout for bias and scale
 3. **1.3:** Pre-store bias and scale in f32 on device
-4. **1.2:** Replace 3-pass topk with 1-pass topk (requires accuracy validation)
+4. **1.2:** Replace 3-pass topk with 1-pass topk (DS V3 validates this approach)
 
-### Step 3: Phase 3 (Shared Expert Reorder) -- Lowest Effort
-1. Move `shared_experts(residual)` before `all_gather_async(x)`
-2. Verify correctness with test suite
+### Step 3: Phase 3 (L1 Memory Config) -- Lowest Effort, DS V3 Pattern
+1. Add `memory_config=ttnn.L1_MEMORY_CONFIG` to all decode-path ops
+2. Systematic pass through TTNNMoE, TTNNMoERouterDecode, TTNNExperts, shared experts
+3. Verify correctness with test suite
 
-### Step 4: Phase 2 (Expert Pipeline) -- Medium Effort
-1. **2.1:** Replace weight application with matmul-based approach
-2. **2.2:** Switch layout conversions to L1 memory config
-3. Run performance comparison
+### Step 4: Phase 4 (Fused SiLU + LoFi) -- Low Effort
+1. **4.1:** Replace separate `silu()` + `mul()` with fused `mul(..., activations=[SiLU])`
+2. **4.2:** Test LoFi compute kernel config for expert matmuls
+3. Validate accuracy
 
-### Step 5: Phase 4 (Trace Capture) -- Requires all above to stabilize
+### Step 5: Phase 2 (Single Reduce-Scatter) -- Medium Effort, Structural Change
+1. **2.1:** Restructure shared expert to not do internal reduce_scatter
+2. **2.1:** Feed gathered input to shared expert (like DS V3)
+3. **2.1:** Add routed + shared before single reduce_scatter
+4. **2.2:** Add num_links=4 to all_to_all operations
+5. Run full test suite
+
+### Step 6: Phase 5 (Trace Capture) -- Requires all above to stabilize
 1. Ensure no data-dependent shapes in MoE decode path
 2. Implement trace capture at model level
 3. Measure end-to-end improvement
@@ -578,7 +666,7 @@ Acceptance criteria:
 
 ---
 
-## Appendix: Ling-mini-2.0 MoE Dimensions
+## Appendix A: Ling-mini-2.0 MoE Dimensions
 
 | Parameter | Value |
 |-----------|-------|
@@ -599,3 +687,13 @@ Acceptance criteria:
 | Expert w1 shape per device | (8, 2048, 1536) bf16 |
 | Expert w3 shape per device | (8, 2048, 1536) bf16 |
 | Expert w2 shape per device | (8, 1536, 2048) bf16 |
+
+## Appendix B: DeepSeek V3 Reference Files
+
+| File | Location in tt-metal | Key Content |
+|------|---------------------|-------------|
+| moe_gate.py | models/demos/deepseek_v3/tt/moe_gate.py | Single-pass topk, bf16 router, f32 bias on device |
+| experts.py | models/demos/deepseek_v3/tt/experts.py | Regular ttnn.linear (not sparse_matmul), fused SiLU, bfloat4_b/8_b weights, LoFi |
+| moe.py | models/demos/deepseek_v3/tt/moe.py | Weight application (repeat+permute, identical to symbiote), num_links=4 |
+| moe_decoder_block_2d.py | models/demos/deepseek_v3/tt/moe_decoder_block_2d.py | add(routed, shared) -> single reduce_scatter |
+| deepseek_moe_gate.hpp | tt_metal/hw/ckernels/.../deepseek_moe_gate.hpp | Custom Tensix kernel fusing entire gate (b1 variant) |
