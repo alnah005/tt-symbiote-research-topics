@@ -471,3 +471,252 @@ attention scores. This should eliminate the repetition loop and produce coherent
 3. For a numerical sanity check, compare a few positions' cos/sin values from
    `BailingRotarySetup` against HuggingFace's `rotary_emb` to confirm they represent
    the same rotations (just in different formats).
+
+## 16. Iteration 6 - trans_mat Shape Fix
+
+### 16.1 The Error
+
+The decode path in `TTNNBailingMoEAttention._forward_decode_paged` crashes with:
+```
+TT_FATAL @ rotary_embedding_llama_device_operation.cpp:153:
+    trans_mat.logical_shape()[-2] == TILE_HEIGHT
+info:
+    Transformation matrix must have 3rd dim equal to TILE_HEIGHT
+```
+
+### 16.2 Root Cause
+
+The `rotary_embedding_llama` kernel in decode mode (`is_decode_mode=True`) requires ALL
+input tensors -- Q, K, cos, sin, AND trans_mat -- to be HEIGHT_SHARDED across `batch_size`
+cores. The trans_mat must have one `(TILE_SIZE, TILE_SIZE)` shard on each core.
+
+The current Bailing decode code does this:
+```python
+trans_mat = self._rotary_setup.get_trans_mat(is_decode=True)
+# returns shape [1, 1, 32, 32] from DRAM (INTERLEAVED)
+
+trans_shard_mem = ttnn.create_sharded_memory_config(
+    shape=(ttnn.TILE_SIZE, ttnn.TILE_SIZE),
+    core_grid=batch_grid,               # batch_size cores
+    strategy=ttnn.ShardStrategy.HEIGHT,
+    ...
+)
+trans_mat = ttnn.to_memory_config(trans_mat, trans_shard_mem)
+```
+
+**The problem:** The trans_mat tensor has logical shape `[1, 1, 32, 32]`, which means its
+total height is 32 (one tile). When you create a HEIGHT_SHARDED config with `batch_size`
+cores and shard_shape `(32, 32)`, it expects the total tensor height to be
+`batch_size * 32`. But the tensor only has height 32. The `ttnn.to_memory_config` call
+either fails or produces a malformed sharded tensor whose shard_spec reports the wrong
+shape, triggering the kernel's assertion on `trans_mat.shard_spec()->shape[0] == TILE_HEIGHT`.
+
+### 16.3 How tt-transformers Solves This (The Working Reference)
+
+In `models/tt_transformers/tt/rope.py` (lines 469-490), the trans_mat is **repeated
+along the height dimension** before being placed into the sharded memory config:
+
+```python
+trans_mat = get_rot_transformation_mat(dhead=ttnn.TILE_SIZE).repeat(
+    1, 1, self.batch_size_per_device_group, 1,
+)  # shape: [1, 1, batch_size * TILE_SIZE, TILE_SIZE]
+
+trans_mat_mem_config = ttnn.create_sharded_memory_config(
+    shape=(ttnn.TILE_SIZE, ttnn.TILE_SIZE),
+    core_grid=self.batch_grid,
+    strategy=ttnn.ShardStrategy.HEIGHT,
+    orientation=ttnn.ShardOrientation.ROW_MAJOR,
+    use_height_and_width_as_shard_shape=True,
+)
+self.transformation_mat = ttnn.from_torch(
+    trans_mat,
+    device=device,
+    layout=ttnn.TILE_LAYOUT,
+    dtype=datatype,
+    memory_config=trans_mat_mem_config,   # placed directly into sharded config
+    mesh_mapper=replicate_tensor_to_mesh_mapper(device),
+)
+```
+
+The same pattern appears in `models/common/modules/attention/attention_1d.py` (lines
+1905-1921):
+```python
+trans_mat = get_rot_transformation_mat().repeat(1, 1, doubled_batch_size, 1)
+```
+
+**Key insight:** The `.repeat(1, 1, batch_size, 1)` call replicates the single
+`[1, 1, 32, 32]` tile `batch_size` times along dim-2, producing a torch tensor of shape
+`[1, 1, batch_size*32, 32]`. Each core then gets one `(32, 32)` shard -- an identical
+copy of the transformation matrix.
+
+### 16.4 The Fix
+
+The fix must happen in `BailingRotarySetup.__init__` in `rope.py`, so that the
+trans_mat_decode is pre-built with the correct repeated shape AND placed directly into
+the HEIGHT_SHARDED memory config at initialization time (not at forward-pass time).
+
+**File:** `/home/ttuser/salnahari/tt-metal/models/experimental/tt_symbiote/modules/rope.py`
+
+**Change 1 -- BailingRotarySetup.__init__ (around line 536-544):**
+
+Replace the current trans_mat_decode creation:
+```python
+# Create transformation matrix for decode (TILE_SIZE x TILE_SIZE)
+trans_mat_decode_torch = _get_rotation_transformation_mat(ttnn.TILE_SIZE)
+self.trans_mat_decode = ttnn.from_torch(
+    trans_mat_decode_torch.to(torch.bfloat16),
+    device=device,
+    layout=ttnn.TILE_LAYOUT,
+    dtype=datatype,
+    memory_config=ttnn.DRAM_MEMORY_CONFIG,
+    mesh_mapper=mesh_mapper,
+)
+```
+
+With:
+```python
+# Create transformation matrix for decode (TILE_SIZE x TILE_SIZE)
+# Must be repeated batch_size times along dim-2 so it can be HEIGHT_SHARDED
+# across batch_size cores (one [TILE_SIZE, TILE_SIZE] shard per core).
+# This follows the pattern from tt-transformers' RotarySetup.
+trans_mat_decode_torch = _get_rotation_transformation_mat(ttnn.TILE_SIZE)
+# Store the torch version for later repetition (batch_size not known at init)
+self._trans_mat_decode_torch = trans_mat_decode_torch.to(torch.bfloat16)
+self.trans_mat_decode = None  # Will be lazily created on first decode call
+```
+
+However, this lazy approach is more complex. A simpler approach that follows the
+tt-transformers pattern more closely requires knowing the batch_size at init time.
+
+**Recommended approach -- accept batch_size as an __init__ parameter:**
+
+```python
+def __init__(
+    self,
+    device,
+    head_dim: int,
+    max_seq_len: int,
+    rope_theta: float,
+    partial_rotary_factor: float = 1.0,
+    datatype: ttnn.DataType = ttnn.bfloat16,
+    max_batch_size: int = 8,              # <-- NEW PARAMETER
+) -> None:
+```
+
+Then create the trans_mat_decode with the repeated shape:
+```python
+# Create transformation matrix for decode, repeated across batch cores
+trans_mat_decode_torch = _get_rotation_transformation_mat(ttnn.TILE_SIZE)
+trans_mat_decode_torch = trans_mat_decode_torch.repeat(1, 1, max_batch_size, 1)
+# shape: [1, 1, max_batch_size * TILE_SIZE, TILE_SIZE]
+
+batch_grid = ttnn.num_cores_to_corerangeset(
+    max_batch_size, device.compute_with_storage_grid_size(), True
+)
+trans_mat_decode_mem = ttnn.create_sharded_memory_config(
+    shape=(ttnn.TILE_SIZE, ttnn.TILE_SIZE),
+    core_grid=batch_grid,
+    strategy=ttnn.ShardStrategy.HEIGHT,
+    orientation=ttnn.ShardOrientation.ROW_MAJOR,
+    use_height_and_width_as_shard_shape=True,
+)
+self.trans_mat_decode = ttnn.from_torch(
+    trans_mat_decode_torch.to(torch.bfloat16),
+    device=device,
+    layout=ttnn.TILE_LAYOUT,
+    dtype=datatype,
+    memory_config=trans_mat_decode_mem,
+    mesh_mapper=mesh_mapper,
+)
+```
+
+**Change 2 -- attention.py `_forward_decode_paged` (around lines 2758-2767):**
+
+Remove the trans_mat sharding code since it's now pre-sharded:
+```python
+# OLD (delete):
+trans_mat = self._rotary_setup.get_trans_mat(is_decode=True)
+trans_shard_mem = ttnn.create_sharded_memory_config(
+    shape=(ttnn.TILE_SIZE, ttnn.TILE_SIZE),
+    core_grid=batch_grid,
+    strategy=ttnn.ShardStrategy.HEIGHT,
+    orientation=ttnn.ShardOrientation.ROW_MAJOR,
+    use_height_and_width_as_shard_shape=True,
+)
+trans_mat = ttnn.to_memory_config(trans_mat, trans_shard_mem)
+
+# NEW (replace with):
+trans_mat = self._rotary_setup.get_trans_mat(is_decode=True)
+# trans_mat is already HEIGHT_SHARDED from BailingRotarySetup init
+```
+
+**Change 3 -- Update the call site where BailingRotarySetup is constructed:**
+
+Find where `BailingRotarySetup(...)` is called and add `max_batch_size=<value>`.
+This is likely in the attention module's `move_weights_to_device_impl` or similar init method.
+
+### 16.5 Alternative: Lazy Initialization (No __init__ Change)
+
+If adding a `max_batch_size` parameter to `BailingRotarySetup.__init__` is undesirable,
+an alternative is to build the sharded trans_mat lazily on the first decode call:
+
+In `BailingRotarySetup.__init__`, keep the DRAM version as-is and also store the torch tensor:
+```python
+self._trans_mat_decode_torch = trans_mat_decode_torch.to(torch.bfloat16)
+self._trans_mat_decode_sharded_cache = {}  # batch_size -> sharded tensor
+```
+
+Add a new method:
+```python
+def get_trans_mat_decode_sharded(self, batch_size: int) -> ttnn.Tensor:
+    """Get trans_mat pre-sharded for the given batch_size."""
+    if batch_size not in self._trans_mat_decode_sharded_cache:
+        trans_mat_torch = self._trans_mat_decode_torch.repeat(1, 1, batch_size, 1)
+        batch_grid = ttnn.num_cores_to_corerangeset(
+            batch_size, self.device.compute_with_storage_grid_size(), True
+        )
+        mem_config = ttnn.create_sharded_memory_config(
+            shape=(ttnn.TILE_SIZE, ttnn.TILE_SIZE),
+            core_grid=batch_grid,
+            strategy=ttnn.ShardStrategy.HEIGHT,
+            orientation=ttnn.ShardOrientation.ROW_MAJOR,
+            use_height_and_width_as_shard_shape=True,
+        )
+        mesh_mapper = ttnn.ReplicateTensorToMesh(self.device) if self.is_mesh_device else None
+        self._trans_mat_decode_sharded_cache[batch_size] = ttnn.from_torch(
+            trans_mat_torch,
+            device=self.device,
+            layout=ttnn.TILE_LAYOUT,
+            dtype=self.datatype,
+            memory_config=mem_config,
+            mesh_mapper=mesh_mapper,
+        )
+    return self._trans_mat_decode_sharded_cache[batch_size]
+```
+
+Then in attention.py, replace:
+```python
+trans_mat = self._rotary_setup.get_trans_mat(is_decode=True)
+trans_shard_mem = ...
+trans_mat = ttnn.to_memory_config(trans_mat, trans_shard_mem)
+```
+With:
+```python
+trans_mat = self._rotary_setup.get_trans_mat_decode_sharded(batch_size)
+```
+
+### 16.6 Summary
+
+| Item | Detail |
+|------|--------|
+| **Root cause** | trans_mat `[1,1,32,32]` cannot be HEIGHT_SHARDED across `batch_size` cores; needs `.repeat(1,1,batch_size,1)` first |
+| **Reference** | `models/tt_transformers/tt/rope.py:469-490` and `models/common/modules/attention/attention_1d.py:1905-1921` |
+| **Files to change** | `rope.py` (BailingRotarySetup) and `attention.py` (_forward_decode_paged) |
+| **Recommended fix** | Add `max_batch_size` param to BailingRotarySetup, repeat trans_mat at init, place directly into HEIGHT_SHARDED memory |
+| **Alternative fix** | Lazy cache with `get_trans_mat_decode_sharded(batch_size)` method |
+
+### 16.7 Verification
+
+1. Run `pytest models/experimental/tt_symbiote/tests/test_ling_mini_2_0.py -v --timeout=0`
+2. Confirm the `TT_FATAL @ rotary_embedding_llama_device_operation.cpp:153` error is gone
+3. Confirm decode output is coherent text (not garbled or repetitive)
