@@ -289,3 +289,134 @@ This file tracks research topics that the Architect needs to investigate for mak
 **Findings:**
 [Pending]
 
+## BailingAttention Decode Path Optimization Plan
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** Decode path is 72% data-movement-bound. Top bottlenecks: AllGather 28.9%, ReshapeView 20.5%, ReduceScatter 14.1%, Matmul 13.2%. Need concrete optimization plan to reduce from ~9.5ms to 3-5ms target.
+**Questions:**
+1. How to reduce 4 all_gathers to fewer?
+2. How to eliminate unnecessary reshapes (328 per decode)?
+3. Can reduce_scatter be combined with all_gather (all_reduce)?
+4. What is the optimal QKV projection sharding strategy?
+5. How does tt-transformers (LLaMA-70B) handle this?
+
+**Findings:**
+`PLAN_optimize_bailing_attention.md`
+Key results: 3-phase plan targeting ~6ms savings total.
+- Phase 1 (low-hanging fruit): Use nlp_create_qkv_heads_decode, eliminate linear 4D reshapes, pre-cache cos/sin sharded, test 4D QK norm. Saves 0.7-1.0ms.
+- Phase 2 (fused QKV): Create TTNNLinearIColShardedWAllReduced, fuse Q+K+V into single matmul + all_reduce. Eliminates 3 all_gathers + 3 matmuls + 1 reduce_scatter, replaces with 1 matmul + 1 all_reduce. Saves 2-3ms.
+- Phase 3 (trace capture): Enable TTNN trace for decode path. Saves 2-3ms.
+Reference: LLaMA-70B uses fused QKV matmul + nlp_create_qkv_heads_decode + column-parallel sharding. BailingMoE needs all_reduce (not reduce_scatter) due to 4 KV heads < 8 devices.
+
+## Fused QKV + AllReduce Detailed Implementation Plan
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** Phase 1 (nlp_create_qkv_heads_decode) REGRESSED -- host dispatch overhead dominates, not device op count. Must reduce 5 CCL ops to 1 by fusing Q/K/V projections into a single column-parallel matmul + all_reduce.
+**Questions:**
+1. Which CCL pattern to use? (all_reduce vs reduce_scatter+all_gather vs hybrid)
+2. How to handle GQA (4 KV heads < 8 devices) with reduce_scatter?
+3. Does ttnn.all_reduce work on T3K (1x8 mesh)?
+4. What weight preparation changes are needed for fused QKV?
+5. Can all_reduce_create_qkv_heads (Galaxy op) be used on T3K?
+6. How does bias handling change with all_reduce vs reduce_scatter?
+
+**Findings:**
+`PLAN_fused_qkv_allreduce.md`
+Key results:
+- Use `ttnn.all_reduce` (not reduce_scatter) because KV heads (4) < devices (8) doesn't divide for reduce_scatter
+- all_reduce replicates full 3072-dim output on all devices; tiny tensors in decode so bandwidth waste is negligible
+- `all_reduce_create_qkv_heads` is Galaxy-only (TG 8x4), not suitable for T3K
+- New linear class `TTNNLinearIColShardedWAllReduced`: matmul + all_reduce, bias must be replicated (not sharded)
+- Prefill path unchanged (keeps separate Q/K/V projections)
+- RISK: T3K test skips 8-device all_reduce due to "hang in all gather"; fallback is composite RS+AG (2 ops, still saves 3)
+- Estimated savings: 2.0-2.7ms per decode (4 fewer CCL host dispatches + 2 fewer matmuls)
+- Memory cost: +12.6MB/layer (403MB total for 32 layers, 3.4% of T3K DRAM)
+
+## TTNNMoE / TTNNBailingMoE Profiling Plan
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** Need to profile TTNNMoE (TTNNBailingMoE) module used in test_ling_mini_2_0.py to understand per-op performance breakdown, identify bottlenecks in the MoE forward pass (all_gather, routing, sparse_matmul experts, all_to_all dispatch/combine, reduce_scatter, shared experts).
+**Questions:**
+1. What is the TTNNMoE/TTNNBailingMoE architecture and its op composition?
+2. How to profile the full MoE forward pass with device-level Tracy profiling?
+3. What are the expected bottlenecks (routing, expert compute, CCL ops, host overhead)?
+4. How to set up environment and run profiling for test_ling_mini_2_0.py?
+
+**Findings:**
+`PLAN_profile_ttnn_moe.md`
+Key results: TTNNBailingMoE inherits from TTNNMoE. Forward pass: all_gather_async -> float32 gate matmul -> TTNNMoERouterDecode (3-pass topk routing with 30+ TTNN ops) -> TTNNExperts (all_to_all_dispatch, 3x sparse_matmul, silu, all_to_all_combine, weight application) -> reduce_scatter_minimal_async -> shared_experts (3 matmuls + silu). Two profiling methods: (1) DispatchManager host-level timing (built into test), (2) Device-level Tracy profiling with TT_METAL_DEVICE_PROFILER=1 + TT_METAL_PROFILER_CPP_POST_PROCESS=1. Buffer overflow likely with 128 decode tokens; reduce to 8-16 and set TT_METAL_PROFILER_PROGRAM_SUPPORT_COUNT=4000. Expected bottlenecks: routing overhead (many small ops), CCL ops (all_gather + reduce_scatter), sparse_matmul efficiency.
+
+## BailingMoE (TTNNBailingMoE / TTNNMoE) Decode Path Optimization
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** The MoE module in Ling-mini-2.0 has multiple performance bottlenecks: CPU fallback in the router sort, 3-pass topk with excessive typecasts, expensive weight application pattern (permute/unsqueeze/repeat), and sequential shared expert execution. Need a detailed optimization plan.
+**Questions:**
+1. What is the full op sequence and cost breakdown for TTNNMoE.forward() decode path?
+2. How can the CPU fallback sort in TTNNMoERouterDecode be eliminated?
+3. Can the 3-pass topk centering approach be simplified or eliminated for Ling-mini-2.0 (64 experts, n_group=1)?
+4. How can the weight application pattern (permute/unsqueeze/repeat/broadcast multiply/sum) be optimized?
+5. Can shared expert computation overlap with routed expert computation?
+6. What layout conversions (ROW_MAJOR <-> TILE_LAYOUT) can be eliminated?
+
+**Findings:**
+`PLAN_optimize_bailing_moe.md`
+Key results: 4-phase plan targeting significant latency reduction.
+- Phase 1 (Router): Eliminate CPU sort fallback, simplify 3-pass topk to 1-pass (n_group <= topk_group), eliminate unnecessary f32 typecasts. Saves ~2-4ms.
+- Phase 2 (Expert pipeline): Optimize weight application with ttnn.embedding_with_broadcast or in-place weighted accumulation, reduce ROW_MAJOR<->TILE conversions. Saves ~1-2ms.
+- Phase 3 (Shared experts): Overlap shared expert MLP with routed expert dispatch/compute using async ops. Saves ~0.5-1ms.
+- Phase 4 (Trace capture): Enable TTNN trace for full MoE decode. Saves ~2-3ms.
+
+## TT-Symbiote Wrapper Overhead Analysis (Ling-mini-2.0 Decode)
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** Need to quantify exactly where the TorchTTNNTensor wrapper overhead and other host-side overhead occurs in the full Ling-mini-2.0 decode path, to prioritize optimizations.
+**Questions:**
+1. How many wrapper calls (wrap_to_torch_ttnn_tensor, _set_device_wrap, _unwrap_to_torch) per decode token?
+2. What is the total time in wrapper overhead vs actual TTNN compute dispatch?
+3. Which modules/layers contribute the most wrapper overhead?
+4. What are the root causes (compose_transforms, device sync, output wrapping)?
+5. What specific optimizations can reduce each overhead source?
+
+**Findings:**
+`REPORT_wrapper_overhead.md`
+Key results: Single decode token = 942ms wall clock. 50.5% is overhead (wrapper + Python), 49.5% is TTNN op dispatch. Breakdown:
+- Input wrapping (compose_transforms): 158.9ms (16.9%), 594 calls
+- Output unwrapping (_unwrap_to_torch + device sync): 76.6ms (8.1%), 84 calls at 42 sync points
+- Output wrapping (wrap_to_torch_ttnn_tensor): 60.6ms (6.4%), 297 calls
+- Print statements + Python control flow: 165.1ms (17.5%), 363 prints
+- Distributed config + aten ops: 13ms (1.4%)
+Top optimizations: (1) Eliminate _unwrap_to_torch by doing residual adds in TTNN on-device (-80ms), (2) Remove print statements (-150ms), (3) Fast-path compose_transforms for already-wrapped tensors (-140ms), (4) Flatten module dispatch nesting (-60ms). Combined: ~450ms savings (47%).
+
+## Wrapper Overhead Optimization Plan (5 optimizations)
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** Need detailed implementation plan for 5 wrapper overhead optimizations targeting ~440ms savings (47% of decode latency).
+**Questions:**
+1. How to create TTNNBailingMoEDecoderLayer to eliminate residual add device syncs?
+2. How to gate prints without removing them?
+3. How to fast-path compose_transforms for already-wrapped tensors?
+4. How to flatten module dispatch nesting in attention/decoder layer?
+5. How to optimize tree_map for common argument patterns?
+
+**Findings:**
+`PLAN_wrapper_optimizations.md`
+Key results: 5-optimization plan in implementation order: P2 (gated prints, ~150ms), P5 (fast tree_map, ~10ms), P3 (fast compose_transforms, ~140ms), P1 (TTNNBailingMoEDecoderLayer with on-device residual adds, ~80ms), P4 (flatten dispatch nesting, ~60ms). Total: ~440ms (47%). P1 creates new TTNNBailingMoEDecoderLayer that replaces BailingMoeV2DecoderLayer, creates child TTNNModules in from_torch, does ttnn.add for residuals. Layer 0 special case (dense MLP, not MoE) handled. P2 uses existing NormalRun.verbose flag. P3 adds isinstance+device fast-path. P4 calls child.forward() directly bypassing module_run. P5 adds fast paths for single tensor, small tuples, shallow dicts.
+
+## Ling-mini-2.0 T3K Hang Root Cause
+**Date:** 2026-03-26
+**Status:** Completed
+**Why Needed:** test_ling_mini_2_0.py hangs on T3K during inference. Need to identify root cause and fix.
+**Questions:**
+1. Where exactly does the test hang?
+2. What operation causes the hang?
+3. Is this a known issue with TTNN CCL operations?
+4. What is the fix?
+
+**Findings:**
+Root cause: `ttnn.all_reduce` with 8 devices on T3K hangs. This is a **known issue** documented in the official T3K CCL test suite at `tests/nightly/t3000/ccl/test_all_reduce.py` line 22: `# (8, 1), # skipped as 8 devices result in hang in all gather`.
+
+The hang occurs in `TTNNLinearIColShardedWAllReduced.forward()` (linear.py:218) which calls `ttnn.all_reduce(tt_output, num_links=1, topology=ttnn.Topology.Ring, cluster_axis=1)`. This class is used by `TTNNBailingMoEAttention._forward_prefill()` and `._forward_decode_paged()` for the fused QKV projection (`self.qkv_proj`).
+
+The test hangs during the first `model.generate()` call (warmup at line 125) when the prefill forward pass reaches the first attention layer's QKV projection.
+
+Fix: Replace `ttnn.all_reduce` with composite `reduce_scatter` + `all_gather` (2 ops instead of 1, but doesn't hang), or use the async variants (`reduce_scatter_minimal_async` + `all_gather_async`) with proper semaphore management via `ccl_manager`, matching the pattern used by `TTNNMoE.forward()` which works on T3K.
