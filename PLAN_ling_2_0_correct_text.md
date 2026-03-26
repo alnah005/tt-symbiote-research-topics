@@ -750,3 +750,296 @@ self._decode_trans_mat = ttnn.to_memory_config(self._decode_trans_mat, trans_mat
 - [ ] Q/K inputs to `rotary_embedding_llama` are HEIGHT_SHARDED (or convert them in `_apply_partial_rope_decode`)
 - [ ] For partial RoPE: Q/K are split to rotary_dim before RoPE, concatenated after
 - [ ] Output text is coherent (not repeating tokens)
+
+---
+
+## 13. Iteration 3 - Simplified Approach (Deep Debug After "aukee" Still Repeating)
+
+### 13.1 Context
+
+After implementing all fixes from Sections 3 and 12 (nlp_create_qkv_heads_decode, decode-mode
+rotary_embedding_llama, HF-to-Meta cos/sin conversion, HEIGHT_SHARDED memory configs), the model
+runs without runtime errors but STILL produces "aukee" repeating tokens. This section provides a
+root-cause analysis based on a detailed trace of the decode dataflow.
+
+### 13.2 Root Cause Analysis
+
+#### Bug A: Slicing HEIGHT_SHARDED Tensors (CRITICAL - This Is Why Output Is Garbled)
+
+The `_apply_partial_rope_decode()` method (line 2561) receives Q/K tensors that are already
+HEIGHT_SHARDED (sharded at line 2837-2846) and then tries to SLICE them along dim=-1:
+
+```python
+# line 2590 - THIS IS ILLEGAL ON HEIGHT_SHARDED TENSORS
+q_rot = query_states[:, :, :, :rotary_dim]   # [1, B, 16, 64] from [1, B, 16, 128]
+q_pass = query_states[:, :, :, rotary_dim:]   # [1, B, 16, 64]
+```
+
+As stated in the rope.py docstring (line 18): _"This avoids slicing HEIGHT_SHARDED tensors which
+is not allowed."_ When you slice a HEIGHT_SHARDED tensor along the width dimension, TTNN either
+silently produces garbage data or returns incorrect memory views. This single bug is sufficient
+to explain the garbled output.
+
+#### Bug B: trans_mat Shard Grid Mismatch (CRITICAL)
+
+The `_decode_trans_mat` is pre-sharded during `move_weights_to_device_impl()` on **1 core**
+(line 2458: `num_cores_to_corerangeset(1, ...)`), but at runtime the Q/K/cos/sin tensors are
+sharded on `batch_size` cores (line 2816). The `rotary_embedding_llama` kernel requires ALL
+inputs to be on the SAME shard grid. Mismatched grids produce silent data corruption.
+
+#### Bug C: Redundant and Fragile cos/sin Conversion (WRONG APPROACH)
+
+The inline HF-to-Meta conversion (lines 2752-2813) is ~60 lines of complex code that:
+1. Pulls TTNN tensors back to PyTorch on host (slow)
+2. Does the half/stack/flatten conversion (correct math, but unnecessary)
+3. Pushes back to device (slow)
+4. Shards to HEIGHT_SHARDED (correct, but the shard width is rotary_dim=64, not head_dim=128)
+
+This approach conflicts with how the standard TT-Transformers pattern works. The standard pattern
+uses identity-padded cos/sin at FULL head_dim so that NO tensor slicing is ever needed.
+
+### 13.3 What The Standard TT-Transformers Pattern Does
+
+Reference: `models/common/modules/rope/rope_1d.py` and `models/common/modules/rope/rope_setup.py`
+
+The standard approach for partial RoPE in decode mode:
+1. Pre-compute cos/sin in Meta format at `rotary_dim` (64)
+2. **Identity-pad** cos to `head_dim` (128) with cos=1.0 for dims 64-127
+3. **Identity-pad** sin to `head_dim` (128) with sin=0.0 for dims 64-127
+4. Pass FULL Q/K (all 128 dims) through `rotary_embedding_llama` -- no slicing needed
+5. The identity padding ensures dims 64-127 pass through unchanged:
+   `q_out[i] = q[i] * 1.0 + rotate_half(q)[i] * 0.0 = q[i]` for i >= 64
+
+This is exactly what the rope.py docstring at line 17-18 describes.
+
+### 13.4 The Simplest Fix
+
+**Strategy**: Use identity-padded cos/sin at full head_dim. Eliminate ALL tensor slicing in
+the decode RoPE path. Use `BailingRotarySetup` (which already computes Meta-format cos/sin)
+instead of inline conversion.
+
+#### Step 1: Modify `BailingRotarySetup._compute_cos_sin_cache()` to identity-pad
+
+Currently `_compute_cos_sin_cache()` returns cos/sin at shape `[1, 1, max_seq_len, rotary_dim]`
+(rotary_dim=64). Modify it to return `[1, 1, max_seq_len, head_dim]` (head_dim=128) with
+identity padding for the non-rotary portion.
+
+In `rope.py`, function `_compute_cos_sin_cache()` (line 362), add after line 406:
+
+```python
+# Identity-pad for partial rotary: dims beyond rotary_dim pass through unchanged
+# cos=1.0 means no rotation, sin=0.0 means no cross-term
+if rotary_dim < head_dim:
+    pad_width = head_dim - rotary_dim
+    cos_pad = torch.ones(cos.shape[0], cos.shape[1], cos.shape[2], pad_width)
+    sin_pad = torch.zeros(sin.shape[0], sin.shape[1], sin.shape[2], pad_width)
+    cos = torch.cat([cos, cos_pad], dim=-1)
+    sin = torch.cat([sin, sin_pad], dim=-1)
+```
+
+Note: `_compute_cos_sin_cache` currently does NOT receive `head_dim` as a separate arg when
+`partial_rotary_factor < 1.0`. The function signature needs to accept `head_dim` explicitly
+(currently it computes `rotary_dim = int(head_dim * partial_rotary_factor)` which means the
+incoming `head_dim` IS the full head_dim). Actually, looking more carefully: the function takes
+`head_dim` and `partial_rotary_factor` separately, computes `rotary_dim`, and returns at
+`rotary_dim`. So we just need to pad back to `head_dim` at the end.
+
+#### Step 2: Modify `BailingRotarySetup.get_cos_sin_for_decode()` output shape
+
+Currently returns `[1, batch, 1, rotary_dim]`. After Step 1, the cache will be at
+`[1, 1, max_seq_len, head_dim]`, so `get_cos_sin_for_decode()` will automatically return
+`[1, batch, 1, head_dim]`. No change needed here.
+
+#### Step 3: Replace the decode cos/sin code in `_forward_decode_paged()`
+
+Replace lines 2752-2851 (the entire inline HF-to-Meta conversion + HEIGHT_SHARDED + partial
+RoPE call) with:
+
+```python
+# Get cos/sin from BailingRotarySetup (already Meta format, identity-padded, on device)
+cos_ttnn, sin_ttnn = self._rotary_setup.get_cos_sin_for_decode(cache_position_tensor)
+
+# Shard cos/sin to HEIGHT_SHARDED
+batch_grid = ttnn.num_cores_to_corerangeset(
+    batch_size, self.device.compute_with_storage_grid_size(), True
+)
+rope_shard_mem = ttnn.create_sharded_memory_config(
+    shape=(ttnn.TILE_SIZE, self.head_dim),  # FULL head_dim, not rotary_dim
+    core_grid=batch_grid,
+    strategy=ttnn.ShardStrategy.HEIGHT,
+    orientation=ttnn.ShardOrientation.ROW_MAJOR,
+    use_height_and_width_as_shard_shape=True,
+)
+cos_ttnn = ttnn.to_memory_config(cos_ttnn, rope_shard_mem)
+sin_ttnn = ttnn.to_memory_config(sin_ttnn, rope_shard_mem)
+
+# Shard Q/K to HEIGHT_SHARDED
+q_shard_mem = ttnn.create_sharded_memory_config(
+    shape=(ttnn.TILE_SIZE, self.head_dim),
+    core_grid=batch_grid,
+    strategy=ttnn.ShardStrategy.HEIGHT,
+    orientation=ttnn.ShardOrientation.ROW_MAJOR,
+    use_height_and_width_as_shard_shape=True,
+)
+query_states = ttnn.to_memory_config(query_states, q_shard_mem)
+k_shard_mem = ttnn.create_sharded_memory_config(
+    shape=(ttnn.TILE_SIZE, key_states.shape[-1]),
+    core_grid=batch_grid,
+    strategy=ttnn.ShardStrategy.HEIGHT,
+    orientation=ttnn.ShardOrientation.ROW_MAJOR,
+    use_height_and_width_as_shard_shape=True,
+)
+key_states = ttnn.to_memory_config(key_states, k_shard_mem)
+
+# Re-shard trans_mat to match batch_grid (was pre-sharded on 1 core at init)
+trans_mat = ttnn.to_memory_config(self._decode_trans_mat, ttnn.DRAM_MEMORY_CONFIG)
+trans_shard_mem = ttnn.create_sharded_memory_config(
+    shape=(ttnn.TILE_SIZE, ttnn.TILE_SIZE),
+    core_grid=batch_grid,
+    strategy=ttnn.ShardStrategy.HEIGHT,
+    orientation=ttnn.ShardOrientation.ROW_MAJOR,
+    use_height_and_width_as_shard_shape=True,
+)
+trans_mat = ttnn.to_memory_config(trans_mat, trans_shard_mem)
+
+# Apply FULL RoPE (no slicing!) - identity padding handles partial rotation
+query_states = ttnn.experimental.rotary_embedding_llama(
+    query_states, cos_ttnn, sin_ttnn, trans_mat, is_decode_mode=True
+)
+key_states = ttnn.experimental.rotary_embedding_llama(
+    key_states, cos_ttnn, sin_ttnn, trans_mat, is_decode_mode=True
+)
+```
+
+#### Step 4: Delete `_apply_partial_rope_decode()` method
+
+The entire `_apply_partial_rope_decode()` method (lines 2561-2615) is no longer needed since
+the identity-padded cos/sin eliminate the need for slicing.
+
+#### Step 5: Initialize `BailingRotarySetup` in `move_weights_to_device_impl()`
+
+Add to `move_weights_to_device_impl()`:
+
+```python
+from models.experimental.tt_symbiote.modules.rope import BailingRotarySetup
+
+config = self._fallback_torch_layer.config
+self._rotary_setup = BailingRotarySetup(
+    device=self.device,
+    head_dim=self.head_dim,
+    max_seq_len=config.max_position_embeddings,
+    rope_theta=config.rope_theta,
+    partial_rotary_factor=self.partial_rotary_factor,
+)
+```
+
+#### Step 6: Remove the pre-sharded `_decode_trans_mat` from init
+
+Since `BailingRotarySetup` already provides `trans_mat_decode`, use that instead.
+Replace lines 2442-2466 with:
+
+```python
+# trans_mat is available from self._rotary_setup.trans_mat_decode
+# (sharding happens at decode time to match batch_size)
+```
+
+Or, keep a DRAM copy from `BailingRotarySetup.trans_mat_decode` and re-shard per call.
+
+### 13.5 Alternative: Even Simpler Fix (Minimal Changes)
+
+If you want the absolute minimum code change to test the hypothesis:
+
+**Just move the slicing BEFORE the HEIGHT_SHARDED conversion.**
+
+In `_forward_decode_paged()`, lines 2829-2851, reorder so that:
+1. Q/K are sliced to rotary_dim WHILE STILL IN L1_INTERLEAVED (after QK norm, before sharding)
+2. Then shard the sliced tensors to HEIGHT_SHARDED
+3. Apply `rotary_embedding_llama` to the rotary portion
+4. Un-shard, concatenate with pass-through, re-shard for paged kernels
+
+This is still ugly but would verify the hypothesis quickly:
+
+```python
+# After QK norm, Q is [1, B, 16, 128] in L1_INTERLEAVED
+# Slice BEFORE sharding (legal on interleaved tensors)
+q_rot = query_states[:, :, :, :rotary_dim]   # [1, B, 16, 64]
+q_pass = query_states[:, :, :, rotary_dim:]   # [1, B, 16, 64]
+k_rot = key_states[:, :, :, :rotary_dim]      # [1, B, 4, 64]
+k_pass = key_states[:, :, :, rotary_dim:]      # [1, B, 4, 64]
+
+# Now shard the rotary portions
+batch_grid = ttnn.num_cores_to_corerangeset(batch_size, self.device.compute_with_storage_grid_size(), True)
+q_rot_shard = ttnn.create_sharded_memory_config(
+    shape=(ttnn.TILE_SIZE, rotary_dim), core_grid=batch_grid,
+    strategy=ttnn.ShardStrategy.HEIGHT, orientation=ttnn.ShardOrientation.ROW_MAJOR,
+    use_height_and_width_as_shard_shape=True,
+)
+q_rot = ttnn.to_memory_config(q_rot, q_rot_shard)
+k_rot_shard = ttnn.create_sharded_memory_config(
+    shape=(ttnn.TILE_SIZE, rotary_dim), core_grid=batch_grid,
+    strategy=ttnn.ShardStrategy.HEIGHT, orientation=ttnn.ShardOrientation.ROW_MAJOR,
+    use_height_and_width_as_shard_shape=True,
+)
+k_rot = ttnn.to_memory_config(k_rot, k_rot_shard)
+
+# Shard cos/sin (already at rotary_dim)
+rope_shard_mem = ttnn.create_sharded_memory_config(
+    shape=(ttnn.TILE_SIZE, rotary_dim), core_grid=batch_grid,
+    strategy=ttnn.ShardStrategy.HEIGHT, orientation=ttnn.ShardOrientation.ROW_MAJOR,
+    use_height_and_width_as_shard_shape=True,
+)
+cos_ttnn = ttnn.to_memory_config(cos_ttnn, rope_shard_mem)
+sin_ttnn = ttnn.to_memory_config(sin_ttnn, rope_shard_mem)
+
+# Re-shard trans_mat to batch_grid
+trans_mat = ttnn.to_memory_config(self._decode_trans_mat, ttnn.DRAM_MEMORY_CONFIG)
+trans_shard = ttnn.create_sharded_memory_config(
+    shape=(ttnn.TILE_SIZE, ttnn.TILE_SIZE), core_grid=batch_grid,
+    strategy=ttnn.ShardStrategy.HEIGHT, orientation=ttnn.ShardOrientation.ROW_MAJOR,
+    use_height_and_width_as_shard_shape=True,
+)
+trans_mat = ttnn.to_memory_config(trans_mat, trans_shard)
+
+# Apply RoPE
+q_rot = ttnn.experimental.rotary_embedding_llama(q_rot, cos_ttnn, sin_ttnn, trans_mat, is_decode_mode=True)
+k_rot = ttnn.experimental.rotary_embedding_llama(k_rot, cos_ttnn, sin_ttnn, trans_mat, is_decode_mode=True)
+
+# Un-shard and concatenate
+q_rot = ttnn.to_memory_config(q_rot, ttnn.L1_MEMORY_CONFIG)
+k_rot = ttnn.to_memory_config(k_rot, ttnn.L1_MEMORY_CONFIG)
+query_states = ttnn.concat([q_rot, q_pass], dim=-1)
+key_states = ttnn.concat([k_rot, k_pass], dim=-1)
+```
+
+### 13.6 Recommendation
+
+**Use the identity-padding approach (Section 13.4, Steps 1-6).** It is cleaner, follows the
+standard TT-Transformers pattern, eliminates ~80 lines of fragile inline cos/sin conversion,
+and is less error-prone. The alternative (Section 13.5) is useful only as a quick hypothesis test.
+
+### 13.7 Additional Concern: Prefill Path
+
+The prefill path (line 2649-2655) uses `TTNNRotaryPositionEmbedding` which calls
+`ttnn.experimental.rotary_embedding` (NOT `rotary_embedding_llama`). This kernel expects
+**HF-format** cos/sin. The prefill path receives HF cos/sin directly from
+`BailingMoeV2RotaryEmbedding.forward()` via `position_embeddings`, so the prefill path
+should be CORRECT.
+
+However, if `BailingRotarySetup` is used for decode, the prefill path should continue to
+receive HF-format cos/sin from the model's own rotary embedding. The two paths use different
+cos/sin sources, which is fine and intentional.
+
+### 13.8 Summary of All Bugs in Current Decode Path
+
+| Bug | Severity | Description |
+|-----|----------|-------------|
+| A. Slicing HEIGHT_SHARDED tensors | CRITICAL | `_apply_partial_rope_decode` slices Q/K along dim=-1 while HEIGHT_SHARDED. Produces garbage. |
+| B. trans_mat shard grid mismatch | CRITICAL | trans_mat sharded on 1 core, Q/K/cos/sin on batch_size cores. Kernel requires same grid. |
+| C. Inline cos/sin conversion | Fragile | ~60 lines of host round-trip. Correct math, but unnecessary and slow. |
+
+### 13.9 Verification After Fix
+
+1. Run the existing test: `pytest models/experimental/tt_symbiote/tests/test_bailing_attention_accuracy.py -k decode`
+2. Run the end-to-end generation test and verify output is NOT "aukee" repeating
+3. Print Q/K values before and after RoPE to verify the pass-through dims (64-127) are unchanged
+4. Print cos/sin values at runtime to verify identity padding (cos[64:]=1.0, sin[64:]=0.0)
