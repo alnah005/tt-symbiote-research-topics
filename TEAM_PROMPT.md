@@ -64,15 +64,7 @@ cat /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics/research_
 > - "What changed in commit abc123 that broke GLM flash?"
 
 - **Cache HIT** — topic exists with `Status: Completed`: read the findings and use them in the plan. Do not re-add the topic.
-- **Cache MISS** — topic is absent OR has `Status: Pending`: proceed using best-effort knowledge. **Do not stall or wait.** Append the topic to `research_topics.md` with `Status: Pending` and push:
-
-### Step 4: Push Any New Topics (REQUIRED if cache miss)
-```bash
-cd /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics
-git add research_topics.md
-git commit -m "team/architect: cache miss — add topic <topic-name>"
-git push
-```
+- **Cache MISS** — topic is absent OR has `Status: Pending`: proceed using best-effort knowledge. **Do not stall or wait.** Note the missing topic and report it to the Team Lead — the Team Lead handles all pushes to the research-topics repo.
 
 ### Architect Prompt Template (Team Lead MUST include this)
 
@@ -107,21 +99,14 @@ After reading the cache, you MUST report in this format:
 Copy the **Findings** section into your analysis. Do NOT re-research completed questions.
 
 ### Step 5: For missing research questions (cache miss)
-Add new research questions and push (DO NOT ADD PLAN FILES or ADD RESEARCH QUESTIONS THAT HAVE BEEN ANSWERED BY YOU):
-```bash
-cd /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics
-# Edit research_topics.md to add new research question
-git add research_topics.md
-git commit -m "team/architect: cache miss — add topic <topic-name>"
-git push
-```
+Report the missing topic to the Team Lead (DO NOT ADD PLAN FILES or ADD RESEARCH QUESTIONS THAT HAVE BEEN ANSWERED BY YOU). The Team Lead handles all writes and pushes to the research-topics repo.
 
 ## VERIFICATION CHECKLIST (Must complete before proceeding)
 - [ ] Executed `git pull` and showed output
 - [ ] Executed `cat research_topics.md` and showed output
 - [ ] Listed all relevant research questions with their Status
 - [ ] Used findings from Completed topics
-- [ ] Added and pushed any missing topics
+- [ ] Reported any missing topics to the Team Lead
 
 **FAILURE TO SHOW COMMAND OUTPUTS = INVALID RESPONSE. START OVER.**
 ```
@@ -133,6 +118,7 @@ After receiving the Architect's response, the Team Lead MUST verify:
 2. The response shows the contents of `research_topics.md`
 3. The response includes the CACHE LOOKUP RESULTS table
 4. Completed topics' findings are incorporated
+5. Any missing topics are reported to the Team Lead (not pushed by the Architect)
 
 **If verification fails, reject the response and re-spawn the Architect.**
 
@@ -142,7 +128,7 @@ After receiving the Architect's response, the Team Lead MUST verify:
 - Adding pending topics allows the research instance to prioritize work
 - The cache is shared across all team sessions
 
-> **Important:** The Architect only **poses the question** — it does NOT attempt to answer or fill in findings. Leave `Findings: TBD` and `Status: Pending`. The research instance answers it asynchronously. Continue planning immediately after pushing.
+> **Important:** The Architect only **poses the question** — it does NOT attempt to answer or fill in findings. Leave `Findings: TBD` and `Status: Pending`. The research instance answers it asynchronously. Report missing topics to the Team Lead and continue planning immediately.
 
 ---
 

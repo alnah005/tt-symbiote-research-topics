@@ -252,6 +252,22 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ---
 
+## TTNNBailingMoEAttention Performance Optimization on T3K
+**Date:** 2026-03-26
+**Status:** Pending
+**Why Needed:** `TTNNBailingMoEAttention` is the attention layer for the Ling (BailingMoeV2) model on T3K and contains several performance-sensitive paths — fused QKV projection, paged SDPA decode, HEIGHT_SHARDED RoPE, and a host-roundtrip tensor replication step — whose combined latency contribution is not yet understood.
+**Questions:**
+- `TTNNBailingMoEAttention` uses a fused QKV projection (`TTNNLinearIColShardedWAllReduced`: 1 matmul + 1 all_reduce) for both prefill and decode, replacing 3 separate matmuls + 5 CCL ops — what are the actual latency savings of this fusion on T3K's 1×8 mesh, and is `num_links=1` in `_maybe_all_gather` optimal for the hidden size?
+- `_to_replicated` round-trips the all-gathered QKV tensor through host CPU (ConcatMeshToTensor → from_torch with ReplicateTensorToMesh) to satisfy paged-attention kernel topology requirements — what is the host-transfer overhead at decode batch=1, and is there a device-side alternative that avoids the host round-trip?
+- The decode path places Q, K, V into HEIGHT_SHARDED L1 before RoPE (`rope_shard_mem` with shape `(TILE_SIZE, head_dim)`) and then re-shards K/V again before `paged_update_on_device` — how many memory-config transitions occur per decode step, and which transition dominates overhead?
+- `paged_sdpa_decode` is invoked with `q_chunk_size=0, k_chunk_size=0` in `decode_program_config` — what does chunk size 0 mean for the paged SDPA kernel, and are these the correct values for the Ling model's GQA configuration (16 Q heads, 4 KV heads, head_dim=128)?
+- The SDPA compute kernel uses `HiFi4` math fidelity with `fp32_dest_acc_en=True` and `packer_l1_acc=True` — is HiFi4 with fp32 accumulation necessary for attention correctness on this model, or would HiFi2 with reduced accumulation improve throughput without measurable accuracy loss?
+- When `use_qk_norm=True`, Q and K are moved to L1, reshaped to 2D, normalized via `TTNNRMSNorm`, then reshaped back for each decode step — what is the latency of this QK norm path relative to the fused QKV matmul, and is the L1 move avoidable?
+- `partial_rotary_factor < 1.0` forces `TTNNRotaryPositionEmbedding` (non-distributed) instead of `TTNNDistributedRotaryPositionEmbedding` — what is the performance cost of non-distributed RoPE on T3K, and is there a way to use the distributed kernel with partial rotary without padding cos/sin to full head_dim?
+- What is the best way to profile the full `TTNNBailingMoEAttention` forward at op-level granularity on T3K to identify the single biggest decode bottleneck (Tracy, ttnn op timers, or another tool)?
+
+---
+
 ## TTNNMoE Performance Optimization on T3K
 **Date:** 2026-03-26
 **Status:** Completed
