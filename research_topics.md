@@ -254,7 +254,8 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ## TTNNBailingMoEAttention Performance Optimization on T3K
 **Date:** 2026-03-26
-**Status:** Pending
+**Status:** Completed
+**Guide:** `guides/ttnn_bailing_moe_attention_performance_optimization_on_t3k/`
 **Why Needed:** `TTNNBailingMoEAttention` is the attention layer for the Ling (BailingMoeV2) model on T3K and contains several performance-sensitive paths — fused QKV projection, paged SDPA decode, HEIGHT_SHARDED RoPE, and a host-roundtrip tensor replication step — whose combined latency contribution is not yet understood.
 **Questions:**
 - `TTNNBailingMoEAttention` uses a fused QKV projection (`TTNNLinearIColShardedWAllReduced`: 1 matmul + 1 all_reduce) for both prefill and decode, replacing 3 separate matmuls + 5 CCL ops — what are the actual latency savings of this fusion on T3K's 1×8 mesh, and is `num_links=1` in `_maybe_all_gather` optimal for the hidden size?
