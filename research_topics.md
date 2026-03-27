@@ -283,4 +283,11 @@ This file tracks research topics that the Architect needs to investigate for mak
 4. Are CCL operation parameters consistent across all call sites?
 
 **Findings:**
-Root cause: `TTNNLinearIColShardedWAllReduced.forward` (linear.py:219-229) `reduce_scatter_minimal_async` is missing `chunks_per_sync=10`, `num_workers_per_link=2`, `num_buffers_per_channel=2`, and `intermediate_memory_config=ttnn.DRAM_MEMORY_CONFIG`. These parameters are present in every other working reduce_scatter call (moe.py:1478, qwen_moe.py:922, linear.py:158). The default values cause deadlock on 8-device T3K ring. Fix: add the four missing parameters. See `PLAN_fix_ling_mini_hang.md` for full details. Secondary finding: `TTNNBailingMoEAttention._maybe_all_gather` (attention.py:2287) uses sync `ttnn.all_gather` but is dead code (never called). Should be cleaned up.
+**Phase 1 (APPLIED, did not fix hang):** `reduce_scatter_minimal_async` was missing `chunks_per_sync=10`, `num_workers_per_link=2`, `num_buffers_per_channel=2`, and `intermediate_memory_config=ttnn.DRAM_MEMORY_CONFIG`. These were added. Hang persists.
+
+**Phase 2 (deep investigation):** Exhaustive parameter-by-parameter comparison confirms ALL CCL calls now match the working MoE gold standard. The `all_gather_async` calls are also consistent. No sync CCL calls in execution path. The hang is most likely caused by:
+1. **Semaphore cycling race condition** -- TT_CCL has only 2 double-buffered semaphore sets, and a single transformer layer uses 4+ CCL ops that cycle through them. During prefill (long sequences), async ops may not complete before semaphore reuse.
+2. **Extra `memory_config`/`intermediate_memory_config` params** on linear.py reduce_scatter that MoE does not have (minor difference).
+3. **TTNNQwen3NextGatedAttention.forward reduce_scatter** (attention.py:2188) is missing ALL CCL parameters (not in Ling path but needs fixing).
+
+See `FINDINGS_ling_mini_t3k_hang_deep_investigation.md` for full analysis and revised 5-step fix plan.
