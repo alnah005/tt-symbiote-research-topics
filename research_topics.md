@@ -291,3 +291,19 @@ This file tracks research topics that the Architect needs to investigate for mak
 3. **TTNNQwen3NextGatedAttention.forward reduce_scatter** (attention.py:2188) is missing ALL CCL parameters (not in Ling path but needs fixing).
 
 See `FINDINGS_ling_mini_t3k_hang_deep_investigation.md` for full analysis and revised 5-step fix plan.
+
+---
+
+## Ling-mini-2.0 Speedup Analysis
+**Date:** 2026-03-27
+**Status:** Completed
+**Why Needed:** Need to identify performance bottlenecks and create a plan to speed up `test_ling_mini_2_0.py` while maintaining correct text generation.
+**Questions:**
+1. What is the current performance profile of the Ling-mini-2.0 test?
+2. Which phases (prefill, decode, weight prep) dominate wall time?
+3. Is traced execution being used effectively during generate()?
+4. What host-device round-trips exist and can they be eliminated?
+5. What optimizations from test_qwen3_5_35b_a3b.py or test_glm.py can be applied?
+
+**Findings:**
+See `PLAN_ling_2_0_speedup.md` for full analysis and implementation plan.
