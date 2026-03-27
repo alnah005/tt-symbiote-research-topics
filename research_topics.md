@@ -287,4 +287,22 @@ This file tracks research topics that the Architect needs to investigate for mak
 **Findings:**
 `guides/ttnn_moe_performance_optimization_on_t3k/`
 
+---
+
+## Deploying a TT Symbiote Model on tt-inference-server
+**Date:** 2026-03-27
+**Status:** Completed
+**Guide:** `guides/deploying_a_tt_symbiote_model_on_tt_inference_server/`
+**Why Needed:** Need to understand what is required to serve a TT Symbiote model through the tt-inference-server infrastructure, including the interface contracts, serving stack, and any integration work needed to make a tt-symbiote model a first-class citizen in that deployment pipeline.
+**Questions:**
+1. What is the high-level architecture of tt-inference-server — what serving framework does it use (vLLM, custom, other), and what is the entry point for adding a new model backend?
+2. What interface or protocol must a model implementation satisfy to be loaded by tt-inference-server (e.g. a specific Python class, method signatures, config schema)?
+3. How are model weights discovered and loaded — does tt-inference-server expect HuggingFace checkpoints, a custom format, or does it delegate to the model implementation?
+4. How does tt-inference-server handle tokenization — is it bundled, delegated to HuggingFace, or must the model provide its own tokenizer path?
+5. What changes, if any, are needed inside the TT Symbiote model code (e.g. forward signature, KV cache management, batch/sequence length constraints) to match what tt-inference-server expects?
+6. How is hardware initialization handled — does tt-inference-server own device setup, or must the model bring its own mesh/device context?
+7. What configuration files or environment variables control model selection, device mapping, and serving parameters (port, max batch, max sequence length)?
+8. Are there existing examples of non-HuggingFace or custom TTNN models already integrated into tt-inference-server that can serve as a reference implementation?
+
+---
 
