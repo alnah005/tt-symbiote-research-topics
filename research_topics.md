@@ -270,4 +270,17 @@ This file tracks research topics that the Architect needs to investigate for mak
 **Findings:**
 `guides/ttnn_moe_performance_optimization_on_t3k/`
 
+---
 
+## Ling-mini-2.0 T3K Hang Root Cause (reduce_scatter missing parameters)
+**Date:** 2026-03-27
+**Status:** Completed
+**Why Needed:** `test_ling_mini_2_0.py` hangs on T3K despite previous fix replacing `ttnn.all_reduce` with composite `reduce_scatter_minimal_async` + `all_gather_async` in `TTNNLinearIColShardedWAllReduced`.
+**Questions:**
+1. Are there remaining `ttnn.all_reduce` or sync `ttnn.all_gather` calls in the Ling-mini-2.0 execution path?
+2. What CCL operations could hang on 8-device T3K?
+3. Is `ccl_manager` properly initialized for all modules?
+4. Are CCL operation parameters consistent across all call sites?
+
+**Findings:**
+Root cause: `TTNNLinearIColShardedWAllReduced.forward` (linear.py:219-229) `reduce_scatter_minimal_async` is missing `chunks_per_sync=10`, `num_workers_per_link=2`, `num_buffers_per_channel=2`, and `intermediate_memory_config=ttnn.DRAM_MEMORY_CONFIG`. These parameters are present in every other working reduce_scatter call (moe.py:1478, qwen_moe.py:922, linear.py:158). The default values cause deadlock on 8-device T3K ring. Fix: add the four missing parameters. See `PLAN_fix_ling_mini_hang.md` for full details. Secondary finding: `TTNNBailingMoEAttention._maybe_all_gather` (attention.py:2287) uses sync `ttnn.all_gather` but is dead code (never called). Should be cleaned up.
