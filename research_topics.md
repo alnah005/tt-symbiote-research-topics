@@ -286,40 +286,4 @@ This file tracks research topics that the Architect needs to investigate for mak
 **Findings:**
 `guides/ttnn_moe_performance_optimization_on_t3k/`
 
----
 
-## Ling-mini-2.0 T3K Hang Root Cause (reduce_scatter missing parameters)
-**Date:** 2026-03-27
-**Status:** Completed
-**Why Needed:** `test_ling_mini_2_0.py` hangs on T3K despite previous fix replacing `ttnn.all_reduce` with composite `reduce_scatter_minimal_async` + `all_gather_async` in `TTNNLinearIColShardedWAllReduced`.
-**Questions:**
-1. Are there remaining `ttnn.all_reduce` or sync `ttnn.all_gather` calls in the Ling-mini-2.0 execution path?
-2. What CCL operations could hang on 8-device T3K?
-3. Is `ccl_manager` properly initialized for all modules?
-4. Are CCL operation parameters consistent across all call sites?
-
-**Findings:**
-**Phase 1 (APPLIED, did not fix hang):** `reduce_scatter_minimal_async` was missing `chunks_per_sync=10`, `num_workers_per_link=2`, `num_buffers_per_channel=2`, and `intermediate_memory_config=ttnn.DRAM_MEMORY_CONFIG`. These were added. Hang persists.
-
-**Phase 2 (deep investigation):** Exhaustive parameter-by-parameter comparison confirms ALL CCL calls now match the working MoE gold standard. The `all_gather_async` calls are also consistent. No sync CCL calls in execution path. The hang is most likely caused by:
-1. **Semaphore cycling race condition** -- TT_CCL has only 2 double-buffered semaphore sets, and a single transformer layer uses 4+ CCL ops that cycle through them. During prefill (long sequences), async ops may not complete before semaphore reuse.
-2. **Extra `memory_config`/`intermediate_memory_config` params** on linear.py reduce_scatter that MoE does not have (minor difference).
-3. **TTNNQwen3NextGatedAttention.forward reduce_scatter** (attention.py:2188) is missing ALL CCL parameters (not in Ling path but needs fixing).
-
-See `FINDINGS_ling_mini_t3k_hang_deep_investigation.md` for full analysis and revised 5-step fix plan.
-
----
-
-## Ling-mini-2.0 Speedup Analysis
-**Date:** 2026-03-27
-**Status:** Completed
-**Why Needed:** Need to identify performance bottlenecks and create a plan to speed up `test_ling_mini_2_0.py` while maintaining correct text generation.
-**Questions:**
-1. What is the current performance profile of the Ling-mini-2.0 test?
-2. Which phases (prefill, decode, weight prep) dominate wall time?
-3. Is traced execution being used effectively during generate()?
-4. What host-device round-trips exist and can they be eliminated?
-5. What optimizations from test_qwen3_5_35b_a3b.py or test_glm.py can be applied?
-
-**Findings:**
-See `PLAN_ling_2_0_speedup.md` for full analysis and implementation plan.
