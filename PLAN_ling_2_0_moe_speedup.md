@@ -1,6 +1,6 @@
 # Plan: Speed Up MoE Module for Ling-mini-2.0 Decode
 
-**Date:** 2026-03-26
+**Date:** 2026-03-27 (updated)
 **Model:** Ling-mini-2.0 (inclusionAI/Ling-mini-2.0)
 **Module:** `TTNNBailingMoE` (subclass of `TTNNMoE`) in `models/experimental/tt_symbiote/modules/moe.py`
 **Test:** `pytest models/experimental/tt_symbiote/tests/test_ling_mini_2_0.py --timeout=0`
@@ -9,356 +9,36 @@
 
 ---
 
-## 1. Problem Description
+## 1. Implementation Status Summary
 
-The MoE (Mixture of Experts) module is the dominant bottleneck in Ling-mini-2.0 decode. Each of the 19 MoE layers (layers 1-19; layer 0 is dense MLP) executes the full `TTNNMoE.forward` pipeline per decode token:
+| Step | Description | Status | Notes |
+|------|-------------|--------|-------|
+| 1.1 | Simplify weight application | **DONE** | Broadcast multiply replaced 7-op repeat pattern |
+| 1.2 | Eliminate pre-gate typecast | **DONE** | `ttnn.linear` with `dtype=ttnn.float32` output |
+| 1.3 | Reduce layout conversions | **PARTIAL** | Some eliminated; 6 remain (unavoidable for dispatch/sparse_matmul) |
+| 2.1 | Shared expert overlap | **DONE** | `shared_experts(residual)` called before `experts.forward()` |
+| 3.1 | Router optimization | **NO CHANGE NEEDED** | Single-pass topk path correct for n_group=1, topk_group=1 |
+| 3.2 | Remove router CPU sort | **NO CHANGE NEEDED** | CPU sort only in GLM-4 path, not Bailing path |
+| 4.1 | Trace capture for MoE | **REMAINING** | High impact, high complexity |
+| 5.1 | Sweep sparse_matmul config | **REMAINING** | Low risk, low-medium impact |
+| 5.2 | LoFi math fidelity | **REMAINING** | Low risk, medium impact |
+| 6.1 | CCL parameter sweep | **REMAINING** | Low risk, low impact |
 
-1. `all_gather_async` (Linear topology, 1 link) -- revert tensor parallelism
-2. Float32 gate matmul (HiFi4) -- compute router logits
-3. `TTNNMoERouterDecode.forward` -- 3-pass topk routing with CPU fallback sort
-4. `TTNNExperts.forward` -- all_to_all_dispatch, 3x sparse_matmul, silu, all_to_all_combine, weight application
-5. `reduce_scatter_minimal_async` (Ring topology) -- reduce routed output
-6. `TTNNGlm4MoeMLP` -- shared expert computation (3 matmuls + silu)
-7. `ttnn.add` -- combine routed + shared expert outputs
-
-With 19 layers, MoE executes 19 times per decode token.
-
----
-
-## 2. Current Architecture Analysis
-
-### Ling-mini-2.0 MoE Configuration
-
-| Parameter | Value |
-|-----------|-------|
-| `hidden_size` | 3072 |
-| `moe_intermediate_size` | 1024 |
-| `n_routed_experts` | 64 |
-| `num_experts_per_tok` | 6 |
-| `n_group` | 1 |
-| `topk_group` | 1 |
-| `n_shared_experts` | 1 |
-| `routed_scaling_factor` | 1.0 |
-| `norm_topk_prob` | True |
-| Experts per device (T3K) | 8 (64/8) |
-
-### Key Observation: `n_group=1, topk_group=1`
-
-Since `n_group <= topk_group`, the router takes the **single-pass topk** branch (moe.py L927-932), NOT the 3-pass centering branch. However, the current single-pass path still:
-- Typecasts f32 -> bf16 for topk
-- Then gathers f32 scores for weights
-- Then normalizes and scales in f32
-- Then performs a **CPU fallback sort** (moe.py L806-813) via `_to_torch_any` + `torch.sort`
-
-### TTNNMoE.forward Data Flow (moe.py L1390-1472)
-
-```
-Input x: (1, 1, 1, hidden_size/8=384) per device [sharded on last dim]
-    |
-    v
-all_gather_async -> (1, 1, 1, 3072) [replicated]
-    |
-    v
-typecast bf16->f32 -> linear(x_f32, gate_weight) -> (1, 64) router logits [f32, HiFi4]
-    |
-    v
-TTNNMoERouterDecode.forward -> topk_indices (1,6), topk_weights (1,6)
-    |--- sigmoid (f32)
-    |--- add bias (f32)
-    |--- typecast f32->bf16
-    |--- topk(k=6) [bf16]
-    |--- gather raw f32 scores
-    |--- normalize + scale [f32]
-    |--- CPU FALLBACK: _to_torch_any + torch.sort + ttnn.from_torch  <--- BOTTLENECK
-    |
-    v
-TTNNExperts.forward:
-    |--- typecast + pad to SPARSITY_BLOCK_SIZE=32
-    |--- to_layout TILE->ROW_MAJOR (x and indices)
-    |--- reshape
-    |--- all_to_all_dispatch
-    |--- reshape + to_layout ROW_MAJOR->TILE
-    |--- moe_expert_token_remap (sparsity generation)
-    |--- 3x sparse_matmul (w1, w3, w2) + silu + mul
-    |--- permute + reshape
-    |--- to_layout TILE->ROW_MAJOR
-    |--- all_to_all_combine
-    |--- reshape + to_layout ROW_MAJOR->TILE
-    |--- WEIGHT APPLICATION: unsqueeze + repeat(hidden_size,1,1,1) + permute + to_layout + mul + sum  <--- BOTTLENECK
-    |--- slice (remove padding)
-    |
-    v
-reduce_scatter_minimal_async -> (1, 1, 1, 384) [sharded]
-    |
-    v
-shared_experts(residual): gate_proj(silu) * up_proj -> down_proj
-    |
-    v
-ttnn.add(routed_output, shared_output) -> squeeze -> output
-```
+**Completed optimizations saved an estimated 0.9-2.1ms/token across 19 MoE layers.**
 
 ---
 
-## 3. Root Causes of Slowness
+## 2. Remaining Optimizations (Prioritized)
 
-### 3.1 CPU Fallback Sort in Router (HIGH IMPACT)
+### Priority 1: Trace Capture for TTNNBailingMoE (HIGH IMPACT, HIGH COMPLEXITY)
 
-**Location:** `TTNNGlm4MoeRouteTokenToExperts.forward`, moe.py L806-813
+**Why:** At batch=1 decode, host dispatch overhead dominates device compute time. The MoE forward contains ~40-50 TTNN ops per layer. At ~5-10us host dispatch per op, that is 200-500us per layer, or 3.8-9.5ms across 19 layers. Trace capture eliminates this entirely.
 
-```python
-topk_idx_t = _to_torch_any(topk_expert_idx).to(torch.int64)
-topk_w_t = _to_torch_any(topk_weights).to(torch.float32)
-sorted_w, sorted_pos = torch.sort(topk_w_t, dim=1, descending=True)
-sorted_idx = torch.gather(topk_idx_t, 1, sorted_pos)
-topk_expert_idx = ttnn.from_torch(sorted_idx.to(torch.int32))
-topk_weights = ttnn.from_torch(sorted_w.to(torch.bfloat16))
-```
+**File:** `modules/moe.py`
 
-This triggers:
-- Device-to-host transfer (`_to_torch_any` calls `ttnn.to_torch`)
-- CPU sort on tiny tensor (1x6)
-- Host-to-device transfer (`ttnn.from_torch`)
+**What to change:**
 
-Each round-trip forces a full device synchronization. This is executed per MoE layer (19 times per token).
-
-**Note:** `TTNNMoERouterDecode.forward` (moe.py L891-1002) does NOT have this CPU sort -- it returns topk results directly. But `TTNNGlm4MoeRouteTokenToExperts.forward` (moe.py L719-814) does. The `TTNNBailingMoE` uses `TTNNMoERouterDecode` (see moe.py L1506), so the CPU sort at L806-813 is NOT in the active path. However, `TTNNMoERouterDecode.forward` at L891-1002 still has correctness concerns we should verify.
-
-**CORRECTION after re-reading:** `TTNNBailingMoE.from_torch` (L1506) creates `TTNNMoERouterDecode` and stores it as `module.route_tokens_to_experts`. The parent `TTNNMoE.forward` (L1442) calls `self.route_tokens_to_experts(router_logits)`. So the ACTIVE router is `TTNNMoERouterDecode`, NOT `TTNNGlm4MoeRouteTokenToExperts`. `TTNNMoERouterDecode.forward` does NOT have the CPU sort fallback. This means the CPU sort is NOT a current bottleneck.
-
-### 3.2 Expensive Weight Application Pattern (MEDIUM-HIGH IMPACT)
-
-**Location:** `TTNNExperts.forward`, moe.py L1299-1313
-
-```python
-topk_experts_weights_rm = ttnn.to_layout(topk_experts_weights, ttnn.ROW_MAJOR_LAYOUT)
-topk_experts_weights_rm = ttnn.unsqueeze(topk_experts_weights_rm, 0)
-topk_experts_weights_rm = ttnn.unsqueeze(topk_experts_weights_rm, 0)
-topk_experts_weights_rm = ttnn.repeat(topk_experts_weights_rm, repeat_dims=(self.hidden_size, 1, 1, 1))
-topk_experts_weights_rm = ttnn.permute(topk_experts_weights_rm, (3, 1, 2, 0))
-topk_experts_weights_tile = ttnn.to_layout(topk_experts_weights_rm, ttnn.TILE_LAYOUT)
-weighted_output = ttnn.mul(combined_output, topk_experts_weights_tile)
-final_output = ttnn.sum(weighted_output, dim=0, keepdim=True)
-```
-
-This executes 7 separate ops (to_layout, 2x unsqueeze, repeat, permute, to_layout, mul) plus a sum. Each op has host dispatch overhead. The `repeat(hidden_size, 1, 1, 1)` with hidden_size=3072 is particularly expensive -- it replicates a (1,1,1,6) tensor to (3072,1,1,6), then permutes to (6,1,1,3072). This is wasteful for a broadcast multiply.
-
-**Alternative:** Reshape weights to (6, 1, 1, 1) and use broadcast multiply with combined_output (6, 1, 1, 3072). TTNN should broadcast the last dimension automatically. Then sum over dim=0.
-
-### 3.3 Sequential Shared Expert Computation (MEDIUM IMPACT)
-
-**Location:** `TTNNMoE.forward`, moe.py L1469-1470
-
-```python
-shared_output = self.shared_experts(residual)
-output = ttnn.add(routed_output, shared_output.to_ttnn)
-```
-
-The shared expert MLP runs AFTER the entire routed expert pipeline completes (after reduce_scatter). The shared expert computation is independent of the routed experts and depends only on `residual` (the input before all_gather). It could overlap with the routed expert pipeline.
-
-### 3.4 Layout Conversions (MEDIUM IMPACT)
-
-Multiple TILE_LAYOUT <-> ROW_MAJOR_LAYOUT conversions in TTNNExperts.forward:
-- L1193: x TILE -> ROW_MAJOR (for all_to_all_dispatch)
-- L1197: topk_experts_indices TILE -> ROW_MAJOR
-- L1212: post_dispatch ROW_MAJOR -> TILE (for sparse_matmul)
-- L1279: expert_output TILE -> ROW_MAJOR (for all_to_all_combine)
-- L1296: combined_output ROW_MAJOR -> TILE
-- L1299: topk_experts_weights TILE -> ROW_MAJOR
-- L1304: topk_experts_weights_rm ROW_MAJOR -> TILE
-
-That is 7 layout conversions per TTNNExperts.forward call, 19 per token.
-
-### 3.5 Unnecessary Typecast in Gate (LOW IMPACT)
-
-**Location:** `TTNNMoE.forward`, moe.py L1419-1422
-
-```python
-if x.dtype != ttnn.float32:
-    x_f32 = ttnn.typecast(x, ttnn.float32)
-```
-
-The all_gather output is bf16. The gate matmul uses HiFi4 with fp32_dest_acc_en=True. This means the matmul accumulates in f32 internally even with bf16 input. The typecast to f32 BEFORE the matmul adds overhead. The matmul could take bf16 input directly and produce f32 output with `dtype=ttnn.float32` output parameter, eliminating the pre-matmul typecast.
-
-### 3.6 Wrapper/Host Overhead (HIGH IMPACT -- addressed separately)
-
-Per the wrapper overhead analysis (PLAN_wrapper_optimizations.md), 50% of decode latency is wrapper/Python overhead. This is addressed by a separate plan (P1-P5). The MoE-specific optimizations in THIS plan are additive to those wrapper optimizations.
-
-### 3.7 No Trace Capture for MoE (MEDIUM-HIGH IMPACT)
-
-The entire MoE forward pass runs without trace capture. Each TTNN op requires a host dispatch. At batch=1 decode, host dispatch overhead likely dominates device compute time. Trace capture would eliminate host dispatch overhead for the steady-state decode path.
-
----
-
-## 4. Step-by-Step Optimization Plan
-
-### Phase 1: Low-Hanging Fruit (No Architectural Changes)
-
-#### Step 1.1: Simplify Weight Application in TTNNExperts.forward
-
-**File:** `modules/moe.py`, `TTNNExperts.forward`, L1299-1313
-
-**Current:** 7-op sequence: to_layout -> unsqueeze -> unsqueeze -> repeat(3072,1,1,1) -> permute -> to_layout -> mul, then sum.
-
-**Proposed:** Replace with broadcast multiply + sum:
-
-```python
-# topk_experts_weights shape: (num_tokens, num_experts_per_tok)
-# combined_output shape: (num_experts_per_tok, 1, num_tokens, hidden_size)
-
-# Reshape weights for broadcasting: (num_experts_per_tok, 1, num_tokens, 1)
-w = ttnn.reshape(topk_experts_weights, ttnn.Shape((1, 1, topk_experts_weights.shape[0], topk_experts_weights.shape[1])))
-w = ttnn.permute(w, (3, 1, 2, 0))  # (num_experts_per_tok, 1, num_tokens, 1)
-if w.layout != ttnn.TILE_LAYOUT:
-    w = ttnn.to_layout(w, ttnn.TILE_LAYOUT)
-
-# Broadcast multiply: (num_experts_per_tok, 1, num_tokens, hidden_size)
-weighted_output = ttnn.mul(combined_output, w)
-
-# Sum over experts dimension
-final_output = ttnn.sum(weighted_output, dim=0, keepdim=True)
-```
-
-This replaces 7 ops with 3 ops (reshape, permute, to_layout) + mul + sum. The key savings come from eliminating `repeat(3072, 1, 1, 1)` which copies 3072x more data than needed.
-
-**Expected Savings:** 15-40us per layer x 19 layers = 0.3-0.8ms/token
-**Risk:** Low. Pure data format change; same mathematical result.
-**Test:** Compare output tensor values before/after with assert_allclose.
-
-#### Step 1.2: Eliminate Pre-Gate Typecast to f32
-
-**File:** `modules/moe.py`, `TTNNMoE.forward`, L1419-1435
-
-**Current:**
-```python
-if x.dtype != ttnn.float32:
-    x_f32 = ttnn.typecast(x, ttnn.float32)
-router_logits = ttnn.linear(x_f32, self._gate_weight_tt, ...)
-```
-
-**Proposed:** Keep x as bf16, let the linear op handle f32 accumulation internally:
-```python
-router_logits = ttnn.linear(
-    x,  # bf16 input
-    self._gate_weight_tt,  # bf16 weight
-    memory_config=ttnn.DRAM_MEMORY_CONFIG,
-    dtype=ttnn.float32,  # f32 output
-    compute_kernel_config=ttnn.WormholeComputeKernelConfig(
-        math_fidelity=ttnn.MathFidelity.HiFi4,
-        math_approx_mode=False,
-        fp32_dest_acc_en=True,
-        packer_l1_acc=True,
-    ),
-)
-```
-
-**Expected Savings:** Small (5-15us per layer, ~0.1-0.3ms/token total). The typecast itself is cheap but every eliminated op reduces host dispatch count.
-**Risk:** Low. The linear op with fp32_dest_acc_en already accumulates in f32. Output dtype parameter controls output format. Verify `ttnn.linear` supports `dtype` output parameter; if not, keep the current approach.
-**Test:** Compare router_logits values before/after.
-
-#### Step 1.3: Reduce Layout Conversions in TTNNExperts
-
-**File:** `modules/moe.py`, `TTNNExperts.forward`
-
-Some layout conversions may be avoidable if we keep data in ROW_MAJOR throughout the dispatch/combine pipeline and only convert to TILE for sparse_matmul.
-
-**Current flow:** TILE -> ROW_MAJOR (dispatch) -> TILE (sparse_matmul) -> ROW_MAJOR (combine) -> TILE (weight app)
-
-The conversions at L1296 (combined_output to TILE) and L1299/1304 (weights to ROW_MAJOR then TILE) can potentially be eliminated if weight application is done in ROW_MAJOR using elementwise ops.
-
-**Expected Savings:** 2-6us per conversion x 2-3 eliminated x 19 layers = 0.1-0.3ms/token
-**Risk:** Low. Layout is a data format concern, not a correctness concern.
-**Test:** Same output values.
-
-### Phase 2: Shared Expert Overlap (Moderate Complexity)
-
-#### Step 2.1: Move Shared Expert Computation Before Reduce-Scatter
-
-**File:** `modules/moe.py`, `TTNNMoE.forward`, L1404-1471
-
-**Current order:**
-```
-1. all_gather(x)
-2. gate + router
-3. experts.forward(x, indices, weights)  -- includes dispatch, compute, combine
-4. reduce_scatter(routed_output)
-5. shared_experts(residual)              -- SEQUENTIAL, after reduce_scatter
-6. add(routed, shared)
-```
-
-**Proposed order:**
-```
-1. all_gather(x)
-2. gate + router
-3. shared_experts(residual)              -- START EARLY (uses residual = original x)
-4. experts.forward(x, indices, weights)
-5. reduce_scatter(routed_output)
-6. add(routed, shared)
-```
-
-The shared expert computation depends on `residual` (the input before all_gather), which is available immediately. By moving it before or alongside the routed expert pipeline, the shared expert matmuls can overlap with routed expert CCL operations (all_to_all_dispatch, all_to_all_combine) through TTNN's async dispatch.
-
-**Key insight:** The shared experts operate on `residual` which has shape `(1, 1, 1, 384)` (already sharded). There is no dependency on the routed expert output. The only constraint is that `shared_output` and `routed_output` must both be ready before the final `ttnn.add`.
-
-**Caveat:** Async overlap only works if the shared expert ops run on different cores or use different NOC channels than the CCL ops. On T3K, this is plausible since CCL ops use the NOC while matmuls use Tensix compute cores.
-
-**Expected Savings:** 0.5-1ms/token if shared expert MLP (~3 matmuls) overlaps with routed expert all_to_all + sparse_matmul.
-**Risk:** Medium. Async overlap is not guaranteed -- depends on TTNN scheduler. If no overlap occurs, there is zero savings but also zero regression.
-**Test:** Same output values. Timing comparison with/without reordering.
-
-### Phase 3: Router Optimization (Moderate Complexity)
-
-#### Step 3.1: Eliminate Router f32 Typecast Chain
-
-**File:** `modules/moe.py`, `TTNNMoERouterDecode.forward`, L891-1002
-
-**Current (n_group <= topk_group path, L927-932):**
-```python
-scores_bf16 = ttnn.typecast(scores_with_bias_f32, ttnn.bfloat16)
-ttnn.deallocate(scores_with_bias_f32)
-_, topk_expert_idx = ttnn.topk(scores_bf16, k=top_k, dim=3, largest=True, sorted=True)
-ttnn.deallocate(scores_bf16)
-```
-
-Then later:
-```python
-topk_weights = ttnn.gather(scores_f32, dim=3, index=topk_expert_idx)  # gather from f32 scores
-denom = ttnn.sum(topk_weights, dim=3, keepdim=True)
-topk_weights = ttnn.div(topk_weights, denom)
-```
-
-The f32 -> bf16 typecast before topk is necessary because ttnn.topk only supports bf16. However, the subsequent gather, sum, and div all happen in f32. The chain is:
-- sigmoid(logits) in f32
-- add bias in f32
-- typecast to bf16 for topk
-- topk in bf16 -> indices
-- gather from f32 scores using indices
-- normalize in f32
-- scale in f32
-
-This is correct and cannot easily be simplified further without f32 topk support. However, for Ling-mini-2.0 with only 64 experts (not 256), the precision risk from bf16 topk is lower. We could consider eliminating the f32 path entirely and doing everything in bf16, but this is a quality/speed tradeoff that needs validation.
-
-**Alternative optimization:** The gate matmul (Step 1.2) already produces f32 logits. If we skip the sigmoid+bias in f32 and instead do sigmoid in bf16, we save the typecast. But sigmoid precision in bf16 near 0.5 is poor. Keep f32 sigmoid.
-
-**Expected Savings:** Minimal for this step alone. The real savings come from trace capture (Phase 4).
-**Risk:** N/A if no change made.
-
-#### Step 3.2: Consider Removing Router Sort (if present in active path)
-
-After re-analysis, `TTNNMoERouterDecode` (the active router for TTNNBailingMoE) does NOT have the CPU sort fallback. The CPU sort is only in `TTNNGlm4MoeRouteTokenToExperts` (L806-813), which is used by `TTNNGlm4MoeMoE` (the GLM-4 path), not by `TTNNBailingMoE`.
-
-**Action:** No change needed for Ling-mini-2.0. The `ttnn.topk` with `sorted=True` already returns sorted indices.
-
-### Phase 4: Trace Capture (High Impact, Higher Complexity)
-
-#### Step 4.1: Enable Trace Capture for TTNNBailingMoE
-
-**File:** `modules/moe.py`, `TTNNBailingMoE` class definition
-
-**Current:** `TTNNBailingMoE` is not decorated with `@trace_enabled`. The `TTNNMoE.forward` method has a `@disable_trace` decorator on `TTNNGlm4MoeExpertLayers.forward` (L532) but TTNNMoE.forward and TTNNExperts.forward do not.
-
-Actually, looking more carefully: TTNNMoE.forward at L1389 is decorated with `@run_on_devices(DeviceArch.T3K)` but NOT `@disable_trace`. And TTNNExperts.forward at L1137 also has `@run_on_devices(DeviceArch.T3K)` but not `@disable_trace`.
-
-**Proposed:** Add `@trace_enabled` decorator to `TTNNBailingMoE`:
+1. Add `@trace_enabled` decorator to `TTNNBailingMoE`:
 
 ```python
 from models.experimental.tt_symbiote.core.run_config import trace_enabled
@@ -368,142 +48,252 @@ class TTNNBailingMoE(TTNNMoE):
     ...
 ```
 
-Then in the test, use `TracedRun` mode:
+2. In the test, enable traced execution mode:
+
 ```python
 from models.experimental.tt_symbiote.core.run_config import set_run_mode, TracedRun
 set_run_mode("TRACED")
 TracedRun.configure(device=mesh_device)
 ```
 
-**Challenge:** MoE forward has dynamic control flow:
-- `if topk_experts_indices.dtype != ttnn.uint16` (L1161) -- data-dependent but constant after first call
-- `if num_tokens % SPARSITY_BLOCK_SIZE != 0` (L1172) -- shape-dependent, constant for fixed batch size
-- `if pad_amount > 0` (L1316) -- same as above
-- `if T == 1` (L910, L986 in router) -- constant for decode
+**Challenges and mitigations:**
 
-For decode with batch=1, all these branches are deterministic after the first call. Trace capture should work if the first call establishes the branch directions and subsequent calls follow the same path.
+- **Dynamic control flow:** All branches in `TTNNExperts.forward` are shape-dependent or dtype-dependent, not data-dependent. For fixed batch=1 decode, branches are deterministic after the first call. Trace capture should work.
+  - `topk_experts_indices.dtype != ttnn.uint16` (L1161) -- constant after first call
+  - `num_tokens % SPARSITY_BLOCK_SIZE != 0` (L1172) -- constant for fixed batch
+  - `pad_amount > 0` (L1312) -- constant for fixed batch
+  - `T == 1` in router (L910, L986) -- constant for decode
 
-**Key risk:** The trace captures a fixed sequence of TTNN ops. If any branch changes between trace capture and replay (e.g., different padding due to different batch size), the trace will produce incorrect results. For fixed batch=1 decode, this should not occur.
+- **Dynamic routing metadata:** `all_to_all_dispatch` produces `all_to_all_dispatch_metadata` that varies with expert selection each token. This metadata is consumed by `all_to_all_combine` and `moe_expert_token_remap`. **This is the key risk.** If these ops store metadata in trace-captured command buffers, replay will use stale metadata.
 
-**Additional risk:** `TTNNExperts.forward` creates `all_to_all_dispatch_metadata` dynamically. If this metadata varies between calls (due to different expert selections), trace replay may fail. Need to verify that `all_to_all_dispatch` and `all_to_all_combine` are trace-compatible.
+  **Mitigation:** Check whether `all_to_all_dispatch`, `all_to_all_combine`, and `moe_expert_token_remap` are trace-compatible. If not, the trace boundary must be split:
+  - Trace A: all_gather -> gate linear -> router (deterministic ops)
+  - Non-traced: all_to_all_dispatch (produces dynamic metadata)
+  - Trace B: sparse_matmul pipeline (deterministic given fixed shapes)
+  - Non-traced: all_to_all_combine (consumes dynamic metadata)
+  - Trace C: weight application -> reduce_scatter -> add shared
 
-**Expected Savings:** 2-3ms/token. Host dispatch overhead for the ~50+ TTNN ops in TTNNMoE.forward is eliminated.
-**Risk:** High. Trace capture for MoE with dynamic routing metadata is complex. May require changes to all_to_all_dispatch/combine to be trace-compatible.
+  This partial trace approach still eliminates dispatch overhead for the majority of ops.
+
+- **Shared expert overlap:** With trace capture, the shared expert call at L1438 may no longer overlap with routed experts since trace replays ops in a fixed order. Verify that the shared expert call is included in the trace and that async dispatch semantics are preserved within the trace.
+
+**Expected savings:** 2-5ms/token (eliminates host dispatch for 40-50 ops x 19 layers)
+**Risk:** High. Requires verification that all_to_all ops are trace-compatible.
 **Test:** Run 128 tokens, verify output matches non-traced output exactly.
 
-#### Step 4.2: Trace Capture for Full Decoder Layer (requires PLAN_wrapper_optimizations P1)
+---
 
-If `TTNNBailingMoEDecoderLayer` is implemented (from wrapper optimizations P1), the entire decoder layer (attention + MoE + residuals + norms) can be trace-captured as a single unit. This eliminates host dispatch overhead for ALL ops in the layer, not just MoE.
+### Priority 2: Sweep sparse_matmul Program Config (LOW RISK, LOW-MEDIUM IMPACT)
 
-**Depends on:** PLAN_wrapper_optimizations P1 (TTNNBailingMoEDecoderLayer).
+**Why:** The current `in0_block_w=min(4, hidden_tiles)` and `per_core_M=1` were chosen as safe defaults, not profiled for Ling-mini-2.0's specific dimensions. Different block widths change L1 usage, data reuse, and compute efficiency.
 
-### Phase 5: Expert Compute Tuning (Low-Medium Impact)
+**File:** `modules/moe.py`, lines 1118-1129
 
-#### Step 5.1: Sweep sparse_matmul Program Config
-
-**File:** `modules/moe.py`, `TTNNExperts.move_weights_to_device_impl`, L1118-1129
-
-**Current config:**
-```python
-in0_block_w = min(4, hidden_tiles)  # hidden_tiles = 3072/32 = 96 -> in0_block_w = 4
-per_core_M = 1
+**Current config (Ling-mini-2.0 specific):**
+```
+Gate/Up: (32, 3072) x (3072, 1024) -> hidden_tiles=96, in0_block_w=4
+Down:    (32, 1024) x (1024, 3072) -> hidden_tiles=32, in0_block_w=4
 ```
 
-For Ling-mini-2.0:
-- Gate/up projections: (32, 3072) x (3072, 1024) -- hidden_tiles=96, intermediate_tiles=32
-- Down projection: (32, 1024) x (1024, 3072) -- hidden_tiles=32, intermediate_tiles=96
+**Sweep grid:**
+```python
+# Gate/Up projections (in_features=3072, out_features=1024)
+gate_up_configs = [
+    {"in0_block_w": 2, "per_core_M": 1},
+    {"in0_block_w": 4, "per_core_M": 1},  # current
+    {"in0_block_w": 8, "per_core_M": 1},
+    {"in0_block_w": 16, "per_core_M": 1},
+    {"in0_block_w": 4, "per_core_M": 2},
+]
+
+# Down projection (in_features=1024, out_features=3072)
+down_configs = [
+    {"in0_block_w": 2, "per_core_M": 1},
+    {"in0_block_w": 4, "per_core_M": 1},  # current
+    {"in0_block_w": 8, "per_core_M": 1},
+    {"in0_block_w": 16, "per_core_M": 1},
+    {"in0_block_w": 4, "per_core_M": 2},
+]
+```
+
+**How to implement:** Parameterize `_gate_up_program_config` and `_down_program_config` in `TTNNExperts.move_weights_to_device_impl` (L1118-1129). Run the test with each config and measure per-token decode latency from the CSV output. Select the config with lowest latency.
+
+**Expected savings:** 0.1-0.5ms/token (10-30% on sparse_matmul time x 3 matmuls x 19 layers)
+**Risk:** Low. Program config affects performance only; does not change numerical results.
+**Test:** Compare output tensors with assert_allclose for each config.
+
+---
+
+### Priority 3: Evaluate LoFi Math Fidelity for Expert Matmuls (LOW RISK, MEDIUM IMPACT)
+
+**Why:** Expert matmuls currently use `HiFi2` (L1130-1135). LoFi uses approximate multiply-accumulate which is faster but less precise. With 64 experts and top-6 routing, individual expert precision may matter less than routing precision (which uses HiFi4 and must not be changed).
+
+**File:** `modules/moe.py`, lines 1130-1135
+
+**Current:**
+```python
+self._expert_compute_cfg = ttnn.WormholeComputeKernelConfig(
+    math_fidelity=ttnn.MathFidelity.HiFi2,
+    math_approx_mode=False,
+    fp32_dest_acc_en=True,
+    packer_l1_acc=True,
+)
+```
+
+**Proposed change:**
+```python
+self._expert_compute_cfg = ttnn.WormholeComputeKernelConfig(
+    math_fidelity=ttnn.MathFidelity.LoFi,
+    math_approx_mode=True,
+    fp32_dest_acc_en=True,  # keep fp32 accumulation for stability
+    packer_l1_acc=True,
+)
+```
+
+**Validation protocol:**
+1. Run 128 decode tokens with HiFi2 (baseline) and LoFi
+2. Compare final hidden states at each layer exit with cosine similarity
+3. Acceptance: cosine_similarity >= 0.999 AND max_absolute_error <= 0.5% of output norm
+4. Compare generated text quality (must produce coherent English)
+
+**Expected savings:** 0.05-0.2ms/token (10-20% on sparse_matmul compute time)
+**Risk:** Medium. Quality regression possible -- must validate per-model. Keep HiFi2 as fallback.
+**Test:** Side-by-side text generation comparison.
+
+---
+
+### Priority 4: CCL Parameter Sweep (LOW RISK, LOW IMPACT)
+
+**Why:** `reduce_scatter_minimal_async` at L1450-1462 uses default params that may not be optimal for Ling-mini-2.0's specific tensor size (1, 1, 1, 3072 -> 384 per device after scatter).
+
+**File:** `modules/moe.py`, lines 1450-1462
+
+**Current:**
+```python
+ttnn.experimental.reduce_scatter_minimal_async(
+    routed_out,
+    ...
+    topology=ttnn.Topology.Ring,
+    chunks_per_sync=10,
+    num_workers_per_link=2,
+    num_buffers_per_channel=2,
+)
+```
 
 **Sweep grid:**
 ```
-in0_block_w: {2, 4, 8, 16}
-per_core_M: {1, 2}
+chunks_per_sync:       {1, 5, 10, 20}
+num_workers_per_link:  {1, 2}
+num_buffers_per_channel: {1, 2}
 ```
 
-**Expected Savings:** 10-30% on sparse_matmul time. At 10-30us per matmul x 3 matmuls x 19 layers, this is 0.1-0.5ms/token.
-**Risk:** Low. Program config affects performance, not correctness.
-**Test:** Benchmark each config; select lowest latency.
+That is 16 combinations. Run each with the standard decode test and measure reduce_scatter latency.
 
-#### Step 5.2: Evaluate LoFi Math Fidelity for Expert Matmuls
+**Expected savings:** 0.05-0.1ms/token (5-15% on reduce_scatter latency, which is already small for batch=1)
+**Risk:** Low. CCL params are performance-only knobs.
+**Test:** Same correctness test with each config.
 
-**File:** `modules/moe.py`, L1130-1135
+---
 
-**Current:** `math_fidelity=ttnn.MathFidelity.HiFi2`
+### Priority 5: Further Layout Conversion Reduction (LOW RISK, LOW IMPACT)
 
-**Test:** Run with LoFi, compare output quality:
-- Cosine similarity >= 0.999 vs HiFi2 reference
-- Max absolute error <= 0.5% of output norm
-- Generated text quality (subjective)
+**Why:** `TTNNExperts.forward` still has 6 layout conversions per call:
+1. L1193: x TILE -> ROW_MAJOR (for all_to_all_dispatch)
+2. L1197: topk_experts_indices TILE -> ROW_MAJOR (for dispatch)
+3. L1212: post_dispatch ROW_MAJOR -> TILE (for sparse_matmul)
+4. L1279: expert_output TILE -> ROW_MAJOR (for all_to_all_combine)
+5. L1296: combined_output ROW_MAJOR -> TILE (for weight application)
+6. L1302-1303: w layout check + possible to_layout (for weight application)
 
-**Expected Savings:** 10-20% on sparse_matmul compute time.
-**Risk:** Medium. LoFi may degrade quality for some expert weight distributions. Must validate per-model.
+Conversions 1, 2 are required (all_to_all_dispatch requires ROW_MAJOR input).
+Conversion 3 is required (sparse_matmul requires TILE input).
+Conversion 4 is required (all_to_all_combine requires ROW_MAJOR input).
 
-### Phase 6: CCL Parameter Tuning (Low Impact for MoE-specific)
+**Potentially eliminable:**
+- Conversion 5 (L1296): If weight application were done in ROW_MAJOR, this could be avoided. But `ttnn.mul` with broadcast is more efficient in TILE layout. Net benefit is unclear.
+- Conversion 6 (L1302-1303): The weight tensor `w` comes from `topk_experts_weights` which is in TILE layout from the router. The permute at L1301 may change layout. Could pre-compute the weight tensor in the correct layout during routing to avoid this conversion.
 
-#### Step 6.1: Sweep reduce_scatter Parameters
-
-**File:** `modules/moe.py`, `TTNNMoE.forward`, L1454-1466
-
-**Current:** `chunks_per_sync=10, num_workers_per_link=2`
-
-**Sweep:** Same as recommended in the guide:
-```
-chunks_per_sync: {1, 5, 10, 20}
-num_workers_per_link: {1, 2}
-```
-
-**Expected Savings:** 5-15% on reduce_scatter latency. Small absolute impact since reduce_scatter operates on small tensors at batch=1.
+**Expected savings:** 0.04-0.1ms/token (2-4us per avoided conversion x 1-2 conversions x 19 layers)
 **Risk:** Low.
 
 ---
 
-## 5. Implementation Order (by expected impact)
+## 3. Total Remaining Savings Estimate
 
-| Priority | Step | Expected Savings | Complexity | Risk |
-|----------|------|-----------------|------------|------|
-| **1** | Step 1.1: Simplify weight application | 0.3-0.8ms | Low | Low |
-| **2** | Step 2.1: Shared expert overlap | 0.5-1.0ms | Medium | Medium |
-| **3** | Step 4.1: Trace capture for MoE | 2-3ms | High | High |
-| **4** | Step 1.2: Eliminate pre-gate typecast | 0.1-0.3ms | Low | Low |
-| **5** | Step 1.3: Reduce layout conversions | 0.1-0.3ms | Low | Low |
-| **6** | Step 5.1: Sweep sparse_matmul config | 0.1-0.5ms | Low | Low |
-| **7** | Step 5.2: LoFi math fidelity | 0.05-0.2ms | Low | Medium |
-| **8** | Step 6.1: CCL parameter sweep | 0.05-0.1ms | Low | Low |
-| **Total** | | **~3.2-6.2ms/token** | | |
+| Priority | Step | Expected Savings | Risk |
+|----------|------|-----------------|------|
+| 1 | Trace capture | 2-5ms | High |
+| 2 | sparse_matmul config sweep | 0.1-0.5ms | Low |
+| 3 | LoFi math fidelity | 0.05-0.2ms | Medium |
+| 4 | CCL parameter sweep | 0.05-0.1ms | Low |
+| 5 | Layout conversion reduction | 0.04-0.1ms | Low |
+| **Total** | | **2.24-5.9ms/token** | |
 
-**Note:** These savings are per-token and are in addition to the ~440ms wrapper overhead savings from PLAN_wrapper_optimizations.md. The MoE-specific savings compound across all 19 MoE layers.
+**Recommended execution order:** Priority 2 and 4 (parameter sweeps) are independent and low-risk -- do them first to establish a better baseline. Priority 3 (LoFi) is also independent. Priority 1 (trace capture) is the highest payoff but requires more investigation into all_to_all trace compatibility.
 
 ---
 
-## 6. Success Criteria
+## 4. What Was Already Done (Completed Steps)
 
-1. **Correctness:** Test generates coherent, non-empty English text (same test passes: `pytest test_ling_mini_2_0.py --timeout=0`)
-2. **Performance:** Measurable reduction in per-token decode time, verified via DispatchManager timing CSV
-3. **Regression:** No regression in prefill path
-4. **Quality:** For Steps 5.2 (LoFi), verify cosine similarity >= 0.999 vs baseline
+### Step 1.1: Weight Application Simplification -- DONE
+
+**moe.py L1298-1309:** The old 7-op pattern (`to_layout` -> `unsqueeze` -> `unsqueeze` -> `repeat(3072,1,1,1)` -> `permute` -> `to_layout` -> `mul`) was replaced with a 4-op broadcast pattern:
+```python
+w = ttnn.reshape(topk_experts_weights, ...)  # (1, 1, num_tokens, num_experts_per_tok)
+w = ttnn.permute(w, (3, 1, 2, 0))           # (num_experts_per_tok, 1, num_tokens, 1)
+w = ttnn.to_layout(w, ttnn.TILE_LAYOUT)      # ensure tile layout
+weighted_output = ttnn.mul(combined_output, w) # broadcast multiply
+final_output = ttnn.sum(weighted_output, dim=0, keepdim=True)
+```
+
+This eliminates the expensive `repeat(3072, 1, 1, 1)` which was copying 3072x more data than needed.
+
+### Step 1.2: Pre-Gate Typecast Elimination -- DONE
+
+**moe.py L1415-1426:** The `ttnn.typecast(x, ttnn.float32)` before the gate linear was removed. Instead, `ttnn.linear` is called with `dtype=ttnn.float32` output parameter on bf16 input:
+```python
+router_logits = ttnn.linear(
+    x,                          # bf16 input (no typecast)
+    self._gate_weight_tt,       # bf16 weight
+    memory_config=ttnn.DRAM_MEMORY_CONFIG,
+    dtype=ttnn.float32,         # f32 output via accumulation
+    compute_kernel_config=ttnn.WormholeComputeKernelConfig(
+        math_fidelity=ttnn.MathFidelity.HiFi4,
+        fp32_dest_acc_en=True,
+        packer_l1_acc=True,
+    ),
+)
+```
+
+### Step 2.1: Shared Expert Overlap -- DONE
+
+**moe.py L1435-1438:** `shared_output = self.shared_experts(residual)` is now called BEFORE `routed_output = self.experts(x, ...)`, allowing TTNN's async dispatch to overlap shared expert matmuls with the routed expert all_to_all + sparse_matmul pipeline.
+
+### Step 3.1/3.2: Router -- NO CHANGE NEEDED
+
+For Ling-mini-2.0 (`n_group=1, topk_group=1`), the router takes the single-pass topk branch (L927-932) which is already optimal. The CPU sort fallback is only in `TTNNGlm4MoeRouteTokenToExperts` (L806-813), not in `TTNNMoERouterDecode` which is the active router for `TTNNBailingMoE`.
 
 ---
 
-## 7. Risk Assessment Summary
+## 5. Key Source Locations (Updated)
 
-| Risk | Steps Affected | Likelihood | Impact | Mitigation |
-|------|---------------|-----------|--------|------------|
-| Trace capture fails due to dynamic routing metadata | 4.1 | Medium | High | Verify all_to_all ops are trace-compatible; fall back to non-traced |
-| Async overlap does not materialize | 2.1 | Medium | None | No regression; just no savings |
-| Broadcast mul shape mismatch | 1.1 | Low | Medium | Test with reference comparison |
-| ttnn.linear dtype parameter unsupported | 1.2 | Low | None | Keep current typecast approach |
-| LoFi degrades output quality | 5.2 | Medium | Medium | Validate per-model; keep HiFi2 as fallback |
-
----
-
-## 8. Dependencies
-
-- **PLAN_wrapper_optimizations.md** (P1-P5): Should be applied first or in parallel. The wrapper overhead savings (440ms) dwarf the MoE-specific savings (3-6ms). However, the MoE optimizations reduce the TTNN op count, which makes trace capture more effective.
-- **TTNNBailingMoEDecoderLayer** (from PLAN_wrapper_optimizations P1): Enables Step 4.2 (full decoder layer trace).
-- **Profiling data:** Steps 5.1, 5.2, and 6.1 require per-op timing data. Collect baseline timing first using the DispatchManager CSV output.
+| Component | File | Lines |
+|-----------|------|-------|
+| TTNNBailingMoE class | `modules/moe.py` | L1470-1624 |
+| TTNNMoE.forward | `modules/moe.py` | L1385-1467 |
+| TTNNExperts.forward | `modules/moe.py` | L1137-1317 |
+| TTNNMoERouterDecode.forward | `modules/moe.py` | L891-1002 |
+| Weight application (DONE) | `modules/moe.py` | L1298-1309 |
+| Gate linear (DONE, no typecast) | `modules/moe.py` | L1415-1426 |
+| Shared experts call (DONE, early) | `modules/moe.py` | L1435-1438 |
+| sparse_matmul config (Priority 2) | `modules/moe.py` | L1118-1135 |
+| Expert compute config (Priority 3) | `modules/moe.py` | L1130-1135 |
+| reduce_scatter params (Priority 4) | `modules/moe.py` | L1450-1462 |
+| Test file | `tests/test_ling_mini_2_0.py` | Full file |
 
 ---
 
-## 9. How to Collect Baseline Measurements
+## 6. How to Collect Measurements
 
 ```bash
 cd /home/ttuser/salnahari
@@ -512,26 +302,21 @@ cd tt-metal
 MESH_DEVICE=T3K pytest models/experimental/tt_symbiote/tests/test_ling_mini_2_0.py --timeout=0 -xvs
 ```
 
-The test automatically saves timing to `ling_mini_2_0_paged_attention_timing_stats.csv`. Analyze the CSV to identify:
-1. Total MoE forward time per layer
-2. Per-op breakdown within TTNNExperts.forward
-3. Router forward time
-4. Shared expert time
-5. CCL op times (all_gather, reduce_scatter, all_to_all_dispatch, all_to_all_combine)
+The test saves timing to `ling_mini_2_0_paged_attention_timing_stats.csv`. For per-op profiling, use Tracy:
+
+```bash
+cd /home/ttuser/salnahari
+source tt_bashrc
+cd tt-metal
+TT_METAL_DEVICE_PROFILER=1 MESH_DEVICE=T3K pytest models/experimental/tt_symbiote/tests/test_ling_mini_2_0.py --timeout=0 -xvs
+```
+
+Then analyze with `tt_metal/tools/profiler/process_ops_logs.py` to get per-op CSV.
 
 ---
 
-## 10. Quick Reference: Key Source Locations
+## 7. Dependencies
 
-| Component | File | Lines |
-|-----------|------|-------|
-| TTNNBailingMoE class | `modules/moe.py` | L1475-1628 |
-| TTNNMoE.forward | `modules/moe.py` | L1389-1472 |
-| TTNNExperts.forward | `modules/moe.py` | L1137-1321 |
-| TTNNMoERouterDecode.forward | `modules/moe.py` | L891-1002 |
-| Weight application (target for Step 1.1) | `modules/moe.py` | L1299-1313 |
-| Pre-gate typecast (target for Step 1.2) | `modules/moe.py` | L1419-1435 |
-| Shared experts call (target for Step 2.1) | `modules/moe.py` | L1469-1470 |
-| sparse_matmul config (target for Step 5.1) | `modules/moe.py` | L1118-1135 |
-| reduce_scatter params (target for Step 6.1) | `modules/moe.py` | L1454-1466 |
-| Test file | `tests/test_ling_mini_2_0.py` | Full file |
+- **PLAN_wrapper_optimizations.md** (P1-P5): Wrapper overhead savings (~440ms) dwarf MoE-specific savings. Apply in parallel.
+- **TTNNBailingMoEDecoderLayer** (from wrapper optimizations P1): Enables full decoder layer trace capture (Step 4.2 from original plan), which is strictly better than MoE-only trace capture.
+- **Profiling baseline:** Priorities 2, 3, 4 require per-op timing data. Collect baseline with Tracy or DispatchManager CSV before sweeping.
