@@ -306,3 +306,31 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ---
 
+## Async CCL Semaphore Behavior Under Trace Replay
+**Date:** 2026-03-27
+**Status:** Pending
+**Why Needed:** `TT_CCL.get_and_cycle_*` methods cycle through 2 double-buffered semaphore handles using a host-side modular counter. During trace capture, a specific semaphore handle is baked into the command buffer. On replay, the host counter continues cycling but the trace always uses the handle from capture time. Need to understand the exact interaction to enable tracing for modules that use async CCL ops (reduce_scatter_minimal_async, all_gather_async).
+**Questions:**
+1. Are semaphore handles stored as kernel arguments (baked into trace) or as buffer addresses that can be updated before replay?
+2. Can `ttnn.experimental.reduce_scatter_minimal_async` and `ttnn.all_gather_async` be used inside a trace capture at all?
+3. Does tt-transformers have any existing patterns for tracing models that use async CCLs with cycling semaphores?
+4. What is the correct way to synchronize host-side semaphore cycling state with trace replay boundaries?
+5. Would resetting semaphore indices before each replay (to match capture-time state) be sufficient, or are there device-side semaphore states that also need resetting?
+
+**Findings:** TBD
+
+---
+
+## ttnn.all_reduce Trace Compatibility
+**Date:** 2026-03-27
+**Status:** Pending
+**Why Needed:** `TTNNLinearIColShardedWAllReduced` uses synchronous `ttnn.all_reduce` (no cycling semaphores). Need to confirm this multi-device collective operation is trace-compatible since it will be used inside traced linear layer execution.
+**Questions:**
+1. Is `ttnn.all_reduce` (synchronous, Ring topology) compatible with trace capture and replay?
+2. Does `ttnn.all_reduce` use any internal semaphore state that could conflict with trace replay?
+3. Are there any known limitations or requirements for using `ttnn.all_reduce` inside a traced region?
+
+**Findings:** TBD
+
+---
+
