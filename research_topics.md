@@ -353,7 +353,8 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ## Windowed Attention: Foundations and T3K Mapping
 **Date:** 2026-03-27
-**Status:** Pending
+**Status:** Completed
+**Guide:** guides/windowed_attention_foundations_and_t3k_mapping/
 **Why Needed:** Some models (e.g. Qwen3.5, Mistral) use windowed (sliding window) attention to bound KV cache size and reduce attention complexity. Understanding the mathematical foundations and compute/memory characteristics is required before mapping windowed attention onto the T3K 1×8 mesh.
 **Questions:**
 1. What is windowed (sliding window) attention — what are the core mathematical operations, what is the window size parameter, and how does it differ from full causal attention in terms of which tokens each query attends to?
