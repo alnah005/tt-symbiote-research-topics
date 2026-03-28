@@ -18,7 +18,7 @@ greedy decreasing bin-packing algorithm from Chapter 4.
 
 $$r_e = \max\!\left(1, \left\lceil f_e \times N \right\rceil\right) > 1 \quad \text{i.e., } f_e > 1/N = 12.5\%$$
 
-and DRAM headroom of $\geq r_e \times \text{expert\_weight\_size}$ is available on the target device.
+and DRAM headroom of $\geq r_e \times \text{expert weight size}$ is available on the target device.
 At $f_e = 0.17$ (Zipf example from Chapter 7), $r_e = \max(1, \lceil 0.17 \times 8 \rceil) = 2$.
 
 **Why uniform is the default:**

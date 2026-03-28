@@ -100,9 +100,9 @@ The total data in flight across the network at any instant (summed across all $N
 
 $$V_\text{network} = N \times (N-1) \times s$$
 
-For a batch of $B$ tokens on $N$ devices, with each token embedding of size $H \times \text{dtype\_bytes}$ bytes, and assuming uniform routing (each device routes $B \times k / N$ token-expert pairs to each other device), the per-device send volume for dispatch is:
+For a batch of $B$ tokens on $N$ devices, with each token embedding of size $H \times \text{dtype bytes}$ bytes, and assuming uniform routing (each device routes $B \times k / N$ token-expert pairs to each other device), the per-device send volume for dispatch is:
 
-$$V_\text{dispatch, per device} = \frac{(N-1)}{N} \times B \times k \times H \times \text{dtype\_bytes}$$
+$$V_\text{dispatch, per device} = \frac{(N-1)}{N} \times B \times k \times H \times \text{dtype bytes}$$
 
 For Qwen3.5-35B with $B = 32$ tokens per device, $k = 8$, $N = 8$, $H = 7168$, BF16 (2 bytes):
 
@@ -179,11 +179,11 @@ This **all-gather + local select + reduce-scatter** pattern avoids routing-depen
 
 For the all-gather approach, every device sends its full token batch $[B, H]$ to all other devices:
 
-$$V_\text{all-gather, per device} = (N-1) \times B \times H \times \text{dtype\_bytes}$$
+$$V_\text{all-gather, per device} = (N-1) \times B \times H \times \text{dtype bytes}$$
 
-For the all-to-all approach, each device sends only the tokens destined for remote experts (under uniform routing, a fraction $(N-1)/N$ of $B \times k$ token slots, each of size $H \times \text{dtype\_bytes}$):
+For the all-to-all approach, each device sends only the tokens destined for remote experts (under uniform routing, a fraction $(N-1)/N$ of $B \times k$ token slots, each of size $H \times \text{dtype bytes}$):
 
-$$V_\text{all-to-all, per device} = \frac{N-1}{N} \times B \times k \times H \times \text{dtype\_bytes}$$
+$$V_\text{all-to-all, per device} = \frac{N-1}{N} \times B \times k \times H \times \text{dtype bytes}$$
 
 The ratio is:
 

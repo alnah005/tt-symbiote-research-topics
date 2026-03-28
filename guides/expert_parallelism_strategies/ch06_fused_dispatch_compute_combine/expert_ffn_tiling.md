@@ -11,15 +11,15 @@ large enough to absorb fluctuations.
 
 The received buffer is logically sliced per expert. For expert $e \in \{0, \ldots, 31\}$:
 
-$$\text{recv\_buf}[e] \in \mathbb{R}^{\text{received\_count}_e \times H}$$
+$$\text{recv buf}[e] \in \mathbb{R}^{\text{received count}_e \times H}$$
 
-where $\text{received\_count}_e$ is the number of tokens routed to expert $e$ on
+where $\text{received count}_e$ is the number of tokens routed to expert $e$ on
 this device, $H = 7168$, and the total satisfies:
 
-$$\sum_{e=0}^{E_d - 1} \text{received\_count}_e = T_{\text{received}}$$
+$$\sum_{e=0}^{E_d - 1} \text{received count}_e = T_{\text{received}}$$
 
 The $E_d = 32$ experts are independent of one another: the FFN of expert $e$ reads
-only from $\text{recv\_buf}[e]$ and produces output only for tokens assigned to
+only from $\text{recv buf}[e]$ and produces output only for tokens assigned to
 expert $e$. This independence is exploited for parallel execution.
 
 ## Section 2: Parallel Expert Execution
@@ -40,10 +40,10 @@ All 32 expert FFN kernels are dispatched simultaneously to their assigned core g
 Each core group independently executes:
 
 1. Load weight tiles for its expert from DRAM into L1 (streaming, see Section 3).
-2. Compute $[\text{received\_count}_e, H] \times [H, D]$ for the up and gate projections.
+2. Compute $[\text{received count}_e, H] \times [H, D]$ for the up and gate projections.
 3. Apply the activation function (e.g., SiLU gating).
-4. Compute $[\text{received\_count}_e, D] \times [D, H]$ for the down projection.
-5. Write expert output $[\text{received\_count}_e, H]$ to the combine send buffer.
+4. Compute $[\text{received count}_e, D] \times [D, H]$ for the down projection.
+5. Write expert output $[\text{received count}_e, H]$ to the combine send buffer.
 
 All 32 expert FFN kernels complete before Stage 4 (combine all-to-all) can begin,
 because the combine sends the concatenation of all expert outputs.
@@ -73,13 +73,13 @@ At $D \approx 14336$ [UNVERIFIED]: $W_{\text{single expert}} \approx 1.17$ GB.
 Clearly, expert weights cannot be held resident in L1. The strategy is
 **tile-by-tile DRAM streaming**:
 
-- The matmul kernel streams weight tiles of shape $[\text{TILE\_SIZE}, \text{TILE\_SIZE}] = [32, 32]$
+- The matmul kernel streams weight tiles of shape $[\text{TILE SIZE}, \text{TILE SIZE}] = [32, 32]$
   (each tile is $32 \times 32 \times 2 = 2048$ bytes) from DRAM into L1 on demand.
 - The activation tensor for a single expert is small and fits entirely in L1:
 
-$$\text{activation size} = \text{received\_count}_e \times H \times 2 \text{ bytes}$$
+$$\text{activation size} = \text{received count}_e \times H \times 2 \text{ bytes}$$
 
-At $C = 2$ (i.e., $\text{received\_count}_e \approx 2$):
+At $C = 2$ (i.e., $\text{received count}_e \approx 2$):
 
 $$2 \times 7168 \times 2 = 28{,}672 \text{ bytes} \approx 28 \text{ KB} \ll 1.5 \text{ MB}$$
 
@@ -145,7 +145,7 @@ Each expert FFN consists of two matmuls per expert (using SwiGLU or similar gati
 | Up + Gate projection | $[\text{rc}_e, H]$ | $[H, D]$ | $[\text{rc}_e, D]$ |
 | Down projection | $[\text{rc}_e, D]$ | $[D, H]$ | $[\text{rc}_e, H]$ |
 
-where $\text{rc}_e = \text{received\_count}_e$, $H = 7168$, $D$ = [UNVERIFIED exact
+where $\text{rc}_e = \text{received count}_e$, $H = 7168$, $D$ = [UNVERIFIED exact
 value for FFN intermediate dimension].
 
 **Tile alignment issue at small batch sizes:**

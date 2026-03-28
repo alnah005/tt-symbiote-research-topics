@@ -33,7 +33,7 @@ def assert_mask_shape(mask_ttnn, E_d: int, C: int, H: int):
     )
 ```
 
-**Fix:** Always derive $M_t$ from the actual padded height of the activation tensor, not from the logical token count. After padding the activation tensor to its canonical shape, compute $M_t = \text{activation\_tensor.shape}[0] // (E_d \times 32)$.
+**Fix:** Always derive $M_t$ from the actual padded height of the activation tensor, not from the logical token count. After padding the activation tensor to its canonical shape, compute $M_t = \text{activation tensor.shape}[0] // (E_d \times 32)$.
 
 ```python
 # Derive M_t from the padded activation tensor shape, not from logical C

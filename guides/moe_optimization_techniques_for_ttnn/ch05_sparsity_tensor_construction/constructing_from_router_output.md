@@ -12,7 +12,7 @@ For the format contract (shape, dtype, layout) that the output of this pipeline 
 
 The MoE router selects the $k$ most relevant experts for each token. Its output is a tensor of **top-k indices** of shape $[B \times S, k]$ containing integer values in $[0, E)$:
 
-$$\text{routing\_indices} \in \mathbb{Z}^{B \times S \times k}, \quad \text{routing\_indices}[t, i] \in [0, E)$$
+$$\text{routing indices} \in \mathbb{Z}^{B \times S \times k}, \quad \text{routing indices}[t, i] \in [0, E)$$
 
 where $t$ indexes tokens (flattened over batch and sequence dimensions) and $i$ indexes the $k$ selected experts for that token.
 
@@ -64,9 +64,9 @@ At this point, the active-slot information is still at per-row granularity. Step
 
 **Tile row definition (flattened view):** Tile row $m$ covers activation rows $[m \times 32,\ (m+1) \times 32)$. Tile row $m$ is **active** if any of those activation rows is an active expert slot:
 
-$$\text{tile\_active}[m] = \bigvee_{r = m \times 32}^{(m+1) \times 32 - 1} \text{assignment\_flat}[r]$$
+$$\text{tile active}[m] = \bigvee_{r = m \times 32}^{(m+1) \times 32 - 1} \text{assignment flat}[r]$$
 
-where $\text{assignment\_flat}$ is `assignment` reshaped to $[E_d \times C]$.
+where $\text{assignment flat}$ is `assignment` reshaped to $[E_d \times C]$.
 
 The total number of tile rows is:
 

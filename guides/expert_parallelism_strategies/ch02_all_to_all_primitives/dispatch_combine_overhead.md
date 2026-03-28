@@ -41,7 +41,7 @@ For $B = 32$: $2 \times 32 \times 7168 \times 256 = 117{,}440{,}512 \approx 117$
 
 The packing kernel reads each of the $B \times k = 32 \times 8 = 256$ token-expert pairs and writes the corresponding token embedding (length $H$) into the packed send buffer. The cost is dominated by memory bandwidth:
 
-$$T_\text{pack} \approx \frac{Bk \cdot H \cdot 2}{\text{mem\_BW}_\text{device}}$$
+$$T_\text{pack} \approx \frac{Bk \cdot H \cdot 2}{\text{mem BW}_\text{device}}$$
 
 For $B = 32$, $H = 7168$ at BF16: $32 \times 8 \times 7168 \times 2 = 3{,}670{,}016$ bytes $\approx 3.5$ MiB (~3.67 MB) read. At a device DRAM bandwidth of ~200 GB/s (Wormhole B0 approximate figure), $T_\text{pack} \approx 3{,}670{,}016 / (200 \times 10^9) \approx 18.4\,\mu\text{s}$. This is non-negligible; efficient packing implementations avoid a full DRAM round-trip by keeping the token batch in L2/L1.
 
@@ -69,7 +69,7 @@ $$T_\text{FFN} = \frac{6BkHD}{\text{TFLOP}_\text{peak}} \quad \text{[D UNVERIFIE
 
 The accumulation step reads the $[B, k, H]$ receive buffer and writes the $[B, H]$ output:
 
-$$T_\text{accum} \approx \frac{Bk \cdot H \cdot 2}{\text{mem\_BW}_\text{device}} + \frac{2BkH}{\text{TFLOP}_\text{peak}}$$
+$$T_\text{accum} \approx \frac{Bk \cdot H \cdot 2}{\text{mem BW}_\text{device}} + \frac{2BkH}{\text{TFLOP}_\text{peak}}$$
 
 The arithmetic term ($2BkH$ FLOPs for $k$ multiply-adds per token per output element) is negligible compared to the memory term at small batch sizes.
 

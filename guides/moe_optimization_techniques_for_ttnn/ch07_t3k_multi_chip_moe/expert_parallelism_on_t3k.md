@@ -139,7 +139,7 @@ At $B = 32$ decode, $T_{\text{expert}}$ is small (low arithmetic intensity), so:
 
 $$T_{\text{total}} \approx 1.0+ \text{ ms per MoE layer}$$
 
-The total inference latency is $\text{num\_layers} \times T_{\text{total}}$; the number of MoE layers in Qwen3.5-35B is [UNVERIFIED].
+The total inference latency is $\text{num layers} \times T_{\text{total}}$; the number of MoE layers in Qwen3.5-35B is [UNVERIFIED].
 
 > **Warning:** The 6.4 MB / 12.5 GB/s estimate assumes the full volume passes over a single hop. The T3K linear topology requires multi-hop routing for devices far apart; actual latency is higher for the end-to-end all-to-all collective. Measure with `ttnn.all_to_all` benchmarks on your specific topology and `num_links` setting.
 

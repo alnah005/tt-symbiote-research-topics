@@ -57,7 +57,7 @@ $$\text{device}(e) = \lfloor e / E_d \rfloor = \lfloor e / 32 \rfloor$$
 
 under uniform assignment. For each token $t \in \{0, \ldots, B-1\}$ and each of its $k$ selected experts $e_{t,j}$ ($j = 0, \ldots, k-1$), the destination device is $\text{device}(e_{t,j})$. The send count for device $d'$ is:
 
-$$\text{send\_count}[d'] = \sum_{t=0}^{B-1} \sum_{j=0}^{k-1} \mathbf{1}[\text{device}(e_{t,j}) = d']$$
+$$\text{send count}[d'] = \sum_{t=0}^{B-1} \sum_{j=0}^{k-1} \mathbf{1}[\text{device}(e_{t,j}) = d']$$
 
 Note that if both of a token's selected experts reside on the same remote device (which occurs with probability $\binom{E_d}{2}/\binom{E}{2}$ under uniform sampling without replacement), that token's embedding is sent to that device once per expert slot, and the device receives two copies of the embedding — one for each expert. The embedding is not deduplicated, because each expert processes it independently.
 
@@ -82,7 +82,7 @@ def compute_send_counts(
 
 The sum of all send counts equals $B \times k$ (every token-expert pair is assigned to exactly one device):
 
-$$\sum_{d'=0}^{N-1} \text{send\_count}[d'] = B \times k$$
+$$\sum_{d'=0}^{N-1} \text{send count}[d'] = B \times k$$
 
 ### Step 2: Padding to Expert Capacity
 
@@ -94,7 +94,7 @@ Send counts are not transmitted directly to the all-to-all; instead, the send bu
 
 Padding inserts zero-valued token embeddings (or a sentinel value) into unused capacity slots. The receiving device's expert FFN processes these zero-padded slots but their outputs are discarded (masked out) during the combine step, so padding does not affect model output.
 
-The padded send buffer for destination device $d'$ has shape $[C \times E_d, H]$: $E_d$ expert slots each with $C$ token positions. Only the first $\text{actual\_count}[d', e]$ positions in expert $e$'s slot are populated with real token data; the remainder are zero.
+The padded send buffer for destination device $d'$ has shape $[C \times E_d, H]$: $E_d$ expert slots each with $C$ token positions. Only the first $\text{actual count}[d', e]$ positions in expert $e$'s slot are populated with real token data; the remainder are zero.
 
 ---
 
@@ -156,7 +156,7 @@ For the dispatch operation to achieve peak memory bandwidth, the token embedding
 - $H = 7168$ must be a multiple of 32. $7168 / 32 = 224$. This holds exactly — there are 224 tiles per row.
 - The number of token slots per expert $C$ must be a multiple of 32 for the send buffer rows to be tile-aligned. For capacity factor $CF = 1.0$ and an expected load of $B \times k / E$ tokens per expert, $C$ must be rounded up to the nearest multiple of 32.
 
-When $C$ is not naturally a multiple of 32, zero-padding is applied to reach the next multiple. This adds a small amount of additional communication volume (at most $31 \times H \times \text{dtype\_bytes} = 31 \times 7168 \times 2 = 444{,}416$ bytes per expert, across 32 experts per device per direction) but is required for correct kernel execution.
+When $C$ is not naturally a multiple of 32, zero-padding is applied to reach the next multiple. This adds a small amount of additional communication volume (at most $31 \times H \times \text{dtype bytes} = 31 \times 7168 \times 2 = 444{,}416$ bytes per expert, across 32 experts per device per direction) but is required for correct kernel execution.
 
 ### Shard Layout on Tenstorrent Cores
 

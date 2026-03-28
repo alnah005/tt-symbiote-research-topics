@@ -95,7 +95,7 @@ Key differences from Gated Delta Net:
 
 The scalar decay $g_t = \exp(\alpha_t)$ requires $\alpha_t < 0$ to keep $g_t \in (0, 1)$. In Qwen3.5-35B-A3B this is achieved as follows:
 
-$$\alpha_t = -\exp(A_{\log}) \cdot \text{softplus}(a_t + \text{dt\_bias})$$
+$$\alpha_t = -\exp(A_{\log}) \cdot \text{softplus}(a_t + \text{dt bias})$$
 
 $$g_t = \exp(\alpha_t)$$
 

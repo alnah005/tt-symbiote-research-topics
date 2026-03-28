@@ -100,7 +100,7 @@ Prefill capacity is 1280× larger at $B=32$, $S=2048$.
 In the prefill phase, each Tensix core must handle more output rows in the expert FFN matmul.
 The `per_core_M` parameter (rows per core in the matmul program config) scales as:
 
-$$\text{per\_core\_M} = \left\lceil \frac{C}{E_d} \right\rceil$$
+$$\text{per core M} = \left\lceil \frac{C}{E_d} \right\rceil$$
 
 At $B=4$, $S=2048$, $C=320$, $E_d=32$: `per_core_M = ceil(320/32) = 10`.
 

@@ -25,7 +25,7 @@ At decode ($B=32$, $S=1$, $C=1$): gather output buffer per device = $32 \times 1
 The matmul time covers three batched GEMM calls (gate, up, down projections) plus the element-wise SwiGLU between them. For a single expert's gate projection:
 
 - FLOP count: $2 \times C \times H \times D$ [D UNVERIFIED — verify against Qwen3 Technical Report]
-- Weight bytes read from DRAM: $H \times D \times \text{bytes\_per\_BFP8}$ [D UNVERIFIED]
+- Weight bytes read from DRAM: $H \times D \times \text{bytes per BFP8}$ [D UNVERIFIED]
 - Activation bytes read: $C \times H \times 2$ (BF16)
 - Output bytes written: $C \times D \times 2$ (BF16) [D UNVERIFIED]
 
@@ -74,7 +74,7 @@ $$\text{FLOPs} = 2 \times C \times H \times D \quad \text{[D UNVERIFIED — veri
 
 Weight bytes read (BFP8, one-time DRAM read per matmul):
 
-$$\text{weight bytes} = H \times D \times \text{bytes\_per\_BFP8} \approx H \times D \times 1.0 \quad \text{[D UNVERIFIED]}$$
+$$\text{weight bytes} = H \times D \times \text{bytes per BFP8} \approx H \times D \times 1.0 \quad \text{[D UNVERIFIED]}$$
 
 (BFP8 stores 1 byte per element for the mantissa plus a shared exponent per 16 elements, giving approximately 1.0625 bytes/element (= 1088/1024 = 17/16); for estimation purposes use 1.0 byte/element.)
 

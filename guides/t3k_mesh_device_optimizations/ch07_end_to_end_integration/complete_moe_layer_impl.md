@@ -350,7 +350,7 @@ After the combine A2A, the originating device holds `combine_recv` shaped $[N, C
 Using the dispatch metadata (`routing_indices` saved at §2), the outputs are reordered into a
 $[B, k, H]$ logical buffer — $B$ tokens, $k=8$ expert outputs each — and accumulated:
 
-$$\text{output}[b] = \sum_{i=1}^{k} w_i^{\text{norm}} \times \text{expert\_output}[b, i]$$
+$$\text{output}[b] = \sum_{i=1}^{k} w_i^{\text{norm}} \times \text{expert output}[b, i]$$
 
 where $w_i^{\text{norm}} = s_i / \sum_{j=1}^{k} s_j$ (normalized sigmoid scores, as described
 in `ch05_expert_parallelism/combine_and_accumulation.md` §2).

@@ -113,7 +113,7 @@ Under the assumption that each token independently routes to expert $e$ with pro
 
 The **overflow rate** (fraction of tokens dropped from expert $e$ per step) is:
 
-$$\text{drop\_rate}_e \;=\; \frac{\mathbb{E}[\text{overflow}_e]}{\mathbb{E}[n_e]} \;=\; \frac{\mathbb{E}[\max(0,\; n_e - C)]}{f_e}$$
+$$\text{drop rate}_e \;=\; \frac{\mathbb{E}[\text{overflow}_e]}{\mathbb{E}[n_e]} \;=\; \frac{\mathbb{E}[\max(0,\; n_e - C)]}{f_e}$$
 
 See `capacity_overflow_handling.md`, Section 4 for the full Poisson calculation at $B = 32$.
 

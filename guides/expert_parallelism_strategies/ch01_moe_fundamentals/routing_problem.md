@@ -20,9 +20,9 @@ Each device originates $B/N$ tokens and must forward those tokens to $(B/N) \tim
 
 The actual count of remote experts per token is random and depends on the routing distribution. The formula below states the expected value under uniform routing (condition: experts are selected independently and uniformly at random across devices):
 
-$$\mathbb{E}[\text{cross-device volume per token}] \approx \mathbb{E}[k_\text{remote}] \times H \times \text{dtype\_bytes}$$
+$$\mathbb{E}[\text{cross-device volume per token}] \approx \mathbb{E}[k_\text{remote}] \times H \times \text{dtype bytes}$$
 
-where $\mathbb{E}[k_\text{remote}] = k(N-1)/N = 7$ under uniform routing (equal to $k-1$ here only because $k = N = 8$). Scaling to a batch of $B$ tokens, the expected total cross-device volume is $B \times k(N-1)/N \times H \times \text{dtype\_bytes}$.
+where $\mathbb{E}[k_\text{remote}] = k(N-1)/N = 7$ under uniform routing (equal to $k-1$ here only because $k = N = 8$). Scaling to a batch of $B$ tokens, the expected total cross-device volume is $B \times k(N-1)/N \times H \times \text{dtype bytes}$.
 
 For $B = 32$ tokens, $k = 8$, $N = 8$, $H = 7168$ (Qwen3.5-35B hidden dimension), and BF16 (2 bytes), this expected total works out to:
 

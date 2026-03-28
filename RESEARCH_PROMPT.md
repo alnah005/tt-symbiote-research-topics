@@ -346,3 +346,4 @@ Chapter directory names use the format `ch<N>_<short_snake_case_title>`.
     - **Inline expressions** (variables, symbols, short formulas embedded in prose) use `$...$`.
     - Shape annotations (e.g. `[B, T, H]`), arithmetic calculations (e.g. `2 × 262,144 × 256 × 2 = ...`), and pseudocode must remain in fenced code blocks or plain text — do not wrap these in LaTeX.
     - Agent B must flag any display equation written in plain text or a code block (rather than `$$...$$`) as a structural gap.
+    - **Never use underscores inside `\text{...}`** — the markdown parser consumes the `\` in `\_` before the math renderer sees it, producing a bare `_` that causes a "allowed only in math mode" error. Use spaces instead: `\text{expert capacity}` not `\text{expert\_capacity}`.

@@ -118,7 +118,7 @@ The slot metadata (mapping each slot index to a `(token_id, expert_slot_j, routi
 
 In practice, there are two approaches:
 
-1. **Transmit metadata with dispatch.** The slot metadata is transmitted as a separate small tensor during the dispatch all-to-all (alongside the token embeddings). This adds a small overhead of $C \times E_d \times \text{metadata\_bytes}$ per device per dispatch, but ensures that the expert device has all the information it needs to pack the combine send buffer correctly.
+1. **Transmit metadata with dispatch.** The slot metadata is transmitted as a separate small tensor during the dispatch all-to-all (alongside the token embeddings). This adds a small overhead of $C \times E_d \times \text{metadata bytes}$ per device per dispatch, but ensures that the expert device has all the information it needs to pack the combine send buffer correctly.
 
 2. **Mirror-image convention.** If the combine send buffer is defined to use the same row order as the dispatch receive buffer (which was packed by the originating device and therefore implicitly encodes the metadata order), no explicit metadata transmission is needed for the combine. The receiving device (originating device during combine) already holds the slot metadata from the dispatch step and can apply it directly to the received expert outputs.
 

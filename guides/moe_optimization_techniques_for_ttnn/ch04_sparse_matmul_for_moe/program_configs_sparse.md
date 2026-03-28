@@ -44,9 +44,9 @@ These constraints apply to the per-expert tile counts $M_t$, $K_t$, $N_t$ — no
 
 The relationship between `per_core_M` and real work at decode:
 
-$$\text{per\_core\_M} = \frac{M_t}{\text{grid\_y}} = \frac{\lceil C/32 \rceil}{\text{grid\_y}}$$
+$$\text{per core M} = \frac{M_t}{\text{grid y}} = \frac{\lceil C/32 \rceil}{\text{grid y}}$$
 
-For $\rho = 0.03$ (1 active expert out of 32, $M_t = 1$), effective computed tile rows per core = $\rho \times \text{per\_core\_M} \approx 0.03 \times 1 = 0.03$. The core completes its mask checks and skips 97% of K-steps. This low per-core utilization is expected and correct: sparse_matmul is efficient precisely because the skipped tiles cost almost nothing.
+For $\rho = 0.03$ (1 active expert out of 32, $M_t = 1$), effective computed tile rows per core = $\rho \times \text{per core M} \approx 0.03 \times 1 = 0.03$. The core completes its mask checks and skips 97% of K-steps. This low per-core utilization is expected and correct: sparse_matmul is efficient precisely because the skipped tiles cost almost nothing.
 
 ### 1.4 Grid Sizing for Sparse Decode
 

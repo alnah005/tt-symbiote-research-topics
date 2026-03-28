@@ -93,7 +93,7 @@ $$\rho = \frac{\text{active expert slots} \times M_t}{E_d \times M_t} = \frac{\t
 
 where $M_t = \lceil C / 32 \rceil$. The $M_t$ terms cancel: each active expert occupies $M_t$ tile rows in the numerator, and the denominator $E_d \times M_t$ is the total tile rows. The formula therefore simplifies to active experts divided by total experts, independent of $M_t$.
 
-> **Note:** This cancellation holds when each active expert fills all of its $M_t$ tile rows (i.e., capacity is fully used). In the decode regime ($M_t = 1$, $C \leq 32$), there is only one tile row per expert and the formula is trivially correct. In the prefill regime ($M_t > 1$, high fill rate), every active expert fills all $M_t$ rows, so the $M_t$ still cancels and the formula $\rho = \text{active\_experts} / E_d$ remains correct. This is why the §2.1 and §2.2 results agree with the formula below regardless of $M_t$.
+> **Note:** This cancellation holds when each active expert fills all of its $M_t$ tile rows (i.e., capacity is fully used). In the decode regime ($M_t = 1$, $C \leq 32$), there is only one tile row per expert and the formula is trivially correct. In the prefill regime ($M_t > 1$, high fill rate), every active expert fills all $M_t$ rows, so the $M_t$ still cancels and the formula $\rho = \text{active experts} / E_d$ remains correct. This is why the §2.1 and §2.2 results agree with the formula below regardless of $M_t$.
 
 Under uniform routing:
 

@@ -32,13 +32,13 @@ $$M_t = \left\lceil \frac{C}{32} \right\rceil$$
 
 $$K_t = \left\lceil \frac{H}{32} \right\rceil = \left\lceil \frac{7168}{32} \right\rceil = 224$$
 
-$$N_t = \left\lceil \frac{D}{32} \right\rceil \quad \text{[N\_t UNVERIFIED — verify against Qwen3 Technical Report]}$$
+$$N_t = \left\lceil \frac{D}{32} \right\rceil \quad \text{[Nt UNVERIFIED — verify against Qwen3 Technical Report]}$$
 
 For the down projection (`[C, D]` × `[D, H]`):
 
 $$M_t = \left\lceil \frac{C}{32} \right\rceil \quad \text{(same as above)}$$
 
-$$K_t = \left\lceil \frac{D}{32} \right\rceil \quad \text{[K\_t for down proj UNVERIFIED — verify against Qwen3 Technical Report]}$$
+$$K_t = \left\lceil \frac{D}{32} \right\rceil \quad \text{[Kt for down proj UNVERIFIED — verify against Qwen3 Technical Report]}$$
 
 $$N_t = \left\lceil \frac{H}{32} \right\rceil = \left\lceil \frac{7168}{32} \right\rceil = 224$$
 
@@ -50,7 +50,7 @@ $$N_t = \left\lceil \frac{H}{32} \right\rceil = \left\lceil \frac{7168}{32} \rig
 
 `per_core_M` is the number of output tile rows each core computes. Given a grid with `grid_y` rows:
 
-$$\text{per\_core\_M} = \frac{M_t}{\text{grid\_y}} = \frac{\lceil C/32 \rceil}{\text{grid\_y}}$$
+$$\text{per core M} = \frac{M_t}{\text{grid y}} = \frac{\lceil C/32 \rceil}{\text{grid y}}$$
 
 For this to be a positive integer, $M_t$ must be divisible by `grid_y`. As $C$ grows (higher batch or longer sequences), $M_t$ grows proportionally and the core grid can accommodate more tile rows per core.
 
@@ -70,11 +70,11 @@ For this to be a positive integer, $M_t$ must be divisible by `grid_y`. As $C$ g
 
 `per_core_N` is the number of output tile columns each core computes:
 
-$$\text{per\_core\_N} = \frac{N_t}{\text{grid\_x}} = \frac{\lceil D/32 \rceil}{\text{grid\_x}} \quad \text{[D UNVERIFIED — verify against Qwen3 Technical Report]}$$
+$$\text{per core N} = \frac{N_t}{\text{grid x}} = \frac{\lceil D/32 \rceil}{\text{grid x}} \quad \text{[D UNVERIFIED — verify against Qwen3 Technical Report]}$$
 
 For the down projection, $N_t = 224$ (the H dimension), so:
 
-$$\text{per\_core\_N} = \frac{224}{\text{grid\_x}}$$
+$$\text{per core N} = \frac{224}{\text{grid x}}$$
 
 For grid_x=8: `per_core_N = 28`. For grid_x=4: `per_core_N = 56`.
 
@@ -383,7 +383,7 @@ This check is particularly important for the decode regime ($M_t=1$, grid_y=1) �
 | Config type | `MatmulMultiCoreProgramConfig` | `MatmulMultiCoreReuseMultiCastProgramConfig` | $M_t=1$ forces single-row grid |
 | `grid_y` | 1 | 2 | Must divide $M_t$ |
 | `grid_x` | 8 | 8 | Must divide $N_t$ |
-| `per_core_M` | 1 | 1 | $M_t / \text{grid\_y}$ |
+| `per_core_M` | 1 | 1 | $M_t / \text{grid y}$ |
 | `per_core_N` | $N_t / 8$ [UNVERIFIED] | $N_t / 8$ [UNVERIFIED] | Depends on confirmed $D$ |
 | `K_t` (gate/up) | 224 | 224 | $\lceil 7168/32 \rceil$ — confirmed |
 | `in0_block_w` (gate/up) | 8 | 8 | Divides $K_t=224$; $224 \% 8 = 0$ ✓ |

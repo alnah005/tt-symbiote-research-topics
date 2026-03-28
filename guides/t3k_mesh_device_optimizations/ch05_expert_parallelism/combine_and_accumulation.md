@@ -72,15 +72,15 @@ For softmax-based routing (used in other MoE architectures), the scores are alre
 
 The combined output for token $b$ is:
 
-$$\text{output}[b] = \sum_{i=1}^{k} w_i^{\text{norm}} \times \text{expert\_output}[b, i]$$
+$$\text{output}[b] = \sum_{i=1}^{k} w_i^{\text{norm}} \times \text{expert output}[b, i]$$
 
-where $\text{expert\_output}[b, i] \in \mathbb{R}^H$ is the output of the $i$-th selected expert for token $b$.
+where $\text{expert output}[b, i] \in \mathbb{R}^H$ is the output of the $i$-th selected expert for token $b$.
 
 Expanding for $k = 8$:
 
 $$\text{output}[b] = w_1^{\text{norm}} \cdot e_1 + w_2^{\text{norm}} \cdot e_2 + \cdots + w_8^{\text{norm}} \cdot e_8$$
 
-where each $e_i = \text{expert\_output}[b, i] \in \mathbb{R}^{7168}$.
+where each $e_i = \text{expert output}[b, i] \in \mathbb{R}^{7168}$.
 
 ### Accumulation Loop
 

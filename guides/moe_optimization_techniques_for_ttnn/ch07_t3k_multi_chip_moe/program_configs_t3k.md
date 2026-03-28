@@ -10,7 +10,7 @@ The config parameters that change are those that depend on the activation tensor
 
 `per_core_M` specifies the number of tile rows each core processes. The total tile rows across all local experts are:
 
-$$\text{total\_tiles\_M} = E_d \times \left\lceil \frac{C}{32} \right\rceil = E_d \times M_t$$
+$$\text{total tiles M} = E_d \times \left\lceil \frac{C}{32} \right\rceil = E_d \times M_t$$
 
 With 80 Tensix cores per chip and 32 local experts, a natural core grouping is:
 
@@ -18,7 +18,7 @@ $$\text{core groups} = \frac{\text{cores}}{E_d} = \frac{80}{32} = 2.5 \quad \Rig
 
 Assigning 2 cores per expert (a core group handles one expert's matmul):
 
-$$\text{per\_core\_M} = \frac{E_d \times M_t}{\text{num\_core\_groups}} = \frac{32 \times M_t}{32} = M_t$$
+$$\text{per core M} = \frac{E_d \times M_t}{\text{num core groups}} = \frac{32 \times M_t}{32} = M_t$$
 
 So `per_core_M` equals $M_t = \lceil C / 32 \rceil$.
 
@@ -36,11 +36,11 @@ For the Qwen3.5-35B decode regime ($B \leq 256$), `per_core_M = 1` universally. 
 
 `per_core_N` depends on the output dimension $D$ [UNVERIFIED] and the grid column count:
 
-$$\text{per\_core\_N} = \left\lceil \frac{D / 32}{\text{grid\_cols}} \right\rceil = \left\lceil \frac{N_t}{\text{grid\_cols}} \right\rceil$$
+$$\text{per core N} = \left\lceil \frac{D / 32}{\text{grid cols}} \right\rceil = \left\lceil \frac{N_t}{\text{grid cols}} \right\rceil$$
 
 where $N_t = \lceil D / 32 \rceil$ is the total tile columns. With `grid_cols = 2` (2 cores per expert group arranged in a 1×2 or similar sub-grid):
 
-$$\text{per\_core\_N} = \left\lceil \frac{N_t}{2} \right\rceil \quad \text{[UNVERIFIED: depends on actual D]}$$
+$$\text{per core N} = \left\lceil \frac{N_t}{2} \right\rceil \quad \text{[UNVERIFIED: depends on actual D]}$$
 
 ### `out_subblock_h` and `out_subblock_w`
 
@@ -104,12 +104,12 @@ def make_t3k_moe_program_config(
 
 With 32 local experts and 80 Tensix cores, the natural assignment leaves 16 cores idle:
 
-$$\text{active cores} = E_d \times \text{cores\_per\_expert} = 32 \times 2 = 64$$
+$$\text{active cores} = E_d \times \text{cores per expert} = 32 \times 2 = 64$$
 $$\text{idle cores} = 80 - 64 = 16 \quad (20\% \text{ wasted})$$
 
 The utilization within each active core is further reduced by the small token count per expert:
 
-$$\text{token utilization} = \frac{C}{\text{tile\_size}} = \frac{2}{32} = 6.25\% \quad (B = 32)$$
+$$\text{token utilization} = \frac{C}{\text{tile size}} = \frac{2}{32} = 6.25\% \quad (B = 32)$$
 
 Only 2 of the 32 token slots in each tile row contain real data; the remaining 30 are zero-padded. A dense matmul wastes cycles on those zeros. This is why `sparse_matmul` is critical on T3K:
 
@@ -164,16 +164,16 @@ $$N_t = \left\lceil \frac{D}{32} \right\rceil \quad \text{[UNVERIFIED]}$$
 
 With 32 core groups (one per expert) and 2 cores per group (64 total active cores):
 
-$$\text{per\_core\_M} = \frac{E_d \times M_t}{\text{num\_core\_groups}} = \frac{32 \times 1}{32} = 1$$
+$$\text{per core M} = \frac{E_d \times M_t}{\text{num core groups}} = \frac{32 \times 1}{32} = 1$$
 
 **Step 5: Grid configuration**
 
-$$\text{grid} = (\text{grid\_cols}, \text{grid\_rows}) = (2, 32) \quad \Rightarrow \quad 64 \text{ active cores, 16 idle}$$
+$$\text{grid} = (\text{grid cols}, \text{grid rows}) = (2, 32) \quad \Rightarrow \quad 64 \text{ active cores, 16 idle}$$
 
 **Step 6: Output subblock**
 
-$$\text{out\_subblock\_h} = 1 \quad (\text{only valid divisor of } \text{per\_core\_M} = 1)$$
-$$\text{out\_subblock\_w} = \text{largest divisor of } \text{per\_core\_N} \leq 8 \quad \text{[UNVERIFIED: depends on D]}$$
+$$\text{out subblock h} = 1 \quad (\text{only valid divisor of } \text{per core M} = 1)$$
+$$\text{out subblock w} = \text{largest divisor of } \text{per core N} \leq 8 \quad \text{[UNVERIFIED: depends on D]}$$
 
 **Step 7: Core utilization**
 

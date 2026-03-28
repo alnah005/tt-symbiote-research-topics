@@ -6,7 +6,7 @@ After the combine all-to-all (Stage 4) completes, each device holds the expert
 outputs for all $B$ tokens that originated on that device. Logically, this is a
 three-dimensional buffer:
 
-$$\text{expert\_out}[B, k, H] \quad \text{(BF16)}$$
+$$\text{expert out}[B, k, H] \quad \text{(BF16)}$$
 
 where:
 - $B$ is the batch size of tokens originating on this device.
@@ -43,7 +43,7 @@ $$w_{b,j}^{\text{norm}} = \frac{w_{b,j}^{\text{raw}}}{\sum_{l=1}^{k} w_{b,l}^{\t
 
 The output for token $b$ is:
 
-$$\text{output}[b, :] = \sum_{j=1}^{k=8} w_{b,j}^{\text{norm}} \cdot \text{expert\_out}[b, j, :]$$
+$$\text{output}[b, :] = \sum_{j=1}^{k=8} w_{b,j}^{\text{norm}} \cdot \text{expert out}[b, j, :]$$
 
 This is a weighted sum over $k = 8$ vectors of length $H = 7168$.
 

@@ -187,7 +187,7 @@ W_down = ttnn.from_torch(
 
 The leading $E$ dimension is the batch dimension from TTNN's perspective. Each expert's weight slice is a contiguous `[H, D]` or `[D, H]` matrix in DRAM; the kernel reads each expert's slice in turn during the batched dispatch.
 
-> **Warning:** The weights for all 256 experts must fit in DRAM. On a single Wormhole B0 device (12 GB DRAM), the total weight footprint for gate + up + down in BFP8 is approximately $3 \times E \times H \times D \times \text{bytes\_per\_BFP8\_element}$. With $E=256$, $H=7168$, D=[D UNVERIFIED — verify against Qwen3 Technical Report], this must be verified against device memory capacity. For 8 T3K devices with expert parallelism (Chapter 7), each chip holds $E/8 = 32$ experts, reducing per-chip weight memory by 8×.
+> **Warning:** The weights for all 256 experts must fit in DRAM. On a single Wormhole B0 device (12 GB DRAM), the total weight footprint for gate + up + down in BFP8 is approximately $3 \times E \times H \times D \times \text{bytes per BFP8 element}$. With $E=256$, $H=7168$, D=[D UNVERIFIED — verify against Qwen3 Technical Report], this must be verified against device memory capacity. For 8 T3K devices with expert parallelism (Chapter 7), each chip holds $E/8 = 32$ experts, reducing per-chip weight memory by 8×.
 
 ### 3.3 Contiguous Expert Slices and DRAM Locality
 
@@ -247,7 +247,7 @@ Tile counts for the per-expert matmul:
 
 $$M_t = \lceil 32 / 32 \rceil = 1$$
 $$K_t = \lceil 7168 / 32 \rceil = 224$$
-$$N_t = \lceil D / 32 \rceil \quad \text{[N\_t UNVERIFIED — verify against Qwen3 Technical Report]}$$
+$$N_t = \lceil D / 32 \rceil \quad \text{[Nt UNVERIFIED — verify against Qwen3 Technical Report]}$$
 
 **Down projection (second linear layer):**
 

@@ -209,7 +209,7 @@ $$n_{\text{chunks}} = \left\lceil \frac{S}{S_{\text{chunk}}} \right\rceil$$
 
 For each chunk, the activation tensor is $[B, S_{\text{chunk}}, H]$. Choose $S_{\text{chunk}}$ such that the per-core shard fits in L1:
 
-$$S_{\text{chunk}} = n_{\text{cores}} \times \left\lfloor \frac{L1_{\text{per-core}}}{H \times 2 \times \text{tiles\_per\_row}} \right\rfloor$$
+$$S_{\text{chunk}} = n_{\text{cores}} \times \left\lfloor \frac{L1_{\text{per-core}}}{H \times 2 \times \text{tiles per row}} \right\rfloor$$
 
 A practical formula for aligning to matmul tile requirements (tile size = 32):
 

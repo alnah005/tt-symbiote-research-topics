@@ -53,7 +53,7 @@ single effective link of 12.5 GB/s. This may be optimistic for interior devices.
 
 **Why it matters:** In speculative decoding, a small draft model generates several candidate tokens,
 and a larger verifier model (Qwen3.5-35B) evaluates them in a single forward pass. This changes
-the effective batch structure: the verifier sees a batch of $B' = B \times \text{spec\_depth}$
+the effective batch structure: the verifier sees a batch of $B' = B \times \text{spec depth}$
 positions at once, with some positions being draft tokens that will be rejected. The MoE routing
 distribution for rejected tokens is discarded, but their expert capacity slots are consumed.
 
@@ -128,7 +128,7 @@ each expert confined to intra-device cores only (no additional Ethernet traffic)
 **Why it matters:** $D$ determines:
 
 - Expert weight size per device: $3 \times 32 \times 7168 \times D \times 2$ bytes
-- `per_core_N` in the matmul program config: $\lceil D / 32 \rceil / \text{grid\_cols}$
+- `per_core_N` in the matmul program config: $\lceil D / 32 \rceil / \text{grid cols}$
 - Expert FFN FLOP count and arithmetic intensity
 
 Several estimates in prior chapters are marked [UNVERIFIED] because $D$ is not confirmed in

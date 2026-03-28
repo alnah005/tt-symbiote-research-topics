@@ -75,7 +75,7 @@ The standard solution is to fix an **expert_capacity** — a maximum number of t
 
 Expert capacity is typically specified via a **capacity factor** `C`:
 
-$$\text{expert\_capacity} = C \times T \times \text{top\_k} \;/\; \text{num\_experts}$$
+$$\text{expert capacity} = C \times T \times \text{top k} \;/\; \text{num experts}$$
 
 where `T = batch * seq` is the total number of tokens and `top_k` is the number of experts each token is assigned to.
 
@@ -126,7 +126,7 @@ Most MoE models address this with an auxiliary **load balancing loss** added to 
 
 Switch Transformer uses:
 
-$$\mathcal{L}_{\text{balance}} = \text{num\_experts} \times \sum_{i} f_i \cdot P_i$$
+$$\mathcal{L}_{\text{balance}} = \text{num experts} \times \sum_{i} f_i \cdot P_i$$
 
 where:
 - `f_i` = fraction of tokens dispatched to expert `i` in the current batch (`f_i = count_i / T`)
@@ -222,16 +222,16 @@ The **sparsity tensor** is the TTNN data structure that encodes this pattern; it
 
 The **sparsity ratio** is the fraction of expert slots (after capacity padding) that receive zero tokens:
 
-$$\text{sparsity\_ratio} = 1 - \frac{\sum \text{slot\_counts}}{\text{num\_experts} \times \text{expert\_capacity}}$$
+$$\text{sparsity ratio} = 1 - \frac{\sum \text{slot counts}}{\text{num experts} \times \text{expert capacity}}$$
 
 Since `sum(slot_counts) = T * top_k` (assuming no dropped tokens — when tokens are dropped, `sum(slot_counts) < T * top_k`; see Note below), under the no-drop condition, this simplifies to:
 
-$$\text{sparsity\_ratio} = 1 - \frac{T \times \text{top\_k}}{\text{num\_experts} \times \text{expert\_capacity}}$$
+$$\text{sparsity ratio} = 1 - \frac{T \times \text{top k}}{\text{num experts} \times \text{expert capacity}}$$
 
-Substituting $\text{expert\_capacity} = C \times T \times \text{top\_k} / \text{num\_experts}$ (at uniform load; using the pre-rounding formula for the derivation):
+Substituting $\text{expert capacity} = C \times T \times \text{top k} / \text{num experts}$ (at uniform load; using the pre-rounding formula for the derivation):
 
-$$= 1 - \frac{T \times \text{top\_k}}{\text{num\_experts} \times C \times T \times \text{top\_k} / \text{num\_experts}}
-= 1 - \frac{T \times \text{top\_k} \times \text{num\_experts}}{\text{num\_experts} \times C \times T \times \text{top\_k}}
+$$= 1 - \frac{T \times \text{top k}}{\text{num experts} \times C \times T \times \text{top k} / \text{num experts}}
+= 1 - \frac{T \times \text{top k} \times \text{num experts}}{\text{num experts} \times C \times T \times \text{top k}}
 = 1 - \frac{1}{C}$$
 
 > **Note:** The identity `sparsity_ratio = 1 - 1/C` holds under the no-drop condition (when tokens are dropped, the actual ratio exceeds this value) and only when `expert_capacity` equals the unrounded formula — after tile-ceiling rounding to the nearest multiple of 32, the true sparsity ratio is slightly greater than `1 - 1/C` (typically sub-percent difference). When tokens are dropped (C is small or routing is highly imbalanced), use the general form with `sum(slot_counts)`.

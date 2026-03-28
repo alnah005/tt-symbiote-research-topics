@@ -111,7 +111,7 @@ Every TTNN kernel op manages its L1 usage through circular buffers. A CB is a na
 
 For each core executing an op, the CB footprint is:
 
-$$\text{CB total} = \sum_{i} n_{\text{tiles},i} \times \text{bytes\_per\_tile}$$
+$$\text{CB total} = \sum_{i} n_{\text{tiles},i} \times \text{bytes per tile}$$
 
 where $i$ ranges over all active CBs for that op (input CBs, output CBs, intermediate CBs).
 
@@ -139,7 +139,7 @@ When a tensor is placed in L1 with sharding, each core holds a contiguous slice 
 
 The tensor's row dimension is split across cores. For a tensor of shape $[M, N]$ (in tiles: $M_t \times N_t$):
 
-$$\text{per-core shard shape} = \left[\left\lceil\frac{M_t}{n_{\text{cores}}}\right\rceil, N_t\right] \times \text{bytes\_per\_tile}$$
+$$\text{per-core shard shape} = \left[\left\lceil\frac{M_t}{n_{\text{cores}}}\right\rceil, N_t\right] \times \text{bytes per tile}$$
 
 All $N_t$ column tiles are present on every core, but only a subset of row tiles. This is the natural layout for ops that process different rows independently (e.g., layernorm row-wise).
 
@@ -147,7 +147,7 @@ All $N_t$ column tiles are present on every core, but only a subset of row tiles
 
 The tensor's column dimension is split across cores. Each core holds all rows but only a fraction of columns:
 
-$$\text{per-core shard shape} = \left[M_t, \left\lceil\frac{N_t}{n_{\text{cores}}}\right\rceil\right] \times \text{bytes\_per\_tile}$$
+$$\text{per-core shard shape} = \left[M_t, \left\lceil\frac{N_t}{n_{\text{cores}}}\right\rceil\right] \times \text{bytes per tile}$$
 
 Used when column-parallel operations are needed without row communication.
 
@@ -155,7 +155,7 @@ Used when column-parallel operations are needed without row communication.
 
 Both dimensions are split. Cores are arranged in a 2D grid of shape $(r \times c)$ where $r \times c = n_{\text{cores}}$:
 
-$$\text{per-core shard shape} = \left[\left\lceil\frac{M_t}{r}\right\rceil, \left\lceil\frac{N_t}{c}\right\rceil\right] \times \text{bytes\_per\_tile}$$
+$$\text{per-core shard shape} = \left[\left\lceil\frac{M_t}{r}\right\rceil, \left\lceil\frac{N_t}{c}\right\rceil\right] \times \text{bytes per tile}$$
 
 Block sharding minimizes per-core shard size for square-ish tensors and is typically used for 2D matmuls.
 

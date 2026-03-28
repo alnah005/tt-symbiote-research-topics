@@ -18,7 +18,7 @@ The `per_core_M` parameter in the program config controls how many output rows a
 each core. A value of `per_core_M > 1` multiplies the per-core L1 working set linearly. At decode
 time with $C < 32$, the correct value is:
 
-$$\text{per\_core\_M} = \left\lceil \frac{C}{32} \right\rceil = 1$$
+$$\text{per core M} = \left\lceil \frac{C}{32} \right\rceil = 1$$
 
 If `per_core_M` is set to a larger value (for example, copied from a prefill config without
 adjustment), the matmul kernel will attempt to allocate more L1 than is available on Wormhole B0

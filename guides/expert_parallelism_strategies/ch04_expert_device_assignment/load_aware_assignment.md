@@ -396,7 +396,7 @@ Each direction of migration (source device writes, destination device reads) con
 
 **Practical guidance:** For periodic reassignment every 1,000 steps, even if 64 experts ($\Delta = 64$, one quarter of all experts) are moved, the migration cost is:
 
-$$T_{\text{total\_migrate}} = 64 \times W_{\text{expert}} / 12.5\;\text{GB/s}$$
+$$T_{\text{total migrate}} = 64 \times W_{\text{expert}} / 12.5\;\text{GB/s}$$
 
 This amortized over 1,000 steps is typically a small fraction of per-step inference time. However, if $\Delta = 64$ and $W_{\text{expert}}$ is on the order of hundreds of MB, migration can take several seconds — plan accordingly.
 

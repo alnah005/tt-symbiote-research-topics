@@ -56,14 +56,14 @@ where up to $C \times E_d$ tokens can be sent per destination device.
 The packing step:
 
 1. For each token $b \in [0, B)$ and each of its $k$ selected experts, determine which device
-   owns that expert: $\text{device} = \lfloor \text{expert\_index} / E_d \rfloor$.
+   owns that expert: $\text{device} = \lfloor \text{expert index} / E_d \rfloor$.
 2. Place the token's hidden state into the appropriate destination slot in the send buffer.
 3. Record the dispatch metadata (token index, expert index, routing score) for use at the combine
    step.
 
 The `per_core_M` parameter for the expert FFN matmul is set from this step:
 
-$$\text{per\_core\_M} = \left\lceil \frac{C}{32} \right\rceil = 1 \quad \text{for all decode } B \text{ (since } C < 32\text{)}$$
+$$\text{per core M} = \left\lceil \frac{C}{32} \right\rceil = 1 \quad \text{for all decode } B \text{ (since } C < 32\text{)}$$
 
 ### Step 3: All-to-All Dispatch
 
@@ -135,7 +135,7 @@ distributions. See Section 8.3 (error 3) for the consequences.
 
 The final output for each token is:
 
-$$y = \sum_{i=1}^{k} \hat{s}_i \cdot \text{expert\_out}_i$$
+$$y = \sum_{i=1}^{k} \hat{s}_i \cdot \text{expert out}_i$$
 
 ### Step 7: Residual Add
 

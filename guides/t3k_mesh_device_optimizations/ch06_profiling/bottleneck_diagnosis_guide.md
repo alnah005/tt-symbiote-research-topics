@@ -65,7 +65,7 @@ Use the following table as a starting point, then verify with profiling:
 
 At decode with $B=32$, $C=2$: dispatch volume ≈ 6.4 MB/device → start with `num_links=1`,
 try `num_links=2` and compare. The latency reduction from adding links is approximately
-$\text{transfer\_time} / \text{num\_links}$ at full payload; for small payloads, link setup
+$\text{transfer time} / \text{num links}$ at full payload; for small payloads, link setup
 overhead erodes this gain (see `device_perf_counters.md` §4).
 
 > **Warning:** Increasing `num_links` beyond the point of diminishing returns wastes Ethernet

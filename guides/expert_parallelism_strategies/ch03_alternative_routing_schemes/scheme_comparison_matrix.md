@@ -144,7 +144,7 @@ $$T_\text{metadata}^\text{a2a} = T_\text{router}(NB) - T_\text{router}(B) = 2(N-
 
 Substituting $N = 8$, $H = 7{,}168$, $E = 256$, $\text{TFLOP}_\text{peak} = 262 \times 10^{12}$:
 
-$$T_\text{extra\_router}(B) = \frac{2 \times 7 \times B \times 7{,}168 \times 256}{262 \times 10^{12}} = \frac{25{,}690{,}112 \times B}{262 \times 10^{12}} \approx 9.8 \times 10^{-8} \times B \text{ seconds}$$
+$$T_\text{extra router}(B) = \frac{2 \times 7 \times B \times 7{,}168 \times 256}{262 \times 10^{12}} = \frac{25{,}690{,}112 \times B}{262 \times 10^{12}} \approx 9.8 \times 10^{-8} \times B \text{ seconds}$$
 
 For $B = 32$: extra router time $\approx 3.1\,\mu\text{s}$. This is small compared to the $\sim 514\,\mu\text{s}$ all-to-all collective time, confirming that at $B = 32$, all-to-all is preferred on compute grounds. The crossover batch size $B^*$ (where extra router cost equals metadata overhead) depends on the TTNN-specific metadata latency, which is measured in Chapter 6, `end_to_end_latency_model.md`.
 

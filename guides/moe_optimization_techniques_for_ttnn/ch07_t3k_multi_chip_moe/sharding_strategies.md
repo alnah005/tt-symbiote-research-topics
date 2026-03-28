@@ -103,8 +103,8 @@ expert_weights_device = ttnn.as_tensor(
 
 The expert FFN computation streams weight tiles from DRAM to L1 on a per-core basis. The memory access pattern for a single expert's matmul is:
 
-1. Load activation tile $[C, \text{tile\_size}]$ from L1 receive buffer into compute core
-2. Load corresponding weight tile $[\text{tile\_size}, D_{\text{tile}}]$ from DRAM
+1. Load activation tile $[C, \text{tile size}]$ from L1 receive buffer into compute core
+2. Load corresponding weight tile $[\text{tile size}, D_{\text{tile}}]$ from DRAM
 3. Accumulate into output tile in L1
 4. Repeat across the $K_t = \lceil H / 32 \rceil = \lceil 7168 / 32 \rceil = 224$ tile columns
 

@@ -69,7 +69,7 @@ The following symbols are used consistently across all files in this chapter. Th
 | $k$ | Number of experts selected per token (top-k routing) | 8 |
 | $B$ | Batch size (number of sequences) | varies |
 | $S$ | Sequence length | 1 (decode); 2048 (prefill) |
-| $\rho$ | Sparsity ratio: fraction of expert slots (and tile rows) that are active: $\rho = \text{active\_experts} / E_d$ (consistent with Chapter 4 convention). Fraction of tile rows skipped = $1 - \rho$. | $\approx 0.031$ for B=1 decode |
+| $\rho$ | Sparsity ratio: fraction of expert slots (and tile rows) that are active: $\rho = \text{active experts} / E_d$ (consistent with Chapter 4 convention). Fraction of tile rows skipped = $1 - \rho$. | $\approx 0.031$ for B=1 decode |
 | $C$ | Expert capacity: maximum number of tokens routed to a single expert: $C = \lceil k \times B \times S / E \rceil$ | 1 (B=1, S=1); 256 (B=4, S=2048) |
 
 > **Tip:** For Qwen3.5-35B decode with B=1, $\rho \approx 0.031$: only 1 of the 32 local experts is active on average. That means $1 - \rho = 31/32 \approx 0.969$ of tile rows are skipped — approximately 97% of expert FFN compute is avoided by `sparse_matmul`.
