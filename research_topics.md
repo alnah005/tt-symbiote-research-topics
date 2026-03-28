@@ -334,3 +334,35 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ---
 
+## Gated Delta Net and Gated Attention on T3K
+**Date:** 2026-03-27
+**Status:** Completed
+**Guide:** `guides/gated_delta_net_and_gated_attention_on_t3k/`
+**Why Needed:** Qwen-Coder-Next and Qwen3.5 models introduce Gated Delta Net (a linear-recurrent attention variant) alongside standard Gated Attention. Understanding the mathematical foundations and compute/memory characteristics of these operations is required before mapping them onto the T3K 1×8 mesh.
+**Questions:**
+1. What is the Gated Delta Net mechanism — what are the core mathematical operations (delta rule update, gating, state matrix), and how does it differ from standard softmax attention and other linear attention variants (e.g. RetNet, Mamba, GLA)?
+2. What is the Gated Attention mechanism used in these models — how does the gating interact with the standard QKV projection and SDPA, and what tensor shapes does it introduce relative to vanilla multi-head attention?
+3. What are the data dependencies and recurrence structure in Gated Delta Net — is the state update strictly sequential per token, or can it be parallelized across the sequence dimension (e.g. via parallel scan / associative scan)?
+4. What TTNN primitive operations (matmul, elementwise, scan, reduce) would be needed to implement a single Gated Delta Net step for decode (batch=1, single token) and for prefill (full sequence), and what are the expected tensor shapes at each step?
+5. How does the hidden state size and gating dimensionality of Gated Delta Net compare to the KV cache size of standard attention for the same model — what are the memory footprint implications on T3K L1 and DRAM?
+6. For the recurrent decode step of Gated Delta Net, is the bottleneck compute-bound (state matrix multiply) or bandwidth-bound (state read/write), and how does this map to Wormhole's compute-to-bandwidth ratio?
+7. How should the Gated Delta Net state matrix be sharded across the 8 devices of T3K — what parallelism strategy (tensor parallel, sequence parallel, or replicated state) minimizes CCL overhead while keeping per-device memory within budget?
+8. Are there existing TTNN kernels or tt-transformers primitives (e.g. `ttnn.matmul`, `ttnn.mul`, fused scan ops) that can express the Gated Delta Net and Gated Attention forward passes, or are new custom kernels required?
+
+---
+
+## Windowed Attention: Foundations and T3K Mapping
+**Date:** 2026-03-27
+**Status:** Pending
+**Why Needed:** Some models (e.g. Qwen3.5, Mistral) use windowed (sliding window) attention to bound KV cache size and reduce attention complexity. Understanding the mathematical foundations and compute/memory characteristics is required before mapping windowed attention onto the T3K 1×8 mesh.
+**Questions:**
+1. What is windowed (sliding window) attention — what are the core mathematical operations, what is the window size parameter, and how does it differ from full causal attention in terms of which tokens each query attends to?
+2. How does windowed attention interact with KV cache management during decode — does each new token evict old KV entries, and what is the resulting KV cache size relative to full attention?
+3. What are the data dependencies and memory access patterns in windowed attention during prefill (full sequence) vs decode (single token) — can the window be expressed as a masked full-attention kernel, or does it require a specialized kernel?
+4. What TTNN primitive operations would be needed to implement windowed attention for decode and prefill, and what tensor shapes does the window constraint introduce (e.g. KV tensor shape as a circular buffer vs full-length tensor)?
+5. How does windowed attention interact with paged KV cache implementations — can paged_sdpa_decode be used with a window constraint, or does the paging scheme need to be aware of the window boundary?
+6. For the T3K 1×8 mesh, how should the windowed KV cache be sharded across devices — is the window applied per-device (each device holds a shard of the window) or is the full window replicated, and what are the CCL implications for cross-device attention?
+7. Is windowed attention compute-bound or bandwidth-bound on Wormhole for typical window sizes (e.g. 4096, 8192 tokens) and batch=1 decode — and how does this compare to full attention at the same sequence position?
+8. Are there existing TTNN kernels or tt-transformers primitives that already support windowed or masked attention patterns, or would a new kernel / program config be required?
+
+---
