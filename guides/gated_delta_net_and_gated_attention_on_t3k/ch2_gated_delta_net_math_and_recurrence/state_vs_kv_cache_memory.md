@@ -199,7 +199,7 @@ At B = 2 or higher, the per-layer state exceeds 2 MB and cannot fit in any singl
 The L1 constraint confirms that:
 
 1. The decode step is **streaming-from-DRAM** dominated, consistent with the arithmetic intensity analysis in Section 3 of `parallelism_and_scan.md` (~1.25 FLOPs/byte).
-2. Efficient decode requires kernel designs that maximize DRAM bandwidth utilization during the `S^T k̃` and `k̃ ⊗ error` operations, rather than trying to keep the full state resident in L1.
+2. Efficient decode requires kernel designs that maximize DRAM bandwidth utilization during the $S^\top \tilde{k}$ and $\tilde{k} \otimes \text{error}$ operations, rather than trying to keep the full state resident in L1.
 3. Head-parallel sharding (one T3K device per subset of heads) is a natural strategy: each device holds a shard of the state in its DRAM and processes the corresponding heads locally. This is analyzed in Chapter 6.
 
 ---

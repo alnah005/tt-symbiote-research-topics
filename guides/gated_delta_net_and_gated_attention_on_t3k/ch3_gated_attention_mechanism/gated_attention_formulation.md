@@ -76,10 +76,11 @@ v_raw [B, T, 512] → reshape → V_raw: [B, T, n_kv_h, d_h] = [B, T, 2, 256]
 
 The gate is applied to the raw query vectors before any normalization. This is an element-wise operation after a sigmoid activation:
 
-```
-gate_sigmoid = σ(gate_raw):  [B, T, 16, 256]   (sigmoid applied element-wise)
-Q_gated      = Q_raw ⊙ gate_sigmoid: [B, T, 16, 256]
-```
+$$\text{gate\_sigmoid} = \sigma(\text{gate\_raw})$$
+
+$$Q_{\text{gated}} = Q_{\text{raw}} \odot \text{gate\_sigmoid}$$
+
+Both tensors have shape `[B, T, 16, 256]`.
 
 **Geometric interpretation.** Each element of `gate_sigmoid` lies in (0, 1). Multiplying by Q entry-wise performs input-dependent suppression: query dimensions that the model deems irrelevant for the current token are scaled toward zero. This gives the model the ability to selectively "blank out" parts of its query representation on a per-token, per-head, per-dimension basis — a form of soft feature selection that standard attention lacks.
 
@@ -101,7 +102,7 @@ K_normed = RMSNorm(K_raw,   weight=k_norm_weight):  [B, T,  2, 256]
 
 The normalization is applied over the last dimension (d_h = 256) for each (B, T, head) slice independently. Shapes are unchanged.
 
-**Order note.** The sequence is: project → gate_sigmoid ⊙ Q → RMSNorm(Q_gated). Most models that use both gating and normalization apply normalization first. Here the gating precedes the norm, which means the norm operates on already-masked query vectors, stabilizing the magnitude of the surviving signal rather than the raw projection.
+**Order note.** The sequence is: project → $\sigma(\text{gate\_raw}) \odot Q$ → $\text{RMSNorm}(Q_{\text{gated}})$. Most models that use both gating and normalization apply normalization first. Here the gating precedes the norm, which means the norm operates on already-masked query vectors, stabilizing the magnitude of the surviving signal rather than the raw projection.
 
 V is not normalized.
 
@@ -180,18 +181,17 @@ V_exp:  [B, T, 16, 256] → transpose → [B, 16, T, 256]   (prefill)
 
 **Prefill (T > 1):**
 
-```
-attn_output = scaled_dot_product_attention(Q_rope, K_exp, V_exp)
+$$\text{scores} = \frac{Q_{\text{rope}} \cdot K_{\text{exp}}^\top}{\sqrt{d_h}}$$
 
-  scores = (Q_rope @ K_exp^T) / sqrt(d_h)
-         = [B, 16, T, 256] @ [B, 16, 256, T]  →  [B, 16, T, T]
+Shape: $[B, 16, T, 256] \cdot [B, 16, 256, T] \to [B, 16, T, T]$
 
-  weights = softmax(scores, dim=-1):  [B, 16, T, T]
-  (causal mask applied before softmax)
+$$\text{weights} = \text{softmax}(\text{scores})$$
 
-  attn_output = weights @ V_exp
-              = [B, 16, T, T] @ [B, 16, T, 256]  →  [B, 16, T, 256]
-```
+Shape: $[B, 16, T, T]$ (causal mask applied before softmax)
+
+$$\text{attn\_output} = \text{weights} \cdot V_{\text{exp}}$$
+
+Shape: $[B, 16, T, T] \cdot [B, 16, T, 256] \to [B, 16, T, 256]$
 
 Shape check: `sqrt(d_h) = sqrt(256) = 16.0`.
 

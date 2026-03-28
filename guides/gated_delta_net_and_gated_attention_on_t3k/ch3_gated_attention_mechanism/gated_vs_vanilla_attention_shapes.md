@@ -27,7 +27,7 @@ Abbreviations used in the table:
 | SDPA output | [B, 16, T, 128] | [B, 16, 1, 128] |
 | Reshaped output | [B, T, 2048] | [B, 1, 2048] |
 
-Shape check: `n_h × d_h = 16 × 128 = 2048`. Output matches hidden size directly.
+Shape check: $n_h \times d_h = 16 \times 128 = 2048$. Output matches hidden size directly.
 
 ### Standard GQA (example: n_q_h=16, n_kv_h=4, d_h=128, hidden=2048)
 
@@ -42,7 +42,7 @@ Shape check: `n_h × d_h = 16 × 128 = 2048`. Output matches hidden size directl
 | SDPA output | [B, 16, T, 128] | [B, 16, 1, 128] |
 | Reshaped output | [B, T, 2048] | [B, 1, 2048] |
 
-Shape check: `n_q_h × d_h = 16 × 128 = 2048`. Expand factor: `n_q_h / n_kv_h = 16 / 4 = 4×`.
+Shape check: $n_{q\_h} \times d_h = 16 \times 128 = 2048$. Expand factor: $n_{q\_h} / n_{kv\_h} = 16 / 4 = 4\times$.
 
 ### Qwen3.5 Gated Attention (n_q_h=16, n_kv_h=2, d_h=256, hidden=2048)
 
@@ -60,9 +60,9 @@ Shape check: `n_q_h × d_h = 16 × 128 = 2048`. Expand factor: `n_q_h / n_kv_h =
 | Reshaped output | [B, T, 4096] | [B, 1, 4096] |
 | After o_proj | [B, T, 2048] | [B, 1, 2048] |
 
-Shape check: `n_q_h × d_h = 16 × 256 = 4096`. The reshape produces 4096, and o_proj `[4096 → 2048]` brings it back to hidden size. Note this differs from MHA/GQA examples above where the reshape directly produces hidden size — Gated Attention needs an explicit down-projection step.
+Shape check: $n_{q\_h} \times d_h = 16 \times 256 = 4096$. The reshape produces 4096, and o_proj $[4096 \to 2048]$ brings it back to hidden size. Note this differs from MHA/GQA examples above where the reshape directly produces hidden size — Gated Attention needs an explicit down-projection step.
 
-Expand factor: `n_q_h / n_kv_h = 16 / 2 = 8×`.
+Expand factor: $n_{q\_h} / n_{kv\_h} = 16 / 2 = 8\times$.
 
 ---
 

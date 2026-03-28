@@ -5,7 +5,7 @@
 Chapter 1 established two complementary shortcomings in the existing linear attention family:
 
 - **GLA** introduces a data-dependent, per-column forgetting gate that allows the state to selectively discard old information. However the write is always a direct outer product `v_t k̃_t^T` — the model writes whatever value it sees into the state, regardless of what is already stored there. There is no mechanism to correct prediction errors.
-- **DeltaNet** applies the delta rule: it measures the prediction error between what the state currently associates with key `k̃_t` and the new target value `v_t`, then writes only the correction. This gives precise, targeted writes. But standard DeltaNet sets no coarse decay gate, so the state accumulates all past writes without global forgetting.
+- **DeltaNet** applies the delta rule: it measures the prediction error between what the state currently associates with key $\tilde{k}_t$ and the new target value $v_t$, then writes only the correction. This gives precise, targeted writes. But standard DeltaNet sets no coarse decay gate, so the state accumulates all past writes without global forgetting.
 
 **Gated Delta Net** combines both mechanisms: scalar coarse forgetting from GLA and error-correcting writes from DeltaNet. The result is a state that (a) decays uniformly over time so old associations fade, and (b) corrects itself toward new associations rather than blindly overwriting them.
 
@@ -18,90 +18,86 @@ For a single head at sequence step `t`, let:
 | Symbol | Shape | Description |
 |--------|-------|-------------|
 | `S_t` | `[d_k, d_v]` | Recurrent state matrix at step t |
-| `k̃_t` | `[d_k]` | L2-normalized key vector |
-| `q̃_t` | `[d_k]` | L2-normalized query vector |
+| $\tilde{k}_t$ | `[d_k]` | L2-normalized key vector |
+| $\tilde{q}_t$ | `[d_k]` | L2-normalized query vector |
 | `v_t` | `[d_v]` | Value vector |
-| `g_t` | scalar ∈ (0, 1) | Scalar decay gate |
-| `β_t` | scalar ∈ (0, 1) | Update rate (delta step size) |
+| $g_t$ | scalar $\in (0, 1)$ | Scalar decay gate |
+| $\beta_t$ | scalar $\in (0, 1)$ | Update rate (delta step size) |
 | `o_t` | `[d_v]` | Output vector for this head |
 
 The recurrence is:
 
-```
-g_t  = exp(α_t)                                    α_t < 0  →  g_t ∈ (0, 1)
-β_t  = σ(b_t)                                      β_t ∈ (0, 1)
-S_t  = g_t · S_{t-1}  +  k̃_t (β_t · (v_t − g_t · S_{t-1}^T k̃_t))^T
-o_t  = S_t^T q̃_t
-```
+$$g_t = \exp(\alpha_t) \qquad \alpha_t < 0 \;\Rightarrow\; g_t \in (0, 1)$$
+
+$$\beta_t = \sigma(b_t) \qquad \beta_t \in (0, 1)$$
+
+$$S_t = g_t \cdot S_{t-1} + \tilde{k}_t \bigl(\beta_t \cdot (v_t - g_t \cdot S_{t-1}^\top \tilde{k}_t)\bigr)^\top$$
+
+$$o_t = S_t^\top \tilde{q}_t$$
 
 ### Dimensional consistency check
 
-All terms are verified ∈ R^{d_k × d_v}: `g_t · S_{t-1}` ∈ R^{d_k × d_v}, the outer product `k̃_t · (correction)^T` ∈ R^{d_k × d_v}, and the readout `S_t^T q̃_t` ∈ R^{d_v}.
+All terms are verified $\in \mathbb{R}^{d_k \times d_v}$: $g_t \cdot S_{t-1} \in \mathbb{R}^{d_k \times d_v}$, the outer product $\tilde{k}_t \cdot (\text{correction})^\top \in \mathbb{R}^{d_k \times d_v}$, and the readout $S_t^\top \tilde{q}_t \in \mathbb{R}^{d_v}$.
 
 ---
 
 ## 3. Interpretation of Each Term
 
-### 3.1 `g_t · S_{t-1}` — Coarse Forgetting
+### 3.1 $g_t \cdot S_{t-1}$ — Coarse Forgetting
 
-The entire state is multiplied by the scalar `g_t ∈ (0, 1)`. Every entry of the `d_k × d_v` state matrix decays by the same factor. When `g_t` is close to 0 the state is nearly wiped; when `g_t` is close to 1 forgetting is minimal. This is the GLA-style mechanism: a single input-dependent scalar controls global memory retention at this step.
+The entire state is multiplied by the scalar $g_t \in (0, 1)$. Every entry of the `d_k × d_v` state matrix decays by the same factor. When $g_t$ is close to 0 the state is nearly wiped; when $g_t$ is close to 1 forgetting is minimal. This is the GLA-style mechanism: a single input-dependent scalar controls global memory retention at this step.
 
-### 3.2 `g_t · S_{t-1}^T k̃_t` — Predicted Value Under Decayed State
+### 3.2 $g_t \cdot S_{t-1}^\top \tilde{k}_t$ — Predicted Value Under Decayed State
 
-After decaying, the model retrieves what the decayed state associates with the current key: it forms the matrix-vector product `(g_t · S_{t-1})^T k̃_t ∈ R^{d_v}`. This is the model's current best prediction of `v_t` given key `k̃_t`.
+After decaying, the model retrieves what the decayed state associates with the current key: it forms the matrix-vector product $(g_t \cdot S_{t-1})^\top \tilde{k}_t \in \mathbb{R}^{d_v}$. This is the model's current best prediction of $v_t$ given key $\tilde{k}_t$.
 
-### 3.3 `β_t · (v_t − g_t · S_{t-1}^T k̃_t)` — Delta Correction
+### 3.3 $\beta_t \cdot (v_t - g_t \cdot S_{t-1}^\top \tilde{k}_t)$ — Delta Correction
 
-The prediction error is `v_t − g_t · S_{t-1}^T k̃_t ∈ R^{d_v}`. The update rate `β_t = σ(b_t) ∈ (0, 1)` scales how aggressively the state corrects toward the true value. When `β_t ≈ 1` the correction is large; when `β_t ≈ 0` the existing state is trusted.
+The prediction error is $v_t - g_t \cdot S_{t-1}^\top \tilde{k}_t \in \mathbb{R}^{d_v}$. The update rate $\beta_t = \sigma(b_t) \in (0, 1)$ scales how aggressively the state corrects toward the true value. When $\beta_t \approx 1$ the correction is large; when $\beta_t \approx 0$ the existing state is trusted.
 
-This term is the DeltaNet mechanism: instead of writing `v_t` unconditionally, only the error residual is written back.
+This term is the DeltaNet mechanism: instead of writing $v_t$ unconditionally, only the error residual is written back.
 
-### 3.4 Outer Product Write `k̃_t (correction)^T`
+### 3.4 Outer Product Write $\tilde{k}_t (\text{correction})^\top$
 
-The correction vector is written into the state by taking the outer product with key `k̃_t`. The key acts as the addressing vector: the update is concentrated at directions in state-space aligned with `k̃_t`. This is an associative memory update — future queries with keys similar to `k̃_t` will retrieve the corrected value.
+The correction vector is written into the state by taking the outer product with key $\tilde{k}_t$. The key acts as the addressing vector: the update is concentrated at directions in state-space aligned with $\tilde{k}_t$. This is an associative memory update — future queries with keys similar to $\tilde{k}_t$ will retrieve the corrected value.
 
-### 3.5 `o_t = S_t^T q̃_t` — Output Retrieval
+### 3.5 $o_t = S_t^\top \tilde{q}_t$ — Output Retrieval
 
-The output is a linear read from the updated state using the L2-normalized query `q̃_t`. This is identical to the standard linear attention output step.
+The output is a linear read from the updated state using the L2-normalized query $\tilde{q}_t$. This is identical to the standard linear attention output step.
 
 ---
 
 ## 4. Comparison to Standard DeltaNet
 
-Standard DeltaNet (without gating) is the special case `g_t = 1` at every step:
+Standard DeltaNet (without gating) is the special case $g_t = 1$ at every step:
 
-```
-S_t  = S_{t-1}  +  k̃_t (β_t · (v_t − S_{t-1}^T k̃_t))^T    [DeltaNet, g_t = 1]
-```
+$$S_t = S_{t-1} + \tilde{k}_t \bigl(\beta_t \cdot (v_t - S_{t-1}^\top \tilde{k}_t)\bigr)^\top \qquad [\text{DeltaNet},\; g_t = 1]$$
 
-There is no coarse decay — the state accumulates all past updates without forgetting. Gated Delta Net adds the `g_t` multiplier to both the state carry and the prediction, enabling selective forgetting on a per-step basis.
+There is no coarse decay — the state accumulates all past updates without forgetting. Gated Delta Net adds the $g_t$ multiplier to both the state carry and the prediction, enabling selective forgetting on a per-step basis.
 
 ---
 
 ## 5. Comparison to GLA
 
-GLA (Gated Linear Attention) uses a row-wise outer-product gate `G_t = α_t 1^T` where `α_t ∈ R^{d_k}` is a data-dependent column vector from the input projection and `1 ∈ R^{d_v}` is the all-ones vector, giving `G_t ∈ R^{d_k × d_v}`. The operation `G_t ⊙ S_{t-1}` scales row i of S by α_t[i] — row-wise (per key-dimension) decay. GLA writes the value directly:
+GLA (Gated Linear Attention) uses a row-wise outer-product gate $G_t = \alpha_t \mathbf{1}^\top$ where $\alpha_t \in \mathbb{R}^{d_k}$ is a data-dependent column vector from the input projection and $\mathbf{1} \in \mathbb{R}^{d_v}$ is the all-ones vector, giving $G_t \in \mathbb{R}^{d_k \times d_v}$. The operation $G_t \odot S_{t-1}$ scales row i of S by $\alpha_t[i]$ — row-wise (per key-dimension) decay. GLA writes the value directly:
 
-```
-S_t  = (α_t 1^T) ⊙ S_{t-1}  +  k̃_t v_t^T    [GLA]
-```
+$$S_t = (\alpha_t \mathbf{1}^\top) \odot S_{t-1} + \tilde{k}_t v_t^\top \qquad [\text{GLA}]$$
 
 Key differences from Gated Delta Net:
 
-1. **Gating scope**: GLA applies a row-wise (per key-dimension) gate — row i of S scaled by α_t[i]; Gated Delta Net uses a single scalar `g_t` applied uniformly to the entire state.
-2. **Write mechanism**: GLA writes `k̃_t v_t^T` unconditionally; Gated Delta Net writes only the error correction `β_t (v_t − g_t S_{t-1}^T k̃_t) k̃_t^T`.
+1. **Gating scope**: GLA applies a row-wise (per key-dimension) gate — row i of S scaled by $\alpha_t[i]$; Gated Delta Net uses a single scalar $g_t$ applied uniformly to the entire state.
+2. **Write mechanism**: GLA writes $\tilde{k}_t v_t^\top$ unconditionally; Gated Delta Net writes only the error correction $\beta_t (v_t - g_t S_{t-1}^\top \tilde{k}_t) \tilde{k}_t^\top$.
 3. **Error correction**: GLA has none; Gated Delta Net corrects toward the target value.
 
 ---
 
 ## 6. Decay Gate Derivation (Qwen3.5-35B-A3B)
 
-The scalar decay `g_t = exp(α_t)` requires `α_t < 0` to keep `g_t ∈ (0, 1)`. In Qwen3.5-35B-A3B this is achieved as follows:
+The scalar decay $g_t = \exp(\alpha_t)$ requires $\alpha_t < 0$ to keep $g_t \in (0, 1)$. In Qwen3.5-35B-A3B this is achieved as follows:
 
-```
-α_t  = −exp(A_log) · softplus(a_t + dt_bias)
-g_t  = exp(α_t)
-```
+$$\alpha_t = -\exp(A_{\log}) \cdot \text{softplus}(a_t + \text{dt\_bias})$$
+
+$$g_t = \exp(\alpha_t)$$
 
 Where:
 
@@ -186,7 +182,7 @@ in_proj_a:  [B, T, H]  →  [B, T, num_v_groups]
                         =  [B, T, 4]
 ```
 
-The 35B-A3B configuration uses `num_v_groups = 4` (i.e., one decay scalar per group of 8 V-heads). Each of the 4 scalars is broadcast to its 8 V-heads before computing `α_t`.
+The 35B-A3B configuration uses `num_v_groups = 4` (i.e., one decay scalar per group of 8 V-heads). Each of the 4 scalars is broadcast to its 8 V-heads before computing $\alpha_t$.
 
 Note: the 9B configuration uses `num_v_groups = 32` (one decay scalar per V-head, no grouping). Throughout this guide we use the 35B-A3B values.
 
@@ -197,7 +193,7 @@ in_proj_b:  [B, T, H]  →  [B, T, num_v_groups]
                         =  [B, T, 4]
 ```
 
-Same grouping as `in_proj_a`. Each scalar `b_t` passes through `σ(·)` to produce `β_t`.
+Same grouping as `in_proj_a`. Each scalar $b_t$ passes through $\sigma(\cdot)$ to produce $\beta_t$.
 
 ### 7.5 Causal conv1d
 

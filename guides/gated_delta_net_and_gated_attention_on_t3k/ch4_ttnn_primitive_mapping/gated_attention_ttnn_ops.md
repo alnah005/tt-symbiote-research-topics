@@ -133,7 +133,7 @@ For prefill (T > 1), scaled dot-product attention is computed over the full quer
 
 **Important — materialized GQA expansion:** `ttnn.transformer.scaled_dot_product_attention` receives the **materialized 8× expanded** K/V tensors `[B, 16, T, 256]`. The `ttnn.repeat_interleave` call from the GQA KV Repeat section above is performed first; the SDPA op itself does not handle the GQA grouping internally and does not accept a GQA group count argument. This means the forward pass incurs an 8× memory cost for K/V during the SDPA computation (the KV cache itself stores only the 2 unexpanded heads — the expansion is a transient compute-time allocation).
 
-- Scale: 1 / √d_h = 1 / √256 = 1/16.
+- Scale: $1/\sqrt{d_h} = 1/\sqrt{256} = 1/16$.
 - Operation: `ttnn.transformer.scaled_dot_product_attention(Q, K, V, is_causal=True, scale=scale, program_config=SDPAProgramConfig(...))`.
 - `SDPAProgramConfig` specifies the block size and compute grid for the Flash Attention tiling on Wormhole cores.
 - Output: attn_out `[B, 16, T, 256]`.
