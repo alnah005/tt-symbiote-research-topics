@@ -341,3 +341,8 @@ Chapter directory names use the format `ch<N>_<short_snake_case_title>`.
 13. **Every chapter `index.md` must use clickable markdown links for all file references.** Agent A must write all file references in navigation tables and reading-order lists as `[`filename.md`](./filename.md)`, never as plain backtick names. Agent B must flag plain backtick-only file references as a structural gap.
 14. **Every content file must end with the correct navigation footer** (see rule 8). Agent A is responsible for adding it when writing the file. Agent B must flag missing footers as a structural gap.
 15. **The guide-level `index.md` chapter table must use clickable links** to each chapter's `index.md`. Entries of the form `Ch N — Title` without a hyperlink are not acceptable.
+16. **All mathematical equations must use LaTeX formatting.** Agent A is responsible for applying this when writing content:
+    - **Display (block) equations** use `$$...$$` on their own lines.
+    - **Inline expressions** (variables, symbols, short formulas embedded in prose) use `$...$`.
+    - Shape annotations (e.g. `[B, T, H]`), arithmetic calculations (e.g. `2 × 262,144 × 256 × 2 = ...`), and pseudocode must remain in fenced code blocks or plain text — do not wrap these in LaTeX.
+    - Agent B must flag any display equation written in plain text or a code block (rather than `$$...$$`) as a structural gap.
