@@ -323,14 +323,15 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ## ttnn.all_reduce Trace Compatibility
 **Date:** 2026-03-27
-**Status:** Pending
+**Status:** Completed
+**Guide:** `guides/ttnn_all_reduce_trace_compatibility/`
 **Why Needed:** `TTNNLinearIColShardedWAllReduced` uses synchronous `ttnn.all_reduce` (no cycling semaphores). Need to confirm this multi-device collective operation is trace-compatible since it will be used inside traced linear layer execution.
 **Questions:**
 1. Is `ttnn.all_reduce` (synchronous, Ring topology) compatible with trace capture and replay?
 2. Does `ttnn.all_reduce` use any internal semaphore state that could conflict with trace replay?
 3. Are there any known limitations or requirements for using `ttnn.all_reduce` inside a traced region?
 
-**Findings:** TBD
+**Findings:** `ttnn.all_reduce` uses no persistent global semaphore state (passes `std::nullopt` for all semaphore args). On T3K with typical decode shapes it routes to the synchronous RS+AG path (not the composite path). However, trace compatibility requires refactoring `TTNNLinearIColShardedWAllReduced.forward` to call `ttnn.reduce_scatter` + `ttnn.all_gather` directly — `ttnn.all_reduce` hardcodes `std::nullopt` for `optional_output_tensor` internally and cannot expose the pre-allocation required to stabilize the `scattered_tensor` intermediate for trace replay.
 
 ---
 
