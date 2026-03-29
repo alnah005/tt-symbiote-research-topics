@@ -111,6 +111,6 @@ Read the files in this order:
 
 | File | Topic |
 |---|---|
-| [`what_gets_baked_in.md`](what_gets_baked_in.md) | Exact state walk-through during a decode trace capture with one `tt_all_reduce`; tracking host counter before and after; showing the divergence |
-| [`traceability_of_async_ccl_ops.md`](traceability_of_async_ccl_ops.md) | Whether `reduce_scatter_minimal_async` and `all_gather_async` can be placed inside a trace bracket; the persistent output buffer non-issue; the critical semaphore management caveat |
-| [`failure_modes.md`](failure_modes.md) | What goes wrong if host counter is not corrected; what goes wrong if device semaphore values are not reset; silent corruption vs. deadlock |
+| [`what_gets_baked_in.md`](./what_gets_baked_in.md) | Exact state walk-through during a decode trace capture with one `tt_all_reduce`; tracking host counter before and after; showing the divergence |
+| [`traceability_of_async_ccl_ops.md`](./traceability_of_async_ccl_ops.md) | Whether `reduce_scatter_minimal_async` and `all_gather_async` can be placed inside a trace bracket; the persistent output buffer non-issue; the critical semaphore management caveat |
+| [`failure_modes.md`](./failure_modes.md) | What goes wrong if host counter is not corrected; what goes wrong if device semaphore values are not reset; silent corruption vs. deadlock |

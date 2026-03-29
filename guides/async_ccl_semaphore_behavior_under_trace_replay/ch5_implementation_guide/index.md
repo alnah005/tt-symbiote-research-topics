@@ -123,8 +123,8 @@ The key constraint the diagram encodes is:
 
 | File | Purpose |
 |---|---|
-| `code_changes_required.md` | Concrete Python code for index snapshot/restore helpers, device semaphore reset loops for both `use_composite=False` and `use_composite=True`, complete capture wrapper checklist, complete replay wrapper checklist, and guidance on identifying which handles a trace uses |
-| `verifying_correctness.md` | Test strategies for numerical comparison, deadlock detection, silent-corruption detection, host-counter verification, device-side reset verification, and a common-mistake checklist |
+| [`code_changes_required.md`](./code_changes_required.md) | Concrete Python code for index snapshot/restore helpers, device semaphore reset loops for both `use_composite=False` and `use_composite=True`, complete capture wrapper checklist, complete replay wrapper checklist, and guidance on identifying which handles a trace uses |
+| [`verifying_correctness.md`](./verifying_correctness.md) | Test strategies for numerical comparison, deadlock detection, silent-corruption detection, host-counter verification, device-side reset verification, and a common-mistake checklist |
 
 ---
 
@@ -132,6 +132,6 @@ The key constraint the diagram encodes is:
 
 Read the files in this order:
 
-1. **`code_changes_required.md`** — Start here. This file contains all the code snippets and numbered checklists you need to implement trace-compatible async CCL in a tt-transformers model. Work through it sequentially; each section builds on the previous one.
+1. **[`code_changes_required.md`](./code_changes_required.md)** — Start here. This file contains all the code snippets and numbered checklists you need to implement trace-compatible async CCL in a tt-transformers model. Work through it sequentially; each section builds on the previous one.
 
-2. **`verifying_correctness.md`** — After implementing the changes, use this file to design your test plan. It covers the numerical comparison approach, how to distinguish deadlock from silent corruption, and how to verify both the host-side index state and the device-side semaphore values at runtime.
+2. **[`verifying_correctness.md`](./verifying_correctness.md)** — After implementing the changes, use this file to design your test plan. It covers the numerical comparison approach, how to distinguish deadlock from silent corruption, and how to verify both the host-side index state and the device-side semaphore values at runtime.

@@ -55,6 +55,6 @@ Read the files in this order:
 
 | File | Topic |
 |---|---|
-| [`rta_vs_compile_time_args.md`](rta_vs_compile_time_args.md) | What RTAs are, why semaphore addresses are RTAs, exact slot indices for AG and RS |
-| [`override_runtime_arguments_flow.md`](override_runtime_arguments_flow.md) | Program cache lifecycle, how `override_runtime_arguments` writes semaphore addresses on every cache hit including during trace capture |
-| [`trace_node_rta_snapshot.md`](trace_node_rta_snapshot.md) | Mesh trace capture: `assemble_dispatch_commands` → `ordered_trace_data` → `populate_mesh_buffer` → DRAM → hardware prefetcher replay |
+| [`rta_vs_compile_time_args.md`](./rta_vs_compile_time_args.md) | What RTAs are, why semaphore addresses are RTAs, exact slot indices for AG and RS |
+| [`override_runtime_arguments_flow.md`](./override_runtime_arguments_flow.md) | Program cache lifecycle, how `override_runtime_arguments` writes semaphore addresses on every cache hit including during trace capture |
+| [`trace_node_rta_snapshot.md`](./trace_node_rta_snapshot.md) | Mesh trace capture: `assemble_dispatch_commands` → `ordered_trace_data` → `populate_mesh_buffer` → DRAM → hardware prefetcher replay |

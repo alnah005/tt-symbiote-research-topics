@@ -41,10 +41,10 @@ The key invariant: at the moment the CCL kernels begin (step 3), the L1 semaphor
 
 ## Files in reading order
 
-1. [Resetting Host Counters](resetting_host_counters.md) — The snapshot/restore pattern for `TT_CCL` index fields; why this is necessary even when device-side resets are done; code pattern
-2. [Resetting Device Semaphore Values](resetting_device_semaphore_values.md) — How to call `reset_global_semaphore_value` for each capture-time handle; timing and CQ FIFO ordering
-3. [Structuring the Capture](structuring_the_capture.md) — Recommended checklist for pre-capture, capture, and pre-replay setup
-4. [Existing Patterns in tt-transformers](existing_patterns_in_tt_transformers.md) — Audit of `generator.py` and related traced code; which paths need semaphore management and which do not
+1. [`resetting_host_counters.md`](./resetting_host_counters.md) — The snapshot/restore pattern for `TT_CCL` index fields; why this is necessary even when device-side resets are done; code pattern
+2. [`resetting_device_semaphore_values.md`](./resetting_device_semaphore_values.md) — How to call `reset_global_semaphore_value` for each capture-time handle; timing and CQ FIFO ordering
+3. [`structuring_the_capture.md`](./structuring_the_capture.md) — Recommended checklist for pre-capture, capture, and pre-replay setup
+4. [`existing_patterns_in_tt_transformers.md`](./existing_patterns_in_tt_transformers.md) — Audit of `generator.py` and related traced code; which paths need semaphore management and which do not
 
 ---
 

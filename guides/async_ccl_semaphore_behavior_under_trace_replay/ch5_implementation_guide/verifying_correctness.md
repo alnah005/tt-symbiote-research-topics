@@ -182,3 +182,7 @@ The following mistakes are easy to make and, in most cases, produce no hard erro
 - **Using a shared list reference instead of a copy for the snapshot.** Assigning `captured_ag_idx = tt_ccl.ag_semaphores_idx` (without `list(...)`) stores a reference to the same list object. Later mutations to `tt_ccl.ag_semaphores_idx` (whether from `get_and_cycle_*` or from the restore step itself) will also modify `captured_ag_idx`, silently corrupting the snapshot. Always use `list(...)` or `.copy()`.
 
 - **Running the numerical comparison test with too few steps.** Skip-through corruption from `blocking=False` timing is sometimes absent on step 1 if the kernel completes fast enough. Run at least 5 steps, and prefer 10 or more under a realistic workload (e.g., with the model actually processing tokens rather than dummy inputs) to ensure you are testing under realistic kernel timing.
+
+---
+
+**End of guide.** Return to [Guide Index](../index.md)
