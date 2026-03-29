@@ -308,7 +308,8 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ## Async CCL Semaphore Behavior Under Trace Replay
 **Date:** 2026-03-27
-**Status:** Pending
+**Status:** Completed
+**Guide:** `guides/async_ccl_semaphore_behavior_under_trace_replay/`
 **Why Needed:** `TT_CCL.get_and_cycle_*` methods cycle through 2 double-buffered semaphore handles using a host-side modular counter. During trace capture, a specific semaphore handle is baked into the command buffer. On replay, the host counter continues cycling but the trace always uses the handle from capture time. Need to understand the exact interaction to enable tracing for modules that use async CCL ops (reduce_scatter_minimal_async, all_gather_async).
 **Questions:**
 1. Are semaphore handles stored as kernel arguments (baked into trace) or as buffer addresses that can be updated before replay?
@@ -317,7 +318,7 @@ This file tracks research topics that the Architect needs to investigate for mak
 4. What is the correct way to synchronize host-side semaphore cycling state with trace replay boundaries?
 5. Would resetting semaphore indices before each replay (to match capture-time state) be sufficient, or are there device-side semaphore states that also need resetting?
 
-**Findings:** TBD
+**Findings:** Semaphore handles are RTAs (runtime arguments), not compile-time args. Their L1 addresses are baked into the immutable DRAM command buffer at `end_trace_capture` time via `assemble_dispatch_commands`. Both `reduce_scatter_minimal_async` and `all_gather_async` can be placed inside a trace bracket. Before each `execute_trace`: (1) reset device semaphore values to 0 via `ttnn.reset_global_semaphore_value` for all capture-time handles, (2) restore `TT_CCL` index fields to capture-time values. For `use_composite=True`: four handle groups must be reset (RS handles, barrier for RS, AG handles, barrier for AG), including two barrier slots. In the older `models/tt_transformers/tt/ccl.py`, `cluster_axis=0` maps to `semaphore_index=2` (not 0) due to `not 0` being `True`. No existing tt-transformers trace paths perform this management — all four identified generator paths require the additions.
 
 ---
 
