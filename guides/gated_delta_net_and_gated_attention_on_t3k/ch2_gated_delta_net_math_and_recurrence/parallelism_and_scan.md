@@ -16,7 +16,23 @@ In a simple gated linear recurrence of the form $S_t = g_t \cdot S_{t-1} + W_t$,
 
 ### Why naive parallel scan fails
 
-A parallel prefix scan over operators $f_1, f_2, \ldots, f_T$ requires that each $f_t$ be expressible as a function only of its local inputs (not of intermediate states). Here $f_t(S) = g_t \cdot S + \tilde{k}_t (\beta_t (v_t - g_t S^\top \tilde{k}_t))^\top$ is a function of $S$, which is fine — but to compose $f_t \circ f_{t-1}$, the composed operator's write term acquires a dependency on $S_{t-2}$ through the $S_{t-1}^\top \tilde{k}_{t-1}$ retrieval inside $f_{t-1}$. Composition does not close into a fixed-form operator of bounded complexity: each composition adds a new low-rank term, so the composed operator has rank growing linearly with the number of composed steps. This prevents direct parallel scan.
+A parallel prefix scan over operators 
+
+$$f_1, f_2, \ldots, f_T$$
+
+requires that each $f_t$ be expressible as a function only of its local inputs (not of intermediate states). Here 
+
+$$f_t(S) = g_t \cdot S + \tilde{k}_t (\beta_t (v_t - g_t S^\top \tilde{k}_t))^\top$$
+
+is a function of $S$, which is fine — but to compose $f_t \circ f_{t-1}$, the composed operator's write term acquires a dependency on 
+
+$$S_{t-2}$$ 
+
+through the 
+
+$$S_{t-1}^\top \tilde{k}_{t-1}$$
+
+retrieval inside $f_{t-1}$. Composition does not close into a fixed-form operator of bounded complexity: each composition adds a new low-rank term, so the composed operator has rank growing linearly with the number of composed steps. This prevents direct parallel scan.
 
 ---
 
@@ -40,7 +56,12 @@ $$\Gamma_C = \prod_{t=1}^{C} g_t \in (0, 1)$$
 
 This is the **WY representation** of a sequence of rank-1 updates. The key insight is that once we know the chunk-initial state $S_0^{(c)}$, the intra-chunk output tokens can be computed in parallel using triangular masking over the $C \times C$ inner attention scores:
 
-1. Compute the $C \times C$ causal attention matrix within the chunk: $A = (\tilde{Q}_{\text{chunk}} \tilde{K}_{\text{chunk}}^\top) \odot \text{tril}(\text{mask})$, where the mask accounts for the decaying products $g_{t'\ldots t}$ between tokens.
+1. Compute the $C \times C$ causal attention matrix within the chunk:
+
+$$A = (\tilde{Q}_{\text{chunk}} \tilde{K}_{\text{chunk}}^\top) \odot \text{tril}(\text{mask})$$
+   
+   where the mask accounts for the decaying products $g_{t'\ldots t}$ between tokens.
+
 2. Compute the intra-chunk output: $O_{\text{intra}} = A V_{\text{chunk}}$ — standard triangular matmul, parallelizable over the C positions.
 3. Compute the inter-chunk contribution from $S_0^{(c)}$ to all C query positions. Each position $\tau$ within the chunk sees the carry-in state already decayed by the cumulative gate product from chunk start up to that position. The contribution for position $\tau$ is:
 
