@@ -116,7 +116,7 @@ def torch_recurrent_gated_delta_rule(
 
 The gate $g_t$ is not projected directly. It is computed from two learned components:
 
-$$g_t = -\exp(\texttt{A_log}) \cdot \text{softplus}\!\left(a_t + \texttt{dt_bias}\right)$$
+$$g_t = -\exp(\texttt{A\textunderscore{}log}) \cdot \text{softplus}\!\left(a_t + \texttt{dt\textunderscore{}bias}\right)$$
 
 - `A_log` is a learned parameter (shape [num_v_heads]) stored as the log of a positive decay
   rate; its exponential is always positive.
@@ -125,7 +125,7 @@ $$g_t = -\exp(\texttt{A_log}) \cdot \text{softplus}\!\left(a_t + \texttt{dt_bias
 - $\text{softplus}(x) = \log(1 + e^x)$ ensures the inner term is positive.
 - The leading $-$ sign ensures $g_t \leq 0$, making $\exp(g_t) \leq 1$ (valid decay).
 
-In the `GatedDeltaNet` constructor, the implementation precomputes $-\exp(\texttt{A_log})$
+In the `GatedDeltaNet` constructor, the implementation precomputes $-\exp(\texttt{A\textunderscore{}log})$
 and stores it as `_neg_A_exp_dev` on device, eliminating one operation per token:
 
 ```python
@@ -183,7 +183,7 @@ $\mathbf{q}^\top \mathbf{k}$ from growing too large in deeper models.
 Qwen3.5 uses Grouped Query Attention (GQA) in the DeltaNet layers. The number of key/query
 heads (`num_k_heads`) is smaller than the number of value heads (`num_v_heads`). The ratio is:
 
-$$\text{gqa ratio} = \texttt{num_v_heads} / \texttt{num_k_heads}$$
+$$\text{gqa ratio} = \texttt{num\textunderscore{}v\textunderscore{}heads} / \texttt{num\textunderscore{}k\textunderscore{}heads}$$
 
 For Qwen3.5-27B: 48 / 16 = 3. For Qwen3.5-35B-A3B: 32 / 16 = 2.
 
