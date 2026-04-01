@@ -1,3 +1,5 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/alnah005/tt-symbiote-research-topics)
+
 # tt-symbiote-research-topics
 Shared knowledge base for the TT-Symbiote agentic workflow. Acts as a cache between the Team prompt flow (Architect agent) and the Research prompt flow (guide generation agents).
 
