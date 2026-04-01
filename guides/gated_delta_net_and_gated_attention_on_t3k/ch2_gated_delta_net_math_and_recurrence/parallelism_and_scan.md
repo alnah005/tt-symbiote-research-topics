@@ -6,7 +6,11 @@ The Gated Delta Net recurrence for a single head is:
 
 $$S_t = g_t \cdot S_{t-1} + \tilde{k}_t \bigl(\beta_t \cdot (v_t - g_t \cdot S_{t-1}^\top \tilde{k}_t)\bigr)^\top$$
 
-The correction vector $\beta_t \cdot (v_t - g_t \cdot S_{t-1}^\top \tilde{k}_t)$ contains the term $S_{t-1}^\top \tilde{k}_t$ — the state from the previous step appears **inside** the quantity being written back. This is what distinguishes the delta rule from a simple gated linear recurrence.
+The correction vector
+
+$$\beta_t \cdot (v_t - g_t \cdot S_{t-1}^\top \tilde{k}_t)$$ 
+
+contains the term $S_{t-1}^\top \tilde{k}_t$ — the state from the previous step appears **inside** the quantity being written back. This is what distinguishes the delta rule from a simple gated linear recurrence.
 
 In a simple gated linear recurrence of the form $S_t = g_t \cdot S_{t-1} + W_t$, the write matrix $W_t$ is independent of $S_{t-1}$. That structure is associative: you can compute any pair of consecutive updates as a combined operator and apply parallel prefix scan across the sequence. The Gated Delta Net recurrence does **not** have this property in its raw form because $W_t$ itself depends on $S_{t-1}$.
 
