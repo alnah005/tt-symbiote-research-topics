@@ -36,6 +36,13 @@ After reading this chapter you will understand:
 | [`gdn_prefill_strategy.md`](./gdn_prefill_strategy.md) | Batched QKVZ + sequential per-token recurrence with B=1 states |
 | [`state_replication.md`](./state_replication.md) | Post-prefill B=1 to B=32 state replication for KV cache and GDN states |
 
+## Process Files
+
+| File | Description |
+|------|-------------|
+| [`b_review.md`](./b_review.md) | Correctness review: dimension fixes and size accuracy issues |
+| [`compression_analysis.md`](./compression_analysis.md) | Compression analysis: dispatch count duplication and cross-chapter reference suggestions |
+
 See [`batched_projections.md`](./batched_projections.md) to begin.
 
 ---

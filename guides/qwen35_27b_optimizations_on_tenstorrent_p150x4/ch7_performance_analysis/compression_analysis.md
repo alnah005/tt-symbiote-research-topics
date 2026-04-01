@@ -27,3 +27,34 @@ None.
 
 ## VERDICT
 - Crucial updates: no
+
+---
+
+## Pass 2
+
+**Summary:** 0 crucial updates, 2 minor suggestions carried forward (unchanged from Pass 1)
+**Crucial updates: no**
+
+### CRUCIAL (must fix before chapter is done)
+
+None. All three chapter files were re-read in full. No content introduced by correctness passes 2-5 creates new redundancy. The chapter is internally consistent and no section restates another without adding detail.
+
+### MINOR Suggestions (carried forward from Pass 1, unresolved)
+
+- **M1 (bottleneck_analysis.md ~lines 54-63):** Section 3 ("Conv1d Shift Register Overhead") is still an elaboration of the conv1d fusion bullet already present in Section 2. The dispatch-count arithmetic (48 * 9 = 432 dispatches) could be folded into the Section 2 bullet, eliminating the standalone Section 3 heading and saving ~7 lines. Source-verified: gdn.py lines 281-289 confirm exactly 4 copies + 1 multiply + 3 macs + 1 silu = 9 ops per layer, so the arithmetic is correct; the question is whether it needs its own heading.
+- **M2 (performance_summary.md ~lines 48-68):** "Completed Optimizations" section remains verbose. Each bullet restates chapter-cross-references that a Chapter 7 reader has already encountered. Condensing to one-liners with chapter links would save ~10 lines.
+
+### Load-Bearing Evidence
+
+- **M1 (Section 3, bottleneck_analysis.md):** The only unique content in Section 3 is the total dispatch count (432 per step). That number is not present in the Section 2 bullet. Folding "432 dispatches per decode step" into the Section 2 conv1d bullet preserves it; removing Section 3 as a heading loses nothing if that number is retained.
+- **M2 (performance_summary.md Completed Optimizations):** The parenthetical mechanism details (e.g., `MatmulMultiCoreReuseMultiCastProgramConfig`, `replicate_prefill_state_to_batch`) are load-bearing because they give enough specificity to navigate to the correct chapter section. Shortening to one-liners with chapter links would retain the reference without the inline explanation. Nothing would be lost if chapter links are kept.
+
+### Source Verification Notes
+
+- `gdn.py:289` (`conv_out = ttnn.silu(conv_acc)`) confirmed — matches chapter's claim about conv1d silu op.
+- Post-recurrence ops at `gdn.py:330, 334, 337` (`ttnn.rms_norm`, `ttnn.silu`, `ttnn.multiply`) confirmed — match Section 2's "RMS norm + SiLU + gate multiply" fusion opportunity description.
+- No correctness-pass edits introduced duplicate content visible in any of the three chapter files.
+
+### VERDICT
+
+**Crucial updates: no**

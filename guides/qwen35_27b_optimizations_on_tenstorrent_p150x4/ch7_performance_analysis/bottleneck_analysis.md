@@ -27,7 +27,7 @@ Within the fused GDN kernel, the NOC traffic for state is:
 - **Write:** 16 tile writes per pair, 384 pairs = 6,144 NOC write transactions per layer
 - **Total:** 12,288 NOC transactions per GDN layer, 48 layers = ~590,000 NOC transactions per decode step just for state
 
-The reader kernel batches all 44 reads per pair before a single `noc_async_read_barrier()` (Chapter 4), which amortizes barrier overhead. But the fundamental bandwidth cost of moving 12 MB through the NOC per layer remains.
+The reader kernel batches all 44 NOC reads per pair (16 state tiles plus 28 projection and scalar reads) before a single `noc_async_read_barrier()` (Chapter 4), amortizing barrier overhead. But the fundamental bandwidth cost of moving 12 MB through the NOC per layer remains.
 
 ## Remaining Optimization Opportunities
 
@@ -53,13 +53,13 @@ The highest-impact remaining optimization. Detailed in Chapter 6.
 
 The fused GDN kernel (Chapter 4) already combines L2 norm, gate computation, and DeltaNet recurrence into a single dispatch. Two additional fusion opportunities remain:
 
-- **RMS norm + SiLU fusion:** The post-recurrence path currently runs `ttnn.rms_norm` and then SiLU gating with the Z tensor as separate dispatches after the fused kernel returns. Folding these into the compute kernel's output phase would eliminate two additional kernel dispatches per GDN layer (96 dispatches per step across 48 layers).
+- **RMS norm + SiLU fusion:** The post-recurrence path currently runs `ttnn.rms_norm`, `ttnn.silu`, and the gate multiply (`ttnn.multiply`) as separate dispatches after the fused kernel returns. Folding these into the compute kernel's output phase would eliminate three additional kernel dispatches per GDN layer (144 dispatches per step across 48 layers).
 
 - **Conv1d fusion:** The 4-tap causal conv1d shift register (Chapter 3) runs as separate `ttnn.multiply` and `ttnn.mac` operations before the fused kernel. Incorporating the conv1d computation into the reader or compute phase would remove another set of dispatches and avoid materializing intermediate conv results in DRAM.
 
 ### 3. Conv1d Shift Register Overhead
 
-The conv1d shift register implementation uses 4 `ttnn.copy` operations per layer for the state shift, plus 1 `ttnn.multiply` (first tap) and 3 `ttnn.mac` operations (taps 1-3) for the weighted sum. While each operation is small, the dispatch overhead across 48 GDN layers adds up. The total dispatch count for conv1d alone is `48 * (4 copies + 1 multiply + 3 macs) = 384` dispatches per decode step. Fusing conv1d into the main kernel (item 2 above) would eliminate all of these.
+The conv1d shift register implementation uses 4 `ttnn.copy` operations per layer for the state shift, 1 `ttnn.multiply` (first tap), 3 `ttnn.mac` operations (taps 1-3) for the weighted sum, and 1 `ttnn.silu` on the accumulator output (`gdn.py:289`). While each operation is small, the dispatch overhead across 48 GDN layers adds up. The total dispatch count for conv1d alone is `48 * (4 copies + 1 multiply + 3 macs + 1 silu) = 432` dispatches per decode step. Fusing conv1d into the main kernel (item 2 above) would eliminate all of these.
 
 ### 4. Prefill GDN Sequential Bottleneck
 
@@ -90,8 +90,8 @@ The recurrence uses HiFi4 because the iterative state update accumulates numeric
 | Bottleneck | Share of Decode | Root Cause | Optimization Path |
 |---|---|---|---|
 | GDN state DRAM I/O | ~85% (dominant within GDN) | 12 MB read+write per layer via NOC | L1 state with HEIGHT_SHARDED (WIP) |
-| Post-recurrence dispatches | Part of GDN 85% | Separate RMS norm + SiLU kernel launches | Fuse into compute kernel |
-| Conv1d dispatches | Part of GDN 85% | 8 ttnn ops per layer * 48 layers | Fuse into fused GDN kernel |
+| Post-recurrence dispatches | Part of GDN 85% | Separate RMS norm + SiLU + gate multiply kernel launches | Fuse into compute kernel |
+| Conv1d dispatches | Part of GDN 85% | 9 ttnn ops per layer * 48 layers | Fuse into fused GDN kernel |
 | Prefill GDN sequential loop | Dominant TTFT component for long sequences | DeltaNet recurrence dependency | Chunked parallel recurrence |
 | Attention layers | 12% | Already well-optimized (DRAM-sharded, flash SDPA) | Limited further opportunity |
 

@@ -23,6 +23,15 @@ After reading this chapter you will understand:
 
 See [`performance_summary.md`](./performance_summary.md) to begin.
 
+## Process Files
+
+These files are internal pipeline artifacts and are not part of the reading path:
+
+| File | Description |
+|------|-------------|
+| [`b_review.md`](./b_review.md) | Agent B correctness review passes |
+| [`compression_analysis.md`](./compression_analysis.md) | Agent C compression analysis passes |
+
 ---
 
 **Next:** [`performance_summary.md`](./performance_summary.md)

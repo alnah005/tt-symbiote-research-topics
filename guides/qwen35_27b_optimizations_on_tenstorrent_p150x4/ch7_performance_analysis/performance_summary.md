@@ -43,7 +43,7 @@ Every decode step reads the full state from DRAM, passes it through the fused ke
 Total state I/O per step = 48 layers * 12 MB * 2 (read + write) = ~1.15 GB
 ```
 
-This 1.2 GB of DRAM bandwidth per decode step is the single largest contributor to GDN layer latency.
+This ~1.15 GB of DRAM bandwidth per decode step is the single largest contributor to GDN layer latency.
 
 ## Completed Optimizations
 

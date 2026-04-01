@@ -38,3 +38,33 @@ All repeated numbers, config names, tensor shapes, and optimization descriptions
 
 ## VERDICT
 - Crucial updates: no
+
+---
+
+## Pass 2
+
+**Summary:** 0 crucial updates, 1 minor suggestion
+**Crucial updates: no**
+
+### CRUCIAL (must fix before guide is done)
+
+None. The HiFi2/HiFi4 fix in `recurrence_math.md` and the clarifications to `bottleneck_analysis.md` introduced no new cross-chapter redundancy. All precision claims are now consistent across the five locations that reference them (Ch1 `tp_sharding_strategy.md`, Ch3 `recurrence_math.md`, Ch4 `kernel_dispatch.md`, Ch4 `compute_kernel.md`, Ch7 `bottleneck_analysis.md`).
+
+### MINOR Suggestions (optional)
+
+**1. [ch3/recurrence_math.md, Numerical Precision section ~line 186] Forward reference to Ch7 bandwidth analysis**
+
+The Pass 1 MINOR suggestion — adding a forward reference from the Ch3 state-size arithmetic to Ch7 — was not applied and remains outstanding. The Numerical Precision section now also notes that `fp32_dest_acc_en=True` "is critical for the state update where small updates to a large state matrix could otherwise be lost to bfloat16 rounding." Ch7 `bottleneck_analysis.md` echoes the same rationale at line 86 ("The recurrence uses HiFi4 because the iterative state update accumulates numerical error across tokens"). These are additive and not redundant, but a one-sentence cross-reference at the end of the Ch3 Numerical Precision section — "For the decode-time bandwidth cost driven by this 12 MB state, see Chapter 7" — would close the loop for readers who read Ch3 linearly.
+
+### Load-Bearing Evidence
+
+**For MINOR suggestion 1:**
+
+- `ch3/recurrence_math.md` line 150: "This state is read and written every decode step for every GDN layer, making DRAM bandwidth the primary bottleneck. Chapter 6 discusses the L1 state optimization that addresses this." Ch3 already forward-references Ch6 for the optimization path but does not forward-reference Ch7 for the quantitative bandwidth breakdown (1.15 GB/step, 9.78 ms/layer timing). The gap is real but small.
+- `ch7/performance_summary.md` lines 40-46: derives the 1.15 GB/step round-trip figure from the same 12 MB per-layer number first established in Ch3. A reader entering at Ch7 can follow back to Ch3 via the Quick Reference table in `index.md`; a reader reading Ch3 in order has no forward pointer to the Ch7 quantitative treatment.
+
+### VERDICT
+
+**Crucial updates: no**
+
+The guide is done. No compression actions are required before publication. The one outstanding MINOR suggestion (forward reference from Ch3 Numerical Precision to Ch7 bandwidth analysis) is carry-forward from Pass 1 and remains optional.

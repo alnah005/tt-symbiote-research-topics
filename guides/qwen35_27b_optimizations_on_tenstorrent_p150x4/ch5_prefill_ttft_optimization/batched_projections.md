@@ -15,9 +15,11 @@ The optimized prefill replaces these with **2D multicast matmuls** that process 
 | Bottleneck | DRAM bandwidth (weight read) | Compute (matmul FLOPs) |
 | Dispatches per layer | seq_len | 1 |
 
+The decode program config is built by `create_dram_sharded_matmul_program_config` (`model_config.py`, line 95) and stored as `M=1` configs on `Qwen35ModelArgs` at init time (`model_config.py`, lines 291-296). The prefill config is built on-demand by `create_prefill_matmul_program_config(m, k, n, grid_size=(8, 8))` (`model_config.py`, lines 146-172), which computes tile-aligned `per_core_M` and `per_core_N` values and finds the largest valid `out_subblock_w` satisfying the FP32 DST register constraint `out_subblock_h * out_subblock_w <= 4`.
+
 ## Attention Layer Prefill Projections
 
-In `Qwen35Attention.forward_prefill()` (`attention.py`, lines 302-484), three batched projections compute the full sequence's Q+gate, K, and V:
+In `Qwen35Attention.forward_prefill()` (`attention.py`, lines 302-484), three batched projections compute the full sequence's Q+gate, K, and V. The projections operate on per-device TP-sharded weights, so output dimensions reflect local head counts (`n_local_heads = 6`, `n_local_kv_heads = 1` with TP=4):
 
 ```
 x_dram: [1, 1, seq_len, dim=5120]
@@ -27,11 +29,9 @@ K:       x_dram @ wk   -> [1, 1, seq_len, n_local_kv_heads*HD = 1*256 = 256]
 V:       x_dram @ wv   -> [1, 1, seq_len, n_local_kv_heads*HD = 1*256 = 256]
 ```
 
-Each projection uses `create_prefill_matmul_program_config(seq_len, in_dim, out_dim)` to compute tile-aligned `per_core_M` and `per_core_N` values for the 8x8 grid. The config also respects the FP32 DST register limit: `out_subblock_h * out_subblock_w <= 4` when FP32 accumulation is enabled.
+The Q+gate and K projections each call `create_prefill_matmul_program_config(seq_len, dim, out_dim)` directly (`attention.py`, lines 336 and 344). The V projection does not create a new config; it reuses `k_progcfg` from line 344 (`attention.py`, line 352). The input `x` is first moved to DRAM interleaved via `ttnn.to_memory_config(x, ttnn.DRAM_MEMORY_CONFIG)` at line 334. All three projections share this same `x_dram` tensor, which is deallocated at line 358 after the last projection completes.
 
-The input `x` is first moved to DRAM interleaved via `ttnn.to_memory_config(x, ttnn.DRAM_MEMORY_CONFIG)`. All three projections share this same `x_dram` tensor, which is deallocated after the last projection completes.
-
-After the projections, the attention layer continues with reshape, partial RoPE, KV cache fill, flash SDPA, sigmoid gating, and a batched output projection -- all operating on the full `[1, NH, seq_len, HD]` tensor. The output projection is also a 2D matmul:
+After the projections, the attention layer continues with reshape, partial RoPE, KV cache fill, flash SDPA, and sigmoid gating -- all operating on the full `[1, NH, seq_len, HD]` tensor. The output projection is also a 2D matmul (`attention.py`, lines 474-480):
 
 ```
 gated_flat: [1, 1, seq_len, n_local_heads*HD = 6*256 = 1536] @ wo -> [1, 1, seq_len, dim = 5120]
@@ -48,9 +48,9 @@ QKVZ:  x_dram @ wqkvz -> [1, 1, seq_len, qkvz_dim_tp = 4096]
 AB:    x_dram @ wab   -> [1, 1, seq_len, Nv_TP*2    = 24]
 ```
 
-The QKVZ projection is the dominant compute cost. It produces a fused tensor containing Q, K, V, and Z gate values for all tokens, which are later sliced per-token during the sequential recurrence loop. The AB projection produces the two scalar gates (a and b) per value head, also for all tokens at once.
+The QKVZ projection (`gdn.py`, lines 611-617) uses `create_prefill_matmul_program_config(seq_len, dim, qkvz_dim_tp)` and produces a fused tensor containing Q, K, V, and Z gate values for all tokens, which are later sliced per-token during the sequential recurrence loop. The AB projection (`gdn.py`, lines 620-626) uses `create_prefill_matmul_program_config(seq_len, dim, Nv_TP * 2)` and produces the two scalar gates (a and b) per value head for all tokens at once. Both share the same `x_dram` tensor, which is deallocated at line 628.
 
-After the per-token recurrence loop (covered in [`gdn_prefill_strategy.md`](./gdn_prefill_strategy.md)), the per-token outputs are concatenated and processed through a batched output projection:
+After the per-token recurrence loop (covered in [`gdn_prefill_strategy.md`](./gdn_prefill_strategy.md)), the per-token outputs are concatenated and processed through a batched output projection (`gdn.py`, lines 716-722):
 
 ```
 gated_seq: [1, 1, seq_len, value_dim_tp] @ wout -> [1, 1, seq_len, dim = 5120]
@@ -60,15 +60,8 @@ This output projection uses `create_prefill_matmul_program_config(seq_len, self.
 
 ## Why This Matters for TTFT
 
-The dispatch overhead reduction is multiplicative. Consider a single GDN layer processing a 96-token prompt:
-
-- **Baseline:** 96 QKVZ dispatches + 96 AB dispatches + 96 output projection dispatches = 288 kernel launches
-- **Optimized:** 1 QKVZ dispatch + 1 AB dispatch + 1 output projection dispatch = 3 kernel launches
-
-Each dispatch involves host-device communication, program cache lookup, and synchronization. Eliminating 285 dispatches per GDN layer, multiplied across 48 GDN layers and 16 attention layers, accounts for a significant portion of the 5.3x TTFT improvement.
-
-Beyond dispatch count, the 2D matmul configuration is inherently more efficient for `M > 1`. The DRAM-sharded decode matmul reads the full weight matrix from DRAM for each token -- the weight read cost is constant regardless of M. The 2D multicast matmul reads the weight once and distributes it across grid rows, amortizing the DRAM read across all `seq_len` tokens. When `seq_len = 96`, the weight is read once instead of 96 times, converting a bandwidth-bound operation into a compute-bound one where the 8x8 grid is fully utilized.
+For a 96-token prefill, this reduces GDN kernel dispatches from ~288 (one per token per layer) to 3 — one QKVZ matmul, one AB matmul, and one output matmul.
 
 ---
 
-**Previous:** [`index.md`](./index.md) | **Next:** [`gdn_prefill_strategy.md`](./gdn_prefill_strategy.md)
+**Next:** [`gdn_prefill_strategy.md`](./gdn_prefill_strategy.md)

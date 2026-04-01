@@ -26,7 +26,7 @@ self._prefill_fused_output = _to_mesh(
 )
 ```
 
-These B=1 states are allocated via `ttnn.ReplicateTensorToMesh` -- each device gets an identical copy, all initialized to zero. The separation from decode states is important: the B=32 decode states hold `[32*12, 128, 128]` per device (12 MB), while the B=1 prefill states hold `[12, 128, 128]` per device (approximately 393 KB). This smaller footprint means prefill state operations are faster and use less DRAM bandwidth.
+These B=1 states are allocated via `ttnn.ReplicateTensorToMesh` -- each device gets an identical copy, all initialized to zero. The separation from decode states is important: the B=32 decode states hold `[32*12, 128, 128]` per device (approximately 12 MB), while the B=1 prefill states hold `[12, 128, 128]` per device (approximately 384 KiB). This smaller footprint means prefill state operations are faster and use less DRAM bandwidth.
 
 ## The Hybrid Prefill Pipeline
 
@@ -34,16 +34,11 @@ The `forward_prefill()` method proceeds in three phases:
 
 ### Phase 1: Batched Projections
 
-As detailed in [`batched_projections.md`](./batched_projections.md), the QKVZ and AB projections are computed once for the full `[1, 1, seq_len, dim]` input:
-
-```
-qkvz_all: [1, 1, seq_len, qkvz_dim_tp = 4096]  -- Q, K, V, Z for all tokens
-ab_all:   [1, 1, seq_len, Nv_TP * 2   = 24]     -- a, b gates for all tokens
-```
+Phase 1 computes QKVZ (`[1, 1, seq_len, gdn_qkvz_dim_tp]`) and AB (`[1, 1, seq_len, Nv_TP * 2]`) via batched 2D matmuls in one dispatch each (see [`batched_projections.md`](./batched_projections.md)).
 
 ### Phase 2: Per-Token Sequential Loop
 
-The main loop iterates over `seq_len` tokens (lines 636-700). For each token `t`:
+The main loop iterates over `seq_len` tokens (`gdn.py`, lines 636-700). For each token `t`:
 
 **Step 1 -- Token slicing.** Extract token `t` from the precomputed projection tensors:
 
@@ -64,7 +59,7 @@ z_tt   = ttnn.slice(qkvz_t, (0, 0, qkv_dim_tp), (1, B_pf, qkvz_dim_tp))
 
 Similarly, AB is split into separate `a_tt` and `b_tt` tensors.
 
-**Step 2 -- Conv1d shift register.** The same 4-tap causal conv1d used in decode (see Chapter 3) runs on the B=1 prefill conv states:
+**Step 2 -- Conv1d shift register.** The same 4-tap causal conv1d used in decode (see Chapter 3) runs on the B=1 prefill conv states -- the only difference is the state shape is `[1, 1, qkv_dim_tp]` instead of `[1, B, qkv_dim_tp]`:
 
 ```python
 ttnn.copy(states[1], states[0])
@@ -77,8 +72,6 @@ for j in range(1, self.conv_kernel_size):
     conv_acc = ttnn.mac(states[j], tw["conv_taps"][j], conv_acc)
 conv_out = ttnn.silu(conv_acc)
 ```
-
-Each conv state is `[1, 1, qkv_dim_tp]` -- the same shift register pattern as decode, but with B=1 instead of B=32.
 
 **Step 3 -- Fused recurrence kernel.** The same `gdn_full_fused_inplace` kernel from Chapter 4 processes the token, but with `num_pairs = B_pf * Nv_TP = 1 * 12 = 12` instead of the decode-time `num_pairs = 32 * 12 = 384`:
 
@@ -112,7 +105,7 @@ The gated output for each token is appended to `gated_outputs`.
 
 ### Phase 3: Batched Output Projection
 
-After the loop completes, all per-token outputs are concatenated and projected:
+After the loop completes, all per-token outputs are concatenated and projected (`gdn.py`, lines 707-722):
 
 ```python
 gated_seq = ttnn.concat(gated_outputs, dim=1)  # [1, seq_len, value_dim_tp]
@@ -137,12 +130,12 @@ The per-token loop is careful about deallocation. Within each iteration:
 - Intermediate tensors (`out_r`, `out_n`, `z_act`, `out_f`) are deallocated after use
 - Only the final `gated` output for each token is retained in the `gated_outputs` list
 
-The precomputed `qkvz_all` and `ab_all` tensors persist throughout the loop and are deallocated after all tokens are processed (line 702-703). This means DRAM holds both the full-sequence projection results and the growing list of per-token outputs simultaneously -- a tradeoff of memory for the dispatch overhead savings.
+The precomputed `qkvz_all` and `ab_all` tensors persist throughout the loop and are deallocated after all tokens are processed (`gdn.py`, lines 702-703). This means DRAM holds both the full-sequence projection results and the growing list of per-token outputs simultaneously -- a tradeoff of memory for the dispatch overhead savings.
 
 ## Why Not Parallelize the Recurrence?
 
-The DeltaNet recurrence has a true data dependency: token `t`'s state is a function of token `t-1`'s state. Parallel scan algorithms exist for certain recurrence forms, but they require associative operations and typically double the compute. The current sequential approach is simpler and, combined with batched projections, already achieves the 5.3x speedup target. Chunked parallel recurrence (processing groups of tokens with inter-chunk sequential updates) remains a potential future optimization noted in Chapter 7.
+The DeltaNet recurrence has a true data dependency: token $t$'s state is a function of token $t-1$'s state. Parallel scan algorithms exist for certain recurrence forms, but they require associative operations and typically double the compute. The current sequential approach is simpler and, combined with batched projections, already achieves the 5.3x speedup target. Chunked parallel recurrence (processing groups of tokens with inter-chunk sequential updates) remains a potential future optimization noted in Chapter 7.
 
 ---
 
-**Previous:** [`batched_projections.md`](./batched_projections.md) | **Next:** [`state_replication.md`](./state_replication.md)
+**Next:** [`state_replication.md`](./state_replication.md)

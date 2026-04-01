@@ -2,7 +2,7 @@
 
 After prefill completes, the model holds B=1 states representing a single user's processed prompt. Decode, however, operates with B=32 -- all 32 batch slots process tokens simultaneously using traced execution. Before the first decode step can run, the prefilled user's states must be replicated to all 32 batch slots. This affects both GDN recurrence states and attention KV caches.
 
-The replication is a one-time cost that bridges the prefill and decode phases. It runs on the host (CPU-side via PyTorch), moving data through `ttnn.to_torch` and `ttnn.from_torch`. While this introduces a host-device round-trip, it happens only once per prefill and is not on the critical path for per-token latency.
+The replication is a one-time cost that bridges the prefill and decode phases. It runs on the host (CPU-side via PyTorch), moving data through `ttnn.to_torch` and `ttnn.from_torch`.
 
 ## GDN State Replication
 
@@ -32,7 +32,7 @@ The pattern is: read each device's B=1 tensor to CPU, expand along the batch dim
 
 ### Recurrence States
 
-The recurrence state is the primary GDN state tensor. After prefill it holds `[Nv_TP, Dk, Dv] = [12, 128, 128]` per device (approximately 393 KB per device in bfloat16). For decode, this must become `[B*Nv_TP, Dk, Dv] = [384, 128, 128]` per device (12 MB):
+The recurrence state is the primary GDN state tensor. After prefill it holds `[Nv_TP, Dk, Dv] = [12, 128, 128]` per device (approximately 384 KiB per device in bfloat16). For decode, this must become `[B*Nv_TP, Dk, Dv] = [384, 128, 128]` per device (approximately 12 MB):
 
 ```python
 per_dev_rec = ttnn.get_device_tensors(self._prefill_rec_states)
@@ -53,7 +53,7 @@ Note the use of `torch.repeat(B, 1, 1)` rather than `expand` -- `repeat` is requ
 
 ### Cleanup
 
-After replication, all B=1 prefill state tensors are deallocated:
+After replication, all B=1 prefill state tensors are deallocated (`gdn.py`, lines 570-576):
 
 ```python
 for s in self._prefill_conv_states:
@@ -65,7 +65,7 @@ self._prefill_rec_states = None
 self._prefill_fused_output = None
 ```
 
-This frees approximately 393 KB per device of recurrence state, plus the conv state and output buffers. These are no longer needed once decode begins.
+This frees approximately 384 KiB per device of recurrence state, plus the conv state and output buffers. These are no longer needed once decode begins.
 
 ## KV Cache Replication
 
@@ -102,7 +102,7 @@ for h in range(self.n_local_kv_heads):         # NKV heads per device
 
 Unlike the GDN replication (which uses `ttnn.copy` into pre-existing buffers), the KV cache replication replaces `self.k_caches[h]` and `self.v_caches[h]` entirely with new tensors via `ttnn.from_torch`. This is because the KV cache tensors are freshly created with the full `max_seq_len` dimension and the old tensors are implicitly freed when the references are overwritten.
 
-The KV cache replication loops over `n_local_kv_heads` (the number of KV heads on this device after TP sharding). With `NKV=4` heads and `TP=4`, each device holds `NKV_TP=1` head, so this loop executes once per device per attention layer.
+The KV cache replication loops over `n_local_kv_heads` (the number of KV heads on this device after TP sharding). With `NKV=4` heads total and `TP=4`, each device holds `n_local_kv_heads=1` head, so this loop executes once per device per attention layer.
 
 ## Replication Order and Decode Readiness
 
@@ -116,4 +116,4 @@ After step 2, all 64 layers hold valid B=32 state, and the model can immediately
 
 ---
 
-**Previous:** [`gdn_prefill_strategy.md`](./gdn_prefill_strategy.md) | **Next:** [Chapter 6 — L1 State Management and Rolling Window](../ch6_l1_state_management/index.md)
+**Next:** [Chapter 6 — L1 State Management and Rolling Window](../ch6_l1_state_management/index.md)
