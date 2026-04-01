@@ -68,7 +68,7 @@ where $b$ is the per-pair scalar from the AB projection. Beta ranges in $(0, 1)$
 
 ### Decay Gate (Exponential Forgetting)
 
-$$g = -\exp(A\_\text{log}) \cdot \text{softplus}(a + \text{dt bias})$$
+$$g = -\exp(A_{\text{log}}) \cdot \text{softplus}(a + \text{dt bias})$$
 
 Breaking this down:
 - `A_log`: a learned per-head log-space decay rate, precomputed as `neg_exp_A = -exp(A_log)` during `_precompute_constants()` (lines 145–148)
@@ -108,15 +108,15 @@ The state is element-wise multiplied by the decay factor $\exp(g)$. $g$ is alway
 
 ### Step 2: Key-State Product (Memory Readout for Key)
 
-$$kv\_\text{mem} = k_{\text{row}} \cdot S \quad \rightarrow \quad [1, Dk] \times [Dk, Dv] = [1, Dv]$$
+$$kv_{\text{mem}} = k_{\text{row}} \cdot S \quad \rightarrow \quad [1, Dk] \times [Dk, Dv] = [1, Dv]$$
 
 This reads out from the state matrix using the key as a query, producing a vector that represents what the state currently "remembers" about this key direction. This is used in the next step to compute the innovation — how much new information the current value provides beyond what is already stored.
 
 ### Step 3: Scaled Innovation (Delta)
 
-$$\delta = \beta \cdot (v - kv\_\text{mem}) \quad \rightarrow \quad \text{scalar} \times [1, Dv] = [1, Dv]$$
+$$\delta = \beta \cdot (v - kv_{\text{mem}}) \quad \rightarrow \quad \text{scalar} \times [1, Dv] = [1, Dv]$$
 
-The innovation $v - kv\_\text{mem}$ measures the difference between the new value $v$ and what the state already predicts for this key. Scaling by $\beta$ controls the update magnitude. When $\beta$ is small, the state changes slowly; when $\beta$ is large, it aggressively incorporates new information.
+The innovation $v - kv_{\text{mem}}$ measures the difference between the new value $v$ and what the state already predicts for this key. Scaling by $\beta$ controls the update magnitude. When $\beta$ is small, the state changes slowly; when $\beta$ is large, it aggressively incorporates new information.
 
 This is the "delta" in DeltaNet — the update is proportional to the prediction error, similar to the delta rule in classical neural network learning.
 
@@ -161,8 +161,8 @@ The following table maps each mathematical operation to its `ttnn` implementatio
 | $\beta = \sigma(b)$ | `ttnn.sigmoid(b_tt)` | Phase 4: `sigmoid` |
 | $g = \text{neg A} \cdot \text{sp}(a + \text{bias})$ | `ttnn.softplus(ttnn.add(a, bias))`, `ttnn.multiply(neg_A, sp)` | Phase 4: `exp`, `log1p`, mul by `neg_exp_A` |
 | $S \mathrel{*}= \exp(g)$ | Inside recurrence kernel | Phase 5: `exp(g)` broadcast multiply |
-| $kv\_\text{mem} = k \cdot S$ | Inside recurrence kernel | Phase 5: matmul |
-| $\delta = \beta \cdot (v - kv\_\text{mem})$ | Inside recurrence kernel | Phase 5: sub, mul |
+| $kv_{\text{mem}} = k \cdot S$ | Inside recurrence kernel | Phase 5: matmul |
+| $\delta = \beta \cdot (v - kv_{\text{mem}})$ | Inside recurrence kernel | Phase 5: sub, mul |
 | $S \mathrel{+}= k^T \cdot \delta$ | Inside recurrence kernel | Phase 5: copy + matmul accumulate |
 | $\text{out} = q \cdot S$ | Inside recurrence kernel | Phase 5: matmul |
 

@@ -19,7 +19,7 @@ The P150x4 provides 4 Blackhole chips connected in a ring topology. Qwen3.5-27B 
 | `n_local_heads` | `n_heads / tp` | 6 | Attention Q heads per device |
 | `n_local_kv_heads` | `max(1, n_kv_heads / tp)` | 1 | Attention KV heads per device |
 
-The `gdn_qkvz_dim_tp = 4096` value is particularly important: it is the output dimension of the single fused QKVZ matmul that drives each GDN layer, computed as $(\text{GDN\_QKV\_DIM} + \text{GDN\_Z\_DIM}) / 4 = 4096$ — for the derivation of those aggregate constants see `hybrid_architecture.md` (see `model_config.py:267`).
+The `gdn_qkvz_dim_tp = 4096` value is particularly important: it is the output dimension of the single fused QKVZ matmul that drives each GDN layer, computed as $(\text{GDN QKV DIM} + \text{GDN Z DIM}) / 4 = 4096$ — for the derivation of those aggregate constants see `hybrid_architecture.md` (see `model_config.py:267`).
 
 ## Column-Parallel vs Row-Parallel Projections
 
@@ -63,8 +63,8 @@ The all-reduce uses the CCL ring topology on the P150x4's 4-chip interconnect. T
 
 All decode projection weights are stored in DRAM using a WIDTH\_SHARDED layout across 8 DRAM cores per device. The `create_dram_sharded_mem_config(k, n)` function (see `model_config.py:80-92`) builds the memory config:
 
-1. Pad $n$ up to the nearest multiple of $\text{TILE\_SIZE} \times \text{DRAM\_CORES} = 32 \times 8 = 256$
-2. Create a `ShardSpec` with the 8-core DRAM grid (`CoreRange(CoreCoord(0,0), CoreCoord(7,0))`) and shard shape $(k, \text{padded\_n} / 8)$
+1. Pad $n$ up to the nearest multiple of $\text{TILE SIZE} \times \text{DRAM CORES} = 32 \times 8 = 256$
+2. Create a `ShardSpec` with the 8-core DRAM grid (`CoreRange(CoreCoord(0,0), CoreCoord(7,0))`) and shard shape $(k, \text{padded n} / 8)$
 3. Wrap in a `WIDTH_SHARDED` DRAM `MemoryConfig`
 
 The corresponding matmul program config is built by `create_dram_sharded_matmul_program_config(m, k, n)` (see `model_config.py:95-118`), which produces a `MatmulMultiCoreReuseMultiCastDRAMShardedProgramConfig`. For decode, $M=1$ (single token), making these matmuls bandwidth-bound. For example (see `model_config.py:291`):
@@ -107,7 +107,7 @@ for s in range(tp):
     shards.append(torch.cat([q_s, k_s, v_s], dim=0))
 ```
 
-Each device shard contains $[\text{Q\_tp} (512) \mid \text{K\_tp} (512) \mid \text{V\_tp} (1536)]$ = 2560 elements along the output dimension, matching `gdn_qkv_dim_tp = 2560`.
+Each device shard contains $[\text{Q tp} (512) \mid \text{K tp} (512) \mid \text{V tp} (1536)]$ = 2560 elements along the output dimension, matching `gdn_qkv_dim_tp = 2560`.
 
 The fused QKVZ weight is then constructed in `_load_and_wire_attention_weights()` (see `model.py:149-164`) by concatenating the Z projection onto each device's QKV shard:
 
