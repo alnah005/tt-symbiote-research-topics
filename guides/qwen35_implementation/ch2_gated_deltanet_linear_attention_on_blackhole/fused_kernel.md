@@ -34,7 +34,7 @@ The operation is exposed to Python as `ttnn.experimental.gated_delta_net`.
 | `z_flat` | [1, 1, B, value_dim] | bfloat16 | $z$ gate for RMSNorm |
 | `ba_flat` | [1, 1, B, 2*num_v_heads] | bfloat16 | $b$ logits \|\| $a$ logits |
 | `dt_bias` | [1, num_v_heads, 1, 1] | bfloat16 | Learned time-step bias |
-| `neg_A_exp` | [1, num_v_heads, 1, 1] | bfloat16 | $-\exp(\texttt{A\_log})$ |
+| `neg_A_exp` | [1, num_v_heads, 1, 1] | bfloat16 | $-\exp(\texttt{A_log})$ |
 | `state` | [batch, num_v_heads, head_k_dim, head_v_dim] | float32 | Recurrent state $S$ |
 | `norm_w` | [1, num_v_heads, 1, head_v_dim] | bfloat16 | RMSNorm scale weights |
 
@@ -99,7 +99,7 @@ workarounds described in [`host_recurrence.md`](./host_recurrence.md):
 
 2. **GQA expansion**: repeat Q and K `gqa_ratio` times to align with the V head count.
 
-3. **Compute gate** $g = \texttt{neg\_A\_exp} \cdot \text{softplus}(a + \texttt{dt\_bias})$
+3. **Compute gate** $g = \texttt{neg_A_exp} \cdot \text{softplus}(a + \texttt{dt_bias})$
    and **beta** $\beta = \sigma(b)$.
 
 4. **Five-step recurrence** (fp32 throughout via SFPU binary path):

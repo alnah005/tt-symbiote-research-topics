@@ -185,7 +185,7 @@ lifetime of the module:
 | Name | Shape on Device | dtype | Content |
 |------|-----------------|-------|---------|
 | `_dt_bias_dev` | [1, num_v_heads, 1, 1] | bfloat16 | `dt_bias` parameter |
-| `_neg_A_exp_dev` | [1, num_v_heads, 1, 1] | bfloat16 | $-\exp(\texttt{A\_log})$ |
+| `_neg_A_exp_dev` | [1, num_v_heads, 1, 1] | bfloat16 | $-\exp(\texttt{A_log})$ |
 | `_norm_w_dev` | [1, num_v_heads, 1, head_v_dim] | bfloat16 | `norm.weight` expanded per-head |
 
 The `_neg_A_exp_dev` precomputation avoids recomputing the exponential of `A_log` at every
