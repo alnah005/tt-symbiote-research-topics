@@ -4,7 +4,9 @@
 
 Causal scaled dot-product attention for a single head is:
 
-$$\text{Attn}(Q, K, V) = \text{softmax}\!\left(\frac{Q K^\top}{\sqrt{d_k}} + M\right) V$$
+```math
+\text{Attn}(Q, K, V) = \text{softmax}\!\left(\frac{Q K^\top}{\sqrt{d_k}} + M\right) V
+```
 
 where:
 - **$Q \in \mathbb{R}^{T \times d_k}$**, **$K \in \mathbb{R}^{T \times d_k}$**, **$V \in \mathbb{R}^{T \times d_v}$** are the query, key, and value projections for one head over a sequence of length T.
@@ -46,7 +48,9 @@ Standard multi-head attention (MHA) assigns one independent K and V projection p
 
 GQA reduces this by using **n_kv_heads < n_q_heads** key and value heads, where each KV head is shared by a group of query heads. Formally, if query head h belongs to group g(h), then:
 
-$$\text{Attn}_h(Q_h, K, V) = \text{softmax}\!\left(\frac{Q_h K_{g(h)}^\top}{\sqrt{d_k}} + M\right) V_{g(h)}$$
+```math
+\text{Attn}_h(Q_h, K, V) = \text{softmax}\!\left(\frac{Q_h K_{g(h)}^\top}{\sqrt{d_k}} + M\right) V_{g(h)}
+```
 
 All query heads within group g(h) attend to the same K and V matrices. This reduces KV cache size by a factor of n_q_heads / n_kv_heads with negligible quality loss at large model scale, as established empirically in the GQA paper (Ainslie et al. 2023).
 

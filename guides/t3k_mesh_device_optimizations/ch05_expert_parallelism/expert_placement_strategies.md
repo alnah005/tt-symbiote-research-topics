@@ -187,7 +187,9 @@ When a single expert has $f_e \gg f_{\text{avg}}$, even the best bin-packing ass
 
 The replication factor for expert $e$ is:
 
-$$r_e = \max\!\left(1, \left\lceil \frac{f_e \times E}{k} \right\rceil\right) = \max(1, \lceil 32 \times f_e \rceil)$$
+```math
+r_e = \max\!\left(1, \left\lceil \frac{f_e \times E}{k} \right\rceil\right) = \max(1, \lceil 32 \times f_e \rceil)
+```
 
 This formula (from `expert_parallelism_strategies/ch04_expert_device_assignment/expert_replication.md`) ensures that each replica handles approximately $f_e / r_e \approx f_{\text{avg}}$ of tokens — restoring balance to average load.
 
@@ -201,7 +203,9 @@ Any expert with $f_e > 0.0391$ will overflow its capacity slot (capacity $C = \l
 
 Consider a Qwen3.5-35B deployment with Zipf-skewed routing where the most popular expert has $f_e = 0.17$:
 
-$$r_e = \max\!\left(1, \left\lceil \frac{0.17 \times 256}{8} \right\rceil\right) = \max(1, \lceil 5.44 \rceil) = 6$$
+```math
+r_e = \max\!\left(1, \left\lceil \frac{0.17 \times 256}{8} \right\rceil\right) = \max(1, \lceil 5.44 \rceil) = 6
+```
 
 Six copies of this expert are placed across 6 devices (for example, devices 0–5). Each copy handles:
 

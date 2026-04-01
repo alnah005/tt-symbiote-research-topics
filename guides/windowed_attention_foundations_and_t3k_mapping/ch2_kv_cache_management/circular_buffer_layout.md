@@ -120,12 +120,12 @@ Rather than storing the full position of every slot, it suffices to store a
 single scalar — the **position offset** — that allows the position of any slot
 to be reconstructed:
 
-$$\text{pos\_offset} = t - w + 1 \quad \text{(absolute position of the oldest cache entry)}$$
+$$\text{pos offset} = t - w + 1 \quad \text{(absolute position of the oldest cache entry)}$$
 
 Given `pos_offset` and a slot index `s`, the absolute position of the entry in
 slot `s` is:
 
-$$\text{position}(s) = \text{pos\_offset} + \bigl((s - \text{pos\_offset}) \bmod w\bigr)$$
+$$\text{position}(s) = \text{pos offset} + \bigl((s - \text{pos offset}) \bmod w\bigr)$$
 
 RoPE implementations consume this `pos_offset` to compute the correct rotation
 angles without storing a separate position integer per cache slot.

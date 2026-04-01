@@ -54,9 +54,11 @@ attendee set substituted:
 
 $$o_t = \sum_{s \in \mathcal{A}_{\text{win}}(t)} \alpha_{t,s} \, v_s$$
 
-$$\alpha_{t,s} = \frac{\exp\!\left(\dfrac{q_t \cdot k_s}{\sqrt{d}}\right)}
+```math
+\alpha_{t,s} = \frac{\exp\!\left(\dfrac{q_t \cdot k_s}{\sqrt{d}}\right)}
                {\displaystyle\sum_{s' \in \mathcal{A}_{\text{win}}(t)}
-                \exp\!\left(\dfrac{q_t \cdot k_{s'}}{\sqrt{d}}\right)}$$
+                \exp\!\left(\dfrac{q_t \cdot k_{s'}}{\sqrt{d}}\right)}
+```
 
 (For numerical stability the standard max-subtraction trick applies, with the max taken over the same window 𝒜_win(t).)
 

@@ -12,7 +12,9 @@ Before any mitigation strategy can be applied, load imbalance must be measured. 
 
 Let $B$ denote the number of tokens in one forward pass (the batch size). Each token independently selects $k = 8$ experts via the router. Define:
 
-$$f_e \;=\; \mathbb{E}\!\left[\text{tokens assigned to expert } e \text{ in one step}\right]$$
+```math
+f_e \;=\; \mathbb{E}\!\left[\text{tokens assigned to expert } e \text{ in one step}\right]
+```
 
 This expectation is taken over the router's stochastic assignment for a fixed batch of $B$ tokens. Because each token selects exactly $k$ experts, the frequencies sum to:
 

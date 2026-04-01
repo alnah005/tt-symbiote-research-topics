@@ -41,7 +41,7 @@ generated token. The absolute position of the current token is `t = P + g`.
 Under full attention, every new key and value is appended to the cache. The
 cache size after generating `g` tokens is:
 
-$$\text{size}_{\text{full}}(g) = 2 \cdot B \cdot H \cdot (P + g) \cdot d \cdot \text{dtype\_bytes}$$
+$$\text{size}_{\text{full}}(g) = 2 \cdot B \cdot H \cdot (P + g) \cdot d \cdot \text{dtype bytes}$$
 
 This grows without bound as `g` increases. For a 7B model with H = 32 heads, d = 128, B = 1, bfloat16, after generating
 32 768 tokens: cache size ≈ 2 × 1 × 32 × 32 768 × 128 × 2 = 536 870 912
@@ -65,7 +65,7 @@ prefill and eviction begins immediately at g = 0.)
 
 During the fill phase (`0 ≤ g < g_fill`):
 
-$$\text{size}_{\text{win}}(g) = 2 \cdot B \cdot H \cdot (P + g) \cdot d \cdot \text{dtype\_bytes}$$
+$$\text{size}_{\text{win}}(g) = 2 \cdot B \cdot H \cdot (P + g) \cdot d \cdot \text{dtype bytes}$$
 
 This is identical to the full-attention case during this phase.
 
@@ -86,7 +86,7 @@ The **eviction rule** is:
 After each decode step in steady state, the number of entries in the cache
 remains exactly w. The cache size is constant:
 
-$$\text{size}_{\text{win,steady}} = 2 \cdot B \cdot H \cdot w \cdot d \cdot \text{dtype\_bytes}$$
+$$\text{size}_{\text{win,steady}} = 2 \cdot B \cdot H \cdot w \cdot d \cdot \text{dtype bytes}$$
 
 This is independent of `g` (and therefore of T = P + g). No matter how long
 generation continues, the windowed cache does not grow.
@@ -114,11 +114,11 @@ hold per attention layer; multiply by the number of layers L for the full model.
 
 **Windowed attention (steady state):**
 
-$$\text{KV cache size}_{\text{win}} = 2 \cdot B \cdot H \cdot w \cdot d \cdot \text{dtype\_bytes}$$
+$$\text{KV cache size}_{\text{win}} = 2 \cdot B \cdot H \cdot w \cdot d \cdot \text{dtype bytes}$$
 
 **Full attention at generation step T = P + g:**
 
-$$\text{KV cache size}_{\text{full}}(T) = 2 \cdot B \cdot H \cdot T \cdot d \cdot \text{dtype\_bytes}$$
+$$\text{KV cache size}_{\text{full}}(T) = 2 \cdot B \cdot H \cdot T \cdot d \cdot \text{dtype bytes}$$
 
 Both formulae share the factor `2 * B * H * d * dtype_bytes`; the distinction
 is the cache length dimension: constant `w` for windowed, growing `T` for full.
@@ -144,8 +144,8 @@ weights.
 Define the memory saving factor R(T, w) as the ratio of full-attention cache
 size to windowed cache size at generation length T:
 
-$$R(T, w) = \frac{2 \cdot B \cdot H \cdot T \cdot d \cdot \text{dtype\_bytes}}
-               {2 \cdot B \cdot H \cdot w \cdot d \cdot \text{dtype\_bytes}}
+$$R(T, w) = \frac{2 \cdot B \cdot H \cdot T \cdot d \cdot \text{dtype bytes}}
+               {2 \cdot B \cdot H \cdot w \cdot d \cdot \text{dtype bytes}}
          = \frac{T}{w}$$
 
 The saving factor is simply T / w, growing linearly with generation length and

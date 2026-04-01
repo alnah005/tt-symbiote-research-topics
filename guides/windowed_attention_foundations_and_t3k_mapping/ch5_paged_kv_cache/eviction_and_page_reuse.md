@@ -104,7 +104,7 @@ token range.
 Formally:
 
 $$\forall\, b \in [0, B-1],\; \forall\, p \in [p_{\text{low}}(T),\, p_{\text{high}}(T)]: \quad
-  \text{page\_table}[b, p] \in [0, N_{\text{blocks}} - 1]$$
+  \text{page table}[b, p] \in [0, N_{\text{blocks}} - 1]$$
 
 **Invariant 2 — Block ownership uniqueness.** No physical block may appear in
 the page tables of two different active sequences simultaneously, except through
@@ -112,7 +112,7 @@ deliberate copy-on-write sharing (which windowed serving does not use). This
 invariant prevents cross-sequence contamination.
 
 $$\forall\, b_1 \neq b_2,\; \forall\, p_1, p_2:\quad
-  \text{page\_table}[b_1, p_1] \neq \text{page\_table}[b_2, p_2]
+  \text{page table}[b_1, p_1] \neq \text{page table}[b_2, p_2]
   \quad \text{(when both entries are valid)}$$
 
 **Invariant 3 — Write-before-read ordering.** The KV write for token `T`
@@ -201,7 +201,7 @@ slots per sequence and resolves automatically as the sequence reaches steady sta
 If different sequences in the same batch have different window sizes `w_b`, their
 `N_win` values differ:
 
-$$N_{\text{win},b} = \Bigl\lceil \frac{w_b}{\text{block\_size}} \Bigr\rceil$$
+$$N_{\text{win},b} = \Bigl\lceil \frac{w_b}{\text{block size}} \Bigr\rceil$$
 
 A pool of uniform-size blocks can still serve all sequences, but the simple
 `B_max = floor(N_pool / N_win)` formula no longer applies. The allocator must
@@ -271,7 +271,7 @@ $$N_{\text{win}} = \lceil 4096 / 64 \rceil = 64 \text{ blocks}$$
 
 Memory per block:
 
-$$2 \times H_{\text{kv}} \times \text{block\_size} \times d \times 2 \text{ bytes}
+$$2 \times H_{\text{kv}} \times \text{block size} \times d \times 2 \text{ bytes}
 = 2 \times 8 \times 64 \times 128 \times 2 = 262{,}144 \text{ bytes} = 256 \text{ KiB}$$
 
 (factor of 2 for K and V)

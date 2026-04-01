@@ -114,7 +114,9 @@ Dividing by the smaller $Z_b^{\text{drop}}$ inflates the surviving weights, part
 
 **Numerical precision:** The renormalization division involves BF16 arithmetic with 7 mantissa bits and machine epsilon $\varepsilon_{\text{mach}} = 2^{-7} \approx 0.0078$. For $Z_b^{\text{drop}}$ near zero (all high-weight experts dropped), the division is numerically unstable. A practical guard:
 
-$$Z_b^{\text{norm}} \;=\; \max\!\left(Z_b^{\text{drop}},\; \varepsilon_{\text{mach}}\right) \;=\; \max\!\left(Z_b^{\text{drop}},\; 2^{-7}\right)$$
+```math
+Z_b^{\text{norm}} \;=\; \max\!\left(Z_b^{\text{drop}},\; \varepsilon_{\text{mach}}\right) \;=\; \max\!\left(Z_b^{\text{drop}},\; 2^{-7}\right)
+```
 
 This prevents NaN or Inf outputs when a token's entire set of available experts has near-zero routing weight.
 
@@ -136,7 +138,9 @@ The capacity is $C = 2$, so overflow occurs when $n_e > 2$, i.e., $n_e \geq 3$:
 
 $$P(\text{overflow at expert } e \mid B=32, \text{uniform}) \;=\; P(n_e > 2) \;=\; 1 - P(n_e \leq 2)$$
 
-$$P(n_e \leq 2) \;=\; e^{-1}\!\left(1 + 1 + \frac{1}{2}\right) \;=\; e^{-1} \times 2.5 \;\approx\; 0.3679 \times 2.5 \;=\; 0.9197$$
+```math
+P(n_e \leq 2) \;=\; e^{-1}\!\left(1 + 1 + \frac{1}{2}\right) \;=\; e^{-1} \times 2.5 \;\approx\; 0.3679 \times 2.5 \;=\; 0.9197
+```
 
 $$P(\text{overflow at expert } e \mid B=32, \text{uniform}) \;\approx\; 1 - 0.920 \;=\; 0.080$$
 
@@ -180,7 +184,9 @@ $$\approx 0.0613 + 0.0306 + 0.0092 + 0.0023 + \ldots \;\approx\; 0.106 \text{ to
 
 **Step 4: Expected total tokens dropped per step across all $E = 256$ experts.**
 
-$$\mathbb{E}\!\left[\sum_{e=0}^{255} d_e\right] \;=\; 256 \times 0.106 \;\approx\; 27.1 \text{ tokens dropped per step}$$
+```math
+\mathbb{E}\!\left[\sum_{e=0}^{255} d_e\right] \;=\; 256 \times 0.106 \;\approx\; 27.1 \text{ tokens dropped per step}
+```
 
 Total tokens dispatched per step: $k \times B = 8 \times 32 = 256$ token-expert assignments. Fraction dropped:
 

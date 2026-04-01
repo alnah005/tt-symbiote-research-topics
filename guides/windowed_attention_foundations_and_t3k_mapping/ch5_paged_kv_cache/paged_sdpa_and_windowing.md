@@ -67,7 +67,7 @@ relevant blocks from the pool before computing attention.
 At decode step `T` for sequence `b`, the set of virtual pages covering the
 KV history is:
 
-$$\text{pages required} = \bigl\{0, 1, \ldots, \bigl\lfloor T / \text{block\_size} \bigr\rfloor\bigr\}$$
+$$\text{pages required} = \bigl\{0, 1, \ldots, \bigl\lfloor T / \text{block size} \bigr\rfloor\bigr\}$$
 
 The op resolves each virtual page to a physical block via `page_table[b, :]`
 and loads those blocks from the block pool. Specifically, the kernel:
@@ -112,11 +112,11 @@ cost and do not enter the attention computation.
 The window boundary falls at absolute position `t_low = T - w + 1`. The first
 page that is at least partially within the window is virtual page:
 
-$$p_{\text{low}} = \Bigl\lfloor \frac{T - w + 1}{\text{block\_size}} \Bigr\rfloor$$
+$$p_{\text{low}} = \Bigl\lfloor \frac{T - w + 1}{\text{block size}} \Bigr\rfloor$$
 
 and the last page is:
 
-$$p_{\text{high}} = \Bigl\lfloor \frac{T}{\text{block\_size}} \Bigr\rfloor$$
+$$p_{\text{high}} = \Bigl\lfloor \frac{T}{\text{block size}} \Bigr\rfloor$$
 
 giving `p_high - p_low + 1` pages to gather. In steady state this count
 equals exactly `ceil(w / block_size)` (plus at most 1 extra page if the window
@@ -221,7 +221,7 @@ allocations, this strategy maps the circular-buffer eviction policy directly
 onto the paging layer. The sequence is allocated exactly `N_win` physical
 blocks at the start, where:
 
-$$N_{\text{win}} = \Bigl\lceil \frac{w}{\text{block\_size}} \Bigr\rceil$$
+$$N_{\text{win}} = \Bigl\lceil \frac{w}{\text{block size}} \Bigr\rceil$$
 
 These `N_win` blocks are the sequence's permanent, fixed allocation for the
 duration of its lifetime. New tokens are written into blocks in round-robin
@@ -234,11 +234,11 @@ entries never change after initial allocation (the physical block indices are
 constant). What changes on each decode step is which block holds the current
 write target, tracked by a **block write pointer** `bwp`:
 
-$$\text{bwp}(T) = \Bigl\lfloor \frac{T}{\text{block\_size}} \Bigr\rfloor \bmod N_{\text{win}}$$
+$$\text{bwp}(T) = \Bigl\lfloor \frac{T}{\text{block size}} \Bigr\rfloor \bmod N_{\text{win}}$$
 
 The within-block write offset is:
 
-$$\text{offset\_in\_block}(T) = T \bmod \text{block\_size}$$
+$$\text{offset in block}(T) = T \bmod \text{block size}$$
 
 ```text
 Circular-buffer-as-pages example: w=8, block_size=4, N_win=2
@@ -265,7 +265,7 @@ At decode step `T`, `paged_sdpa_decode` must read all `N_win` blocks in the
 correct temporal order (oldest block first, wrapping around). The oldest block
 is at virtual page:
 
-$$p_{\text{oldest}} = \Bigl(\Bigl\lfloor \frac{T}{\text{block\_size}} \Bigr\rfloor + 1\Bigr) \bmod N_{\text{win}}$$
+$$p_{\text{oldest}} = \Bigl(\Bigl\lfloor \frac{T}{\text{block size}} \Bigr\rfloor + 1\Bigr) \bmod N_{\text{win}}$$
 
 The blocks must be gathered in the order:
 
@@ -364,7 +364,7 @@ Under Strategy B, `N_win` blocks are allocated immediately and held for the
 entire sequence lifetime. There is no temporary over-allocation. Total DRAM
 reserved per sequence per layer is:
 
-$$2 \times N_{\text{win}} \times H_{\text{kv}} \times \text{block\_size} \times d \times \text{dtype\_bytes}$$
+$$2 \times N_{\text{win}} \times H_{\text{kv}} \times \text{block size} \times d \times \text{dtype bytes}$$
 
 The factor of 2 is for keys and values. This is essentially identical to the
 non-paged circular buffer size from Chapter 2; the paging layer adds only the
@@ -454,7 +454,7 @@ SDPADecodeProgramConfig:
 
 With this config, the kernel computes:
 
-$$\text{physical\_block}(i) = \text{page\_table}\bigl[b,\; (i + \text{circular\_block\_offset}) \bmod N_{\text{win}}\bigr]$$
+$$\text{physical block}(i) = \text{page table}\bigl[b,\; (i + \text{circular block offset}) \bmod N_{\text{win}}\bigr]$$
 
 for `i = 0, 1, ..., N_win - 1`. This avoids the per-step page table
 reallocation on the host but requires a modest kernel modification to

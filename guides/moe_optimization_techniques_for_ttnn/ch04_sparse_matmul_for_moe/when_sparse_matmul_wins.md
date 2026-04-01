@@ -97,11 +97,15 @@ where $M_t = \lceil C / 32 \rceil$. The $M_t$ terms cancel: each active expert o
 
 Under uniform routing:
 
-$$\text{active experts} \approx \min\!\left(E_d,\ \frac{k \times B \times S}{N}\right)$$
+```math
+\text{active experts} \approx \min\!\left(E_d,\ \frac{k \times B \times S}{N}\right)
+```
 
 So:
 
-$$\rho \approx \frac{\min\!\left(E_d,\ \frac{k \times B \times S}{N}\right)}{E_d} = \frac{\min\!\left(32,\ B \times S\right)}{32}$$
+```math
+\rho \approx \frac{\min\!\left(E_d,\ \frac{k \times B \times S}{N}\right)}{E_d} = \frac{\min\!\left(32,\ B \times S\right)}{32}
+```
 
 (Substituting $k=8$, $N=8$, $E_d=32$; note $k/N = 8/8 = 1$.)
 

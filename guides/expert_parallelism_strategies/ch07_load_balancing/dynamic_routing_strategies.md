@@ -14,11 +14,15 @@ This file presents the inference-time and training-time strategies for mitigatin
 
 At each step, the standard router computes a logit vector $\mathbf{z}_b \in \mathbb{R}^E$ for token $b$. The top-$k$ experts are selected by:
 
-$$\mathcal{S}(b) \;=\; \operatorname{top-}k\!\left(\sigma(\mathbf{z}_b)\right) \quad \text{or} \quad \mathcal{S}(b) \;=\; \operatorname{top-}k\!\left(\operatorname{softmax}(\mathbf{z}_b)\right)$$
+```math
+\mathcal{S}(b) \;=\; \operatorname{top-}k\!\left(\sigma(\mathbf{z}_b)\right) \quad \text{or} \quad \mathcal{S}(b) \;=\; \operatorname{top-}k\!\left(\operatorname{softmax}(\mathbf{z}_b)\right)
+```
 
 Load-aware adjustment applies an **expert bias** $\boldsymbol{\delta} \in \mathbb{R}^E$ to the logits before selection:
 
-$$\mathbf{z}_b^{\text{adj}} \;=\; \mathbf{z}_b - \boldsymbol{\delta}, \quad \delta_e \;=\; \beta \cdot \max\!\left(0,\; \frac{f_e - f_{\text{avg}}}{f_{\text{avg}}}\right)$$
+```math
+\mathbf{z}_b^{\text{adj}} \;=\; \mathbf{z}_b - \boldsymbol{\delta}, \quad \delta_e \;=\; \beta \cdot \max\!\left(0,\; \frac{f_e - f_{\text{avg}}}{f_{\text{avg}}}\right)
+```
 
 where $\beta > 0$ is a penalty coefficient (a configurable hyperparameter). For a hot expert with $f_e = 2 f_{\text{avg}}$, the bias is $\delta_e = \beta \cdot 1.0 = \beta$, reducing its effective logit by $\beta$ and making it less likely to be selected in future steps.
 
@@ -65,7 +69,9 @@ Temperature scaling is applied after the router's linear projection and before t
 
 This strategy is defined in detail in Chapter 4, `ch04_expert_device_assignment/expert_replication.md`. The key formula (reproduced here for completeness) is:
 
-$$r_e \;=\; \max\!\left(1,\; \left\lceil \frac{f_e \cdot E}{k} \right\rceil\right) \;=\; \max\!\left(1,\; \lceil 32 \cdot f_e \rceil\right)$$
+```math
+r_e \;=\; \max\!\left(1,\; \left\lceil \frac{f_e \cdot E}{k} \right\rceil\right) \;=\; \max\!\left(1,\; \lceil 32 \cdot f_e \rceil\right)
+```
 
 where $f_e$ here is the normalized per-token frequency $\tilde{f}_e$ (expected tokens per step divided by $B$, i.e., $\tilde{f}_e = f_e / B$ in the notation of `load_imbalance_detection.md`).
 
