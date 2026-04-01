@@ -122,7 +122,9 @@ value = value.float().repeat_interleave(gqa, dim=1)
 
 Standard attention with scale $1 / \sqrt{\text{head dim}}$:
 
-$$\text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{Q K^\top}{\sqrt{d_\text{head}}}\right) V$$
+```math
+\text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{Q K^\top}{\sqrt{d_\text{head}}}\right) V
+```
 
 For `head_dim=256`, the scale is $1 / \sqrt{256} = 0.0625$.
 

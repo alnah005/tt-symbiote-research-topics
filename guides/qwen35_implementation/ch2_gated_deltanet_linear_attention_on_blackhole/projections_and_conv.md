@@ -146,7 +146,9 @@ ttnn.deallocate(acc)
 
 `_conv_w_devs[i]` is the $i$-th column of the depthwise conv weight. The weighted sum is:
 
-$$\text{conv out} = \text{SiLU}\!\left(\sum_{i=0}^{3} w_i \cdot \text{slot}_{(\text{oldest}+i) \bmod 4}\right)$$
+```math
+\text{conv out} = \text{SiLU}\!\left(\sum_{i=0}^{3} w_i \cdot \text{slot}_{(\text{oldest}+i) \bmod 4}\right)
+```
 
 ### Conv Weight Layout
 
@@ -185,7 +187,7 @@ lifetime of the module:
 | Name | Shape on Device | dtype | Content |
 |------|-----------------|-------|---------|
 | `_dt_bias_dev` | [1, num_v_heads, 1, 1] | bfloat16 | `dt_bias` parameter |
-| `_neg_A_exp_dev` | [1, num_v_heads, 1, 1] | bfloat16 | $-\exp(\texttt{A\textunderscore{}log})$ |
+| `_neg_A_exp_dev` | [1, num_v_heads, 1, 1] | bfloat16 | $-\exp(A_{\log})$ |
 | `_norm_w_dev` | [1, num_v_heads, 1, head_v_dim] | bfloat16 | `norm.weight` expanded per-head |
 
 The `_neg_A_exp_dev` precomputation avoids recomputing the exponential of `A_log` at every

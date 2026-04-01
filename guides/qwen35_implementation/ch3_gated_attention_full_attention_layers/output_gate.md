@@ -4,7 +4,9 @@
 
 After computing the standard attention output but before the WO projection, Qwen3.5 multiplies the result by a sigmoid-gated linear transform of the original layer input $x$:
 
-$$\text{gated output} = \text{attn output} \odot \sigma\!\left(x \, W_\text{gate}\right)$$
+```math
+\text{gated output} = \text{attn output} \odot \sigma\!\left(x \, W_\text{gate}\right)
+```
 
 where $\sigma$ is the element-wise sigmoid function and $W_\text{gate} \in \mathbb{R}^{d_\text{hidden} \times (n_\text{heads} \cdot \text{head dim})}$ is the post-transpose gate weight (raw checkpoint weight transposed before upload).
 
