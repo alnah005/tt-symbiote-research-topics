@@ -66,8 +66,8 @@ individual outputs efficiently.
 | `proj[...+num_v_heads]` | 32 | $b$ (beta logits) |
 | `proj[...+num_v_heads]` | 32 | $a$ (decay logits) |
 
-The conv dimension is $\text{conv\_dim} = 2 \times \text{key\_dim} + \text{value\_dim}$,
-where $\text{key\_dim} = \text{head\_k\_dim} \times \text{num\_k\_heads}$.
+The conv dimension is $\text{conv dim} = 2 \times \text{key dim} + \text{value dim}$,
+where $\text{key dim} = \text{head k dim} \times \text{num k heads}$.
 
 ---
 
@@ -146,7 +146,7 @@ ttnn.deallocate(acc)
 
 `_conv_w_devs[i]` is the $i$-th column of the depthwise conv weight. The weighted sum is:
 
-$$\text{conv\_out} = \text{SiLU}\!\left(\sum_{i=0}^{3} w_i \cdot \text{slot}_{(\text{oldest}+i) \bmod 4}\right)$$
+$$\text{conv out} = \text{SiLU}\!\left(\sum_{i=0}^{3} w_i \cdot \text{slot}_{(\text{oldest}+i) \bmod 4}\right)$$
 
 ### Conv Weight Layout
 

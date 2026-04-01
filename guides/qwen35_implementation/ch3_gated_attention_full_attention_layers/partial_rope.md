@@ -24,7 +24,7 @@ Rotation pairs are formed by splitting the first `rotary_dim=64` dimensions into
 
 For token at position $p$, frequency index $i \in [0, 31]$, the inverse frequency is:
 
-$$\theta_i^{-1} = \frac{1}{\text{rope\_theta}^{2i / \text{rotary\_dim}}}$$
+$$\theta_i^{-1} = \frac{1}{\text{rope theta}^{2i / \text{rotary dim}}}$$
 
 Note the denominator is `rotary_dim=64`, **not** `head_dim=256`. This is the central correctness requirement.
 
@@ -37,7 +37,7 @@ In full:
 $$x_1' = x_1 \cos\phi_i - x_2 \sin\phi_i$$
 $$x_2' = x_2 \cos\phi_i + x_1 \sin\phi_i$$
 
-Dimensions $[\text{rotary\_dim}, \text{head\_dim}) = [64, 255]$ are untouched: $x_j' = x_j$.
+Dimensions $[\text{rotary dim}, \text{head dim}) = [64, 255]$ are untouched: $x_j' = x_j$.
 
 From `test_attention_pcc.py`, the reference implementation:
 
@@ -64,13 +64,13 @@ The standard `rotary_embedding_llama` op (used for Llama-family models) cannot b
 
 `rotary_embedding_llama` computes inverse frequencies using:
 
-$$\theta_i^{-1} = \frac{1}{\text{rope\_theta}^{2i / \text{head\_dim}}}$$
+$$\theta_i^{-1} = \frac{1}{\text{rope theta}^{2i / \text{head dim}}}$$
 
 For Qwen3.5, the denominator must be `rotary_dim=64`, not `head_dim=256`. Since $64 \ll 256$, the exponent $2i/64$ grows 4x faster than $2i/256$. Higher-frequency basis vectors — those responsible for encoding fine positional distinctions — would be wrongly assigned slow, low-frequency oscillations. The result is that the model sees a compressed, incorrect frequency spectrum and produces positional embeddings that do not match the training distribution.
 
 ### Failure 2 — Interleaved vs Non-Interleaved Pairing
 
-`rotary_embedding_llama` uses **interleaved** (Meta-style) pairing: dimension $2i$ is paired with dimension $2i+1$ (adjacent odd/even indices) for $i \in [0, \text{head\_dim}/2)$. Qwen3.5 follows Hugging Face non-interleaved convention: the device kernel `ttnn.experimental.rotary_embedding` pairs dimension $j$ with dimension $j + \text{head\_dim}/2 = j + 128$ (split-half pairing across the full head dimension).
+`rotary_embedding_llama` uses **interleaved** (Meta-style) pairing: dimension $2i$ is paired with dimension $2i+1$ (adjacent odd/even indices) for $i \in [0, \text{head dim}/2)$. Qwen3.5 follows Hugging Face non-interleaved convention: the device kernel `ttnn.experimental.rotary_embedding` pairs dimension $j$ with dimension $j + \text{head dim}/2 = j + 128$ (split-half pairing across the full head dimension).
 
 These two conventions conflict even when only the rotary dimensions are considered. Under Meta-style interleaved pairing, dim 0 rotates with dim 1, dim 2 with dim 3, and so on. Under HF-style non-interleaved pairing used by `ttnn.experimental.rotary_embedding`, dim 0 pairs with dim 128, dim 1 with dim 129, etc. — the split is at `head_dim/2 = 128`, not at `rotary_dim/2 = 32`. Applying the interleaved convention to HF-format Q/K vectors produces rotations between the wrong dimension pairs, corrupting the output regardless of whether the frequencies are correct.
 
@@ -160,7 +160,7 @@ The difference matters for the patch because the cos/sin matrix layout differs b
 | Property | `RotarySetup` | `HfRotarySetup` |
 |----------|---------------|-----------------|
 | RoPE op | `rotary_embedding_llama` | `ttnn.experimental.rotary_embedding` |
-| Dimension pairing | interleaved (dim $2i$ with $2i+1$) | non-interleaved (dim $j$ with $j + \text{head\_dim}/2 = j + 128$) |
+| Dimension pairing | interleaved (dim $2i$ with $2i+1$) | non-interleaved (dim $j$ with $j + \text{head dim}/2 = j + 128$) |
 | Transformation matrix | stored in `transformation_mat` | `None` (not needed) |
 | `get_rot_mats()` return | cos/sin sliced by position, sharded | full cos/sin cache (unsliced) |
 

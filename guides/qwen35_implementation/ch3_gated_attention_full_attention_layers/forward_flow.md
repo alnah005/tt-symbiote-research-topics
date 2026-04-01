@@ -80,9 +80,9 @@ Note that `q_proj.weight` here is the **query-only** weight after the `q_proj_ga
 
 Qwen3.5 applies RMSNorm per attention head to both Q and K after projection. This is called the zero-centered RMSNorm pattern because the weights are initialized to zero and applied as $x \cdot (1 + w)$:
 
-$$\text{qkNorm}(x, w) = \frac{x}{\sqrt{\frac{1}{\text{head\_dim}} \sum_j x_j^2 + \epsilon}} \cdot (1 + w)$$
+$$\text{qkNorm}(x, w) = \frac{x}{\sqrt{\frac{1}{\text{head dim}} \sum_j x_j^2 + \epsilon}} \cdot (1 + w)$$
 
-where $w$ is `q_norm.weight` or `k_norm.weight`, and $\epsilon = \text{norm\_eps} = 10^{-6}$. The weights are initialized to zero, so the norm starts as standard RMSNorm (scale = 1.0) and the `(1 + w)` formulation ensures the effective scale is never exactly zero.
+where $w$ is `q_norm.weight` or `k_norm.weight`, and $\epsilon = \text{norm eps} = 10^{-6}$. The weights are initialized to zero, so the norm starts as standard RMSNorm (scale = 1.0) and the `(1 + w)` formulation ensures the effective scale is never exactly zero.
 
 The Q norm uses `q_norm.weight` of shape `(head_dim,) = (256,)`. The K norm uses `k_norm.weight` of the same shape.
 
@@ -106,7 +106,7 @@ Paged KV cache is supported via `PagedAttentionConfig` passed to `GatedAttention
 
 Qwen3.5 uses Grouped Query Attention. The KV heads are expanded to match the Q head count via `repeat_interleave` inside the base class:
 
-$$\text{GQA ratio} = \frac{n_\text{heads}}{n_\text{kv\_heads}}$$
+$$\text{GQA ratio} = \frac{n_\text{heads}}{n_\text{kv heads}}$$
 
 For 27B: $24 / 4 = 6$. For 35B-A3B: $16 / 2 = 8$.
 
@@ -120,7 +120,7 @@ value = value.float().repeat_interleave(gqa, dim=1)
 
 ### Scaled Dot-Product Attention
 
-Standard attention with scale $1 / \sqrt{\text{head\_dim}}$:
+Standard attention with scale $1 / \sqrt{\text{head dim}}$:
 
 $$\text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{Q K^\top}{\sqrt{d_\text{head}}}\right) V$$
 
@@ -143,7 +143,7 @@ After the softmax attention output is computed and reshaped to `[1, 1, B, n_head
 
 The gated attention output (returned from the hook) is projected back to `hidden_size` by the WO linear:
 
-$$\text{output} = \text{gated\_attn\_output} \, W_O^\top$$
+$$\text{output} = \text{gated attn output} \, W_O^\top$$
 
 For 27B: `[1, 1, B, 6144]` → `[1, 1, B, 5120]`.
 For 35B-A3B: `[1, 1, B, 4096]` → `[1, 1, B, 2048]`.

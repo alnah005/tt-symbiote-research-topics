@@ -56,13 +56,13 @@ The shared expert output is **additionally gated** by a learned scalar. After co
 shared expert's SwiGLU output (shape $[1, 1, B, d]$), a separate weight
 `shared_expert_gate.weight` projects the input token to a single scalar:
 
-$$g = \sigma(\mathbf{x}\, W_{\text{shared\_gate}})$$
+$$g = \sigma(\mathbf{x}\, W_{\text{shared gate}})$$
 
-where $W_{\text{shared\_gate}} \in \mathbb{R}^{d \times 1}$ and $\sigma$ is the sigmoid function.
+where $W_{\text{shared gate}} \in \mathbb{R}^{d \times 1}$ and $\sigma$ is the sigmoid function.
 
 The final shared output is:
 
-$$\text{shared\_out} = \text{SwiGLU}(\mathbf{x}) \cdot g$$
+$$\text{shared out} = \text{SwiGLU}(\mathbf{x}) \cdot g$$
 
 This gate is on device (stored in `self.shared_gate_weight_tt` as bf16) and does **not** require
 a host sync. Its shape on device is `[1, 1, hidden, 1]` — a single column projection.

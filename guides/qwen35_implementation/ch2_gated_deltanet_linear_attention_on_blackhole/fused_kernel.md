@@ -42,9 +42,9 @@ The operation is exposed to Python as `ttnn.experimental.gated_delta_net`.
 
 | Parameter | Type | Content |
 |-----------|------|---------|
-| `scale` | float | $1/\sqrt{\text{head\_k\_dim}}$ |
+| `scale` | float | $1/\sqrt{\text{head k dim}}$ |
 | `norm_eps` | float | RMSNorm epsilon (1e-6) |
-| `key_dim` | int | $\text{head\_k\_dim} \times \text{num\_k\_heads}$ |
+| `key_dim` | int | $\text{head k dim} \times \text{num k heads}$ |
 | `gqa_ratio` | int | `num_v_heads / num_k_heads` |
 
 ### Outputs

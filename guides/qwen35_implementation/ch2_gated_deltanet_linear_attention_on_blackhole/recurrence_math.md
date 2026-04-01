@@ -169,7 +169,7 @@ $\mathbf{k}_t \otimes \boldsymbol{\delta}_t$ can have unbounded magnitude, causi
 matrix $S$ to grow without bound over many token steps. The flag
 `use_qk_l2norm_in_kernel=True` is always set in the Qwen3.5 call path.
 
-After normalization, the query is additionally scaled by $1 / \sqrt{\text{head\_k\_dim}}$:
+After normalization, the query is additionally scaled by $1 / \sqrt{\text{head k dim}}$:
 
 $$\mathbf{q}_{\text{scaled}} = \hat{\mathbf{q}} \cdot \frac{1}{\sqrt{d_k}}$$
 
@@ -183,7 +183,7 @@ $\mathbf{q}^\top \mathbf{k}$ from growing too large in deeper models.
 Qwen3.5 uses Grouped Query Attention (GQA) in the DeltaNet layers. The number of key/query
 heads (`num_k_heads`) is smaller than the number of value heads (`num_v_heads`). The ratio is:
 
-$$\text{gqa\_ratio} = \texttt{num\_v\_heads} / \texttt{num\_k\_heads}$$
+$$\text{gqa ratio} = \texttt{num\_v\_heads} / \texttt{num\_k\_heads}$$
 
 For Qwen3.5-27B: 48 / 16 = 3. For Qwen3.5-35B-A3B: 32 / 16 = 2.
 
@@ -208,9 +208,9 @@ saves parameter budget — while keeping the state matrix $S$ at full [num_v_hea
 After the recurrence produces output $\mathbf{o}_t$ (shape [num_v_heads, head_v_dim]), it is
 passed through a gated RMSNorm before the output projection:
 
-$$\text{output\_normed} = \mathbf{o}_t \cdot \left(\text{mean}(\mathbf{o}_t^2) + \epsilon\right)^{-1/2} \cdot \mathbf{w}_{\text{norm}}$$
+$$\text{output normed} = \mathbf{o}_t \cdot \left(\text{mean}(\mathbf{o}_t^2) + \epsilon\right)^{-1/2} \cdot \mathbf{w}_{\text{norm}}$$
 
-$$\text{final\_output} = \text{output\_normed} \cdot \text{SiLU}(z_t)$$
+$$\text{final output} = \text{output normed} \cdot \text{SiLU}(z_t)$$
 
 where $z_t$ is the output of `in_proj_z` (shape [num_v_heads, head_v_dim]) and $\mathbf{w}_{\text{norm}}$
 is the per-dimension learned scale from `norm.weight` (shape [head_v_dim]).

@@ -26,7 +26,7 @@ stored on the `ModelArgs` object.
 | GQA ratio ($N_V / N_K$) | derived | 3 |
 | Key dimension ($N_K \times d_K$) | derived | 2048 |
 | Value dimension ($N_V \times d_V$) | derived | 6144 |
-| Conv dimension ($2 \times \text{key\_dim} + \text{value\_dim}$) | derived | 10240 |
+| Conv dimension ($2 \times \text{key dim} + \text{value dim}$) | derived | 10240 |
 
 ### 35B-A3B (MoE) — DeltaNet Hyperparameters
 
@@ -40,7 +40,7 @@ stored on the `ModelArgs` object.
 | GQA ratio ($N_V / N_K$) | derived | 2 |
 | Key dimension ($N_K \times d_K$) | derived | 2048 |
 | Value dimension ($N_V \times d_V$) | derived | 4096 |
-| Conv dimension ($2 \times \text{key\_dim} + \text{value\_dim}$) | derived | 8192 |
+| Conv dimension ($2 \times \text{key dim} + \text{value dim}$) | derived | 8192 |
 
 ### DeltaNet Derived Dimensions
 
@@ -98,7 +98,7 @@ the standard `Attention` base class with an output gate and Qwen3.5-specific par
 | Head dimension | `head_dim` | 256 |
 | GQA ratio ($N_Q / N_{KV}$) | derived | 6 |
 | Partial rotary factor | `rope_parameters.partial_rotary_factor` | 0.25 |
-| Rotary dimension ($\text{head\_dim} \times \text{factor}$) | derived | 64 |
+| Rotary dimension ($\text{head dim} \times \text{factor}$) | derived | 64 |
 | RoPE theta | `rope_parameters.rope_theta` | 1,000,000.0 |
 | RMSNorm epsilon | `rms_norm_eps` | 1e-6 |
 | Number of KV cache layers | derived (16 full-attention layers) | 16 |
@@ -113,7 +113,7 @@ the standard `Attention` base class with an output gate and Qwen3.5-specific par
 | Head dimension | `head_dim` | 256 |
 | GQA ratio ($N_Q / N_{KV}$) | derived | 8 |
 | Partial rotary factor | `rope_parameters.partial_rotary_factor` | 0.25 |
-| Rotary dimension ($\text{head\_dim} \times \text{factor}$) | derived | 64 |
+| Rotary dimension ($\text{head dim} \times \text{factor}$) | derived | 64 |
 | RoPE theta | `rope_parameters.rope_theta` | 1,000,000.0 |
 | RMSNorm epsilon | `rms_norm_eps` | 1e-6 |
 | Number of KV cache layers | derived (10 full-attention layers) | 10 |
@@ -122,11 +122,11 @@ the standard `Attention` base class with an output gate and Qwen3.5-specific par
 ### Partial RoPE Note
 
 Qwen3.5 applies RoPE to only the first 64 dimensions of each $d = 256$ attention head
-($\text{partial\_rotary\_factor} = 0.25$, $\text{rotary\_dim} = 64$). The remaining
+($\text{partial rotary factor} = 0.25$, $\text{rotary dim} = 64$). The remaining
 192 dimensions are left unrotated. This requires corrected frequency computation using
-$\text{rotary\_dim} = 64$ rather than $\text{head\_dim} = 256$ in the standard formula:
+$\text{rotary dim} = 64$ rather than $\text{head dim} = 256$ in the standard formula:
 
-$$\theta_i = \frac{1}{\text{rope\_theta}^{2i / \text{rotary\_dim}}} \quad \text{for} \quad i = 0, 1, \ldots, \frac{\text{rotary\_dim}}{2} - 1$$
+$$\theta_i = \frac{1}{\text{rope theta}^{2i / \text{rotary dim}}} \quad \text{for} \quad i = 0, 1, \ldots, \frac{\text{rotary dim}}{2} - 1$$
 
 The 27B and 35B-A3B demos implement this correction differently because they use
 different RoPE setup classes (`RotarySetup` vs `HfRotarySetup`), which address cos/sin
@@ -176,7 +176,7 @@ elif self.moe_intermediate_size is not None:
 active regardless of routing. A scalar gate (`shared_expert_gate.weight`) controls how
 much of the shared expert output is added to the routed expert sum:
 
-$$\text{out} = \text{shared\_out} \cdot \sigma(\text{token} \cdot w_{\text{gate}}) + \sum_{i \in \text{top-k}} r_i \cdot \text{expert}_i(\text{token})$$
+$$\text{out} = \text{shared out} \cdot \sigma(\text{token} \cdot w_{\text{gate}}) + \sum_{i \in \text{top-k}} r_i \cdot \text{expert}_i(\text{token})$$
 
 where $r_i$ are the softmax-normalized routing weights for the selected top-8 experts.
 

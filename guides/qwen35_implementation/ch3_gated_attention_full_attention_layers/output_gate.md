@@ -4,9 +4,9 @@
 
 After computing the standard attention output but before the WO projection, Qwen3.5 multiplies the result by a sigmoid-gated linear transform of the original layer input $x$:
 
-$$\text{gated\_output} = \text{attn\_output} \odot \sigma\!\left(x \, W_\text{gate}\right)$$
+$$\text{gated output} = \text{attn output} \odot \sigma\!\left(x \, W_\text{gate}\right)$$
 
-where $\sigma$ is the element-wise sigmoid function and $W_\text{gate} \in \mathbb{R}^{d_\text{hidden} \times (n_\text{heads} \cdot \text{head\_dim})}$ is the post-transpose gate weight (raw checkpoint weight transposed before upload).
+where $\sigma$ is the element-wise sigmoid function and $W_\text{gate} \in \mathbb{R}^{d_\text{hidden} \times (n_\text{heads} \cdot \text{head dim})}$ is the post-transpose gate weight (raw checkpoint weight transposed before upload).
 
 This gate is architecturally distinct from the Q/K gate seen in DeltaNet layers. It is a full-dimension gating of the attention output — every element of the post-softmax attention result is scaled by a learned value in $(0, 1)$ before the WO projection.
 

@@ -101,13 +101,13 @@ reads in the subsequent `ttnn.add` are spread across memory controllers.
 
 The forward pass through one decoder block:
 
-$$x_0 \leftarrow \text{to\_mem\_config}(x,\, \text{skip\_cfg})$$
+$$x_0 \leftarrow \text{to mem config}(x,\, \text{skip cfg})$$
 
 $$x_{\text{attn}} = \text{AttentionNorm}(x_0)$$
 
 $$a = \text{Attention}(x_{\text{attn}})$$
 
-$$x_1 = x_0 + \text{to\_mem\_config}(a,\, \text{skip\_cfg})$$
+$$x_1 = x_0 + \text{to mem config}(a,\, \text{skip cfg})$$
 
 $$x_{\text{ff}} = \text{FFNorm}(x_1)$$
 

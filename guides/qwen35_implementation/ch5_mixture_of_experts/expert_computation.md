@@ -74,7 +74,7 @@ ttnn.deallocate(gate_up)
 
 The SwiGLU nonlinearity is:
 
-$$\text{hidden} = \text{SiLU}(\text{gate\_out}) \odot \text{up\_out}$$
+$$\text{hidden} = \text{SiLU}(\text{gate out}) \odot \text{up out}$$
 
 where $\text{SiLU}(z) = z \cdot \sigma(z) = \frac{z}{1 + e^{-z}}$.
 
@@ -104,7 +104,7 @@ careful deallocation prevents L1 overflow.
 
 The down projection maps the expert's intermediate representation back to hidden size:
 
-$$\text{expert\_out} = \text{hidden}\, W_{\text{down}} \in \mathbb{R}^{B \times d}$$
+$$\text{expert out} = \text{hidden}\, W_{\text{down}} \in \mathbb{R}^{B \times d}$$
 
 ```python
 expert_out = ttnn.linear(hidden, self.expert_down[eid], memory_config=L1)
@@ -196,7 +196,7 @@ return shared_out + routed_out
 ```
 
 The TTNN implementation is numerically equivalent: the fused `gate+up` matmul followed by
-`ttnn.split` produces the same $[\text{gate\_out}, \text{up\_out}]$ as the separate PyTorch
+`ttnn.split` produces the same $[\text{gate out}, \text{up out}]$ as the separate PyTorch
 `F.linear` calls. The PCC test in `TestMoEPCC.test_single_layer` validates this with a
 threshold of 0.99.
 

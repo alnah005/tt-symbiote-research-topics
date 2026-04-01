@@ -60,7 +60,7 @@ shape: [n_heads * head_dim * 2, hidden_size]
              [16 * 128 * 2, 2048] = [4096,  2048]  for A3B
 ```
 
-The interleaving is per-head. For head $h$, rows $[h \cdot 2 \cdot \text{head\_dim},\; h \cdot 2 \cdot \text{head\_dim} + \text{head\_dim})$ are the query rows, and rows $[h \cdot 2 \cdot \text{head\_dim} + \text{head\_dim},\; (h+1) \cdot 2 \cdot \text{head\_dim})$ are the gate rows.
+The interleaving is per-head. For head $h$, rows $[h \cdot 2 \cdot \text{head dim},\; h \cdot 2 \cdot \text{head dim} + \text{head dim})$ are the query rows, and rows $[h \cdot 2 \cdot \text{head dim} + \text{head dim},\; (h+1) \cdot 2 \cdot \text{head dim})$ are the gate rows.
 
 Schematically:
 
@@ -101,13 +101,13 @@ elif "q_proj.bias" in key:
 
 #### Why There Is No `reverse_permute`
 
-Many Llama-style models require a `reverse_permute` transform on Q and K weights before loading into TTNN. The Llama HuggingFace checkpoint stores rotary frequencies in an interleaved complex-number format (pairs of $(r, i)$ at positions $0, 2, 4, \ldots$), whereas the TTNN RoPE kernel expects them in a split-half format (all real parts in $[0, \text{rotary\_dim}/2)$, all imaginary parts in $[\text{rotary\_dim}/2, \text{rotary\_dim})$). `reverse_permute` applies a permutation to undo this rearrangement before loading.
+Many Llama-style models require a `reverse_permute` transform on Q and K weights before loading into TTNN. The Llama HuggingFace checkpoint stores rotary frequencies in an interleaved complex-number format (pairs of $(r, i)$ at positions $0, 2, 4, \ldots$), whereas the TTNN RoPE kernel expects them in a split-half format (all real parts in $[0, \text{rotary dim}/2)$, all imaginary parts in $[\text{rotary dim}/2, \text{rotary dim})$). `reverse_permute` applies a permutation to undo this rearrangement before loading.
 
 Qwen3.5 uses HuggingFace-style RoPE with a `partial_rotary_factor` parameter. The frequencies are computed as:
 
-$$\theta_i = \frac{1}{\text{rope\_theta}^{2i / \text{rotary\_dim}}}, \quad i = 0, 1, \ldots, \frac{\text{rotary\_dim}}{2} - 1$$
+$$\theta_i = \frac{1}{\text{rope theta}^{2i / \text{rotary dim}}}, \quad i = 0, 1, \ldots, \frac{\text{rotary dim}}{2} - 1$$
 
-where $\text{rotary\_dim} = \text{head\_dim} \times \text{partial\_rotary\_factor}$ (e.g., $256 \times 0.25 = 64$ for 27B). The weights are already stored in the format the HF-style RoPE kernel expects. No permutation transform is needed, and the code explicitly omits it:
+where $\text{rotary dim} = \text{head dim} \times \text{partial rotary factor}$ (e.g., $256 \times 0.25 = 64$ for 27B). The weights are already stored in the format the HF-style RoPE kernel expects. No permutation transform is needed, and the code explicitly omits it:
 
 ```python
 # NO reverse_permute: Qwen3.5 uses HF-style RoPE with partial_rotary_factor,
