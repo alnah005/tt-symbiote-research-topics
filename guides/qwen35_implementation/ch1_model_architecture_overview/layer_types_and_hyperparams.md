@@ -80,7 +80,11 @@ self.is_qwen35_moe  = self.is_qwen35 and self.num_experts > 0
 ```
 
 If `is_qwen35` is true, the config also sets `use_hf_rope = True` and
-`rms_norm_add_unit_offset = True` (zero-centered RMSNorm: $\text{output} \times (1 + w)$).
+`rms_norm_add_unit_offset = True` (zero-centered RMSNorm: 
+
+$$\text{output} \times (1 + w)$$
+
+).
 
 ---
 
