@@ -374,8 +374,8 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ## Gemma 4 Vision Encoder TTNN Porting Strategy
 **Date:** 2026-04-03
-**Status:** Pending
-**Guide:** TBD
+**Status:** Completed
+**Guide:** `guides/gemma_4_vision_encoder_ttnn_porting_strategy/`
 **Why Needed:** Determine whether to port the Gemma4 vision encoder to TTNN or run it on CPU, and if porting, how much of the existing Gemma3 TTNN vision encoder can be reused.
 **Questions:**
 - How different is Gemma4VisionModel from Gemma3's SigLIP vision encoder, and can the existing `models/demos/multimodal/gemma3/tt/` modules be reused directly?
