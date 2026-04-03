@@ -361,8 +361,8 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ## Gemma 4 31B Architecture and TTNN Module Mapping
 **Date:** 2026-04-03
-**Status:** Pending
-**Guide:** TBD
+**Status:** Completed
+**Guide:** `guides/gemma_4_31b_architecture_and_ttnn_module_mapping/`
 **Why Needed:** Need a definitive mapping of every Gemma 4 submodule to its optimal TTNN implementation, including the heterogeneous attention (sliding vs global), K=V sharing, partial rotary, and V-norm patterns.
 **Questions:**
 - How should the two different attention configurations (sliding: 32Q/16KV/256dim vs global: 32Q/4KV/512dim) be handled in a single TTNNModule, or should they be separate classes?
