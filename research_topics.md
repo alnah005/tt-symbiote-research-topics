@@ -358,3 +358,28 @@ This file tracks research topics that the Architect needs to investigate for mak
 - What is the optimization roadmap (Metal Trace, Multi-CQ, per-row MoE routing)?
 
 ---
+
+## Gemma 4 31B Architecture and TTNN Module Mapping
+**Date:** 2026-04-03
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** Need a definitive mapping of every Gemma 4 submodule to its optimal TTNN implementation, including the heterogeneous attention (sliding vs global), K=V sharing, partial rotary, and V-norm patterns.
+**Questions:**
+- How should the two different attention configurations (sliding: 32Q/16KV/256dim vs global: 32Q/4KV/512dim) be handled in a single TTNNModule, or should they be separate classes?
+- Does `ttnn.paged_sdpa_decode` support sliding window attention natively, or must the KV cache be manually truncated?
+- Can `TTNNDistributedRMSNorm` handle the `with_scale=False` variant used for V-norm?
+- What is the optimal tensor-parallel sharding strategy for Gemma4-31B on T3K given the two different KV head counts (16 for sliding, 4 for global)?
+
+---
+
+## Gemma 4 Vision Encoder TTNN Porting Strategy
+**Date:** 2026-04-03
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** Determine whether to port the Gemma4 vision encoder to TTNN or run it on CPU, and if porting, how much of the existing Gemma3 TTNN vision encoder can be reused.
+**Questions:**
+- How different is Gemma4VisionModel from Gemma3's SigLIP vision encoder, and can the existing `models/demos/multimodal/gemma3/tt/` modules be reused directly?
+- What is the latency of the Gemma4 vision encoder on CPU vs. the expected latency on TTNN?
+- Does the vision encoder's 2D factored RoPE (theta=100) pose any issues for existing TTNN RoPE implementations?
+
+---
