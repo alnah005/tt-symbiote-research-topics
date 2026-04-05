@@ -383,3 +383,22 @@ This file tracks research topics that the Architect needs to investigate for mak
 - Does the vision encoder's 2D factored RoPE (theta=100) pose any issues for existing TTNN RoPE implementations?
 
 ---
+
+## Gemma 4 HuggingFace Transformers Implementation Deep Dive
+**Date:** 2026-04-05
+**Status:** Completed
+**Guide:** `guides/gemma_4_huggingface_transformers_implementation_deep_dive/`
+**Why Needed:** Need a comprehensive understanding of every file in the HuggingFace `transformers/models/gemma4/` package and every PyTorch module in the model, covering the full multimodal architecture (text, vision, audio, video), configuration hierarchy, preprocessing pipelines, and the modular inheritance structure from Gemma3/Gemma3n/Mixtral/Llama.
+**Questions:**
+- What does each file in `transformers/models/gemma4/` do — `__init__.py`, `configuration_gemma4.py`, `convert_gemma4_weights.py`, `feature_extraction_gemma4.py`, `image_processing_gemma4.py`, `image_processing_pil_gemma4.py`, `modeling_gemma4.py`, `modular_gemma4.py`, `processing_gemma4.py`, `video_processing_gemma4.py` — and how do they relate to each other?
+- What is the configuration hierarchy (`Gemma4Config`, `Gemma4TextConfig`, `Gemma4VisionConfig`, `Gemma4AudioConfig`) and what key parameters does each define (sliding window size, layer types, head counts, MoE settings, RoPE parameters)?
+- What is the complete PyTorch module tree of `Gemma4ForConditionalGeneration` — what are all nn.Module subclasses, their parent classes (Gemma3, Gemma3n, Mixtral, Llama inheritance), and what does each module compute?
+- How does the text decoder work — `Gemma4TextModel`, `Gemma4TextDecoderLayer`, `Gemma4TextAttention` (sliding vs global attention with different head dims and KV head counts), `Gemma4TextMLP`, `Gemma4TextExperts`/`Gemma4TextRouter` (MoE), `Gemma4TextScaledWordEmbedding` (per-layer input embeddings)?
+- How does the vision encoder work — `Gemma4VisionModel`, `Gemma4VisionEncoder`, `Gemma4VisionEncoderLayer`, `Gemma4VisionAttention`, `Gemma4VisionMLP`, `Gemma4VisionPatchEmbedder`, `Gemma4VisionPooler`, `Gemma4VisionRotaryEmbedding` (2D factored RoPE)?
+- How does the audio encoder work — `Gemma4AudioModel`, `Gemma4AudioLayer`, `Gemma4AudioAttention`, `Gemma4AudioSubSampleConvProjection`, `Gemma4AudioFeedForward`, `Gemma4AudioCausalConv1d`, `Gemma4AudioLightConv1d`, `Gemma4AudioRelPositionalEncoding`?
+- How does `Gemma4MultimodalEmbedder` merge vision, audio, and text token embeddings into a unified sequence for the text decoder?
+- How do the preprocessing pipelines work — `Gemma4Processor` (orchestrator), `Gemma4ImageProcessor` (torchvision-based), `Gemma4PilImageProcessor` (PIL-based), `Gemma4VideoProcessor`, `Gemma4AudioFeatureExtractor` — and what transformations does each apply?
+- What is the relationship between `modular_gemma4.py` and `modeling_gemma4.py` — how does the modular file use inheritance from Gemma3/Gemma3n/Mixtral/Llama base classes while `modeling_gemma4.py` is the auto-generated flattened version?
+- How does `convert_gemma4_weights.py` convert from Google's Orbax checkpoint format to HuggingFace safetensors, and what weight mapping is applied?
+
+---
