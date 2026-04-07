@@ -42,12 +42,12 @@ You are the **Team Lead**. You MUST follow these rules:
 
 ### Step 1: Pull Latest Research Cache (REQUIRED)
 ```bash
-cd /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics && git pull
+cd tt-symbiote-research-topics && git pull
 ```
 
 ### Step 2: Read the Cache (REQUIRED)
 ```bash
-cat /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics/research_topics.md
+cat research_topics.md
 ```
 
 ### Step 3: For EACH Topic the Plan Depends On (REQUIRED)
@@ -78,13 +78,13 @@ You MUST execute the following commands using the Bash tool and SHOW their outpu
 ### Step 1: Pull latest (USE BASH TOOL)
 Execute this command and show the output:
 ```bash
-cd /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics && git pull
+cd tt-symbiote-research-topics && git pull
 ```
 
 ### Step 2: Read cache (USE BASH TOOL)
 Execute this command and show the output:
 ```bash
-cat /home/ttuser/salnahari/research-topics/tt-symbiote-research-topics/research_topics.md
+cat research_topics.md
 ```
 
 ### Step 3: Report cache status
@@ -189,7 +189,7 @@ After receiving the Architect's response, the Team Lead MUST verify:
    - Step-by-step implementation plan
    - Success criteria
 
-2. **Research topics:** pushed to shared repo at `/home/ttuser/salnahari/research-topics/tt-symbiote-research-topics/research_topics.md` (if cache miss) with:
+2. **Research topics:** pushed to shared repo at `research_topics.md` (if cache miss) with:
    - Topic name (must be generic and reusable across tasks — not tied to the current bug/feature)
    - Questions to answer (the Architect poses questions only — do NOT fill in answers or findings)
    - Findings: TBD
