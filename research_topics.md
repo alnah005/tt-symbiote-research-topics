@@ -402,3 +402,21 @@ This file tracks research topics that the Architect needs to investigate for mak
 - How does `convert_gemma4_weights.py` convert from Google's Orbax checkpoint format to HuggingFace safetensors, and what weight mapping is applied?
 
 ---
+
+## TT-Lang Architecture and TT-Symbiote Integration Strategy
+**Date:** 2026-04-09
+**Status:** Completed
+**Guide:** `guides/tt_lang_architecture_and_tt_symbiote_integration_strategy/`
+**Why Needed:** TT-Lang is a Python DSL and MLIR-based compiler for authoring custom high-performance kernels on Tenstorrent hardware, sitting between high-level TTNN ops and low-level TT-Metalium. TT-Symbiote is a PyTorch-to-TTNN acceleration framework that transparently replaces PyTorch modules with TTNN-optimized equivalents. Understanding TT-Lang's full architecture — its programming model, compilation pipeline, simulator, and performance tools — is essential for evaluating how it can complement TT-Symbiote by providing fused custom kernels, reducing module boilerplate, and enabling hardware-aware optimizations that TTNN's op library alone cannot express. The TT-Lang source is at `/localdev/salnahari/testing_dir/tt-lang` and TT-Symbiote is at `/localdev/salnahari/testing_dir/tt-metal/models/experimental/tt_symbiote/`.
+**Questions:**
+- What is TT-Lang's programming model — how do `@ttl.operation`, `@ttl.compute`, and `@ttl.datamovement` decorators compose, what are Dataflow Buffers (DFBs) and TensorBlocks, and how does the multi-node grid execution model work?
+- What is TT-Lang's compilation pipeline — how does Python DSL lower through TTL MLIR → Compute dialect → TTKernel dialect → C++ codegen → JIT compilation, and what optimization passes exist at each stage?
+- How does TT-Lang's functional simulator work — what can be validated without hardware, how does the DFB state machine enforce correctness, and what are the simulator's limitations vs. on-device execution?
+- What performance analysis tools does TT-Lang provide — how do TTLANG_PERF_DUMP, TTLANG_AUTO_PROFILE, signpost profiling, and Perfetto trace integration work, and what metrics do they expose?
+- What are TT-Symbiote's key architectural pain points that TT-Lang could address — specifically the boilerplate in TTNNModule lifecycle methods, the manual weight management pipeline, the 100+ hand-written ATen dispatch handlers, and the lack of custom kernel integration?
+- How can TT-Lang fused kernels be integrated as drop-in replacements for TTNN ops inside TT-Symbiote modules — what is the interface contract (ttnn.Tensor in/out), how does JIT compilation interact with TT-Symbiote's weight preprocessing and device placement, and what changes to TTNNModule.forward() are needed?
+- Which TT-Symbiote operations are the highest-value targets for TT-Lang kernel fusion — specifically the MoE expert dispatch/combine pipeline (sparse_matmul + all_to_all), fused attention variants (QKV projection + RoPE + SDPA), and fused activation patterns (Linear + SiLU/GELU)?
+- Can TT-Lang's grid and DFB abstractions simplify TT-Symbiote's multi-device distribution code — replacing manual ShardTensor2dMesh configuration, all-gather/reduce-scatter coordination in TTNNDistributedRMSNorm, and the ad-hoc topology selection logic?
+- What is the developer workflow for writing a TT-Lang kernel that replaces an existing TT-Symbiote TTNN op — from simulator validation through on-device profiling to production integration — and how does this compare to the current workflow of tuning TTNN program configs?
+
+---
