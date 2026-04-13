@@ -420,3 +420,20 @@ This file tracks research topics that the Architect needs to investigate for mak
 - What is the developer workflow for writing a TT-Lang kernel that replaces an existing TT-Symbiote TTNN op — from simulator validation through on-device profiling to production integration — and how does this compare to the current workflow of tuning TTNN program configs?
 
 ---
+
+## TT-Lang Full pip install Support
+**Date:** 2026-04-09
+**Status:** Completed
+**Guide:** `guides/tt_lang_full_pip_install_support/`
+**Why Needed:** TT-Lang currently requires a multi-step CMake-driven build via `scripts/build-and-install.sh` that manually orchestrates LLVM/MLIR toolchain compilation, tt-metal/tt-mlir submodule builds, nanobind C++ extension compilation, and Python package installation into a custom venv. Need to understand how to make the full project (compiler tier + DSL/runtime tier) installable via standard `pip install .` so that developers can use familiar Python packaging workflows. The TT-Lang source is at `/localdev/salnahari/testing_dir/tt-lang`.
+**Questions:**
+- What is the current end-to-end build and installation flow — how does `scripts/build-and-install.sh` orchestrate CMake configuration, LLVM/tt-mlir/tt-metal dependency builds, nanobind extension compilation, and Python package installation, and what are the implicit environment assumptions (env vars, paths, pre-installed tools)?
+- How does the existing `pyproject.toml` + `python/setup.py` CMakeBuild integration work — what does the custom `CMakeBuild` class do, what CMake variables does it set, and what prevents `pip install .` from working out of the box today?
+- What are the C++ extension build dependencies — what specific LLVM/MLIR libraries, tt-mlir artifacts, and tt-metal headers/libraries must be available before nanobind modules (`_ttlang`, `_ttmlir`) can compile, and how are they currently discovered?
+- How do other MLIR-based Python projects (e.g., torch-mlir, triton, IREE) handle `pip install` with heavy C++ dependencies — do they use pre-built wheels, bundled toolchains, scikit-build-core, or other approaches?
+- What changes to `pyproject.toml`, `setup.py`, and `CMakeLists.txt` are needed to support `pip install .` assuming the LLVM/tt-mlir/tt-metal toolchain is pre-built and installed at a known location (e.g., via `TTLANG_TOOLCHAIN_DIR` env var)?
+- Can the build be split into a two-phase approach — a toolchain wheel (`ttl-toolchain`) containing pre-built LLVM/MLIR/tt-metal shared libraries, and a main wheel (`ttl`) that depends on it and only compiles the nanobind extensions + pure Python packages?
+- What are the packaging constraints for the compiled nanobind extensions — how should `.so` files be bundled in the wheel, what RPATHs or `auditwheel` fixes are needed, and how should MLIR dialect Python bindings be included?
+- How should the `sim`-only (no hardware) installation mode be exposed — as a separate package, an extras_require group (`pip install ttl[sim]`), or a build-time flag?
+
+---
