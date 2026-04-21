@@ -483,6 +483,19 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ---
 
+## ttnn.all_to_all_dispatch and all_to_all_combine Trace Compatibility on T3K
+**Date:** 2026-04-21
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** Tracy profiling of TTNNQwenExperts showed `AllToAllDispatchDeviceOperation` (38 µs) and `AllToAllCombineDeviceOperation` (355 µs) as significant costs in the MoE expert pipeline. Adding `@trace_enabled` to `TTNNQwen3MoE` requires these CCL ops to be trace-compatible. Existing research covers `reduce_scatter_minimal_async`, `all_gather_async`, and `all_reduce`, but not `all_to_all_dispatch/combine`.
+**Questions:**
+- Are `ttnn.all_to_all_dispatch` and `ttnn.all_to_all_combine` compatible with `ttnn.begin_trace_capture` / `ttnn.execute_trace` on a T3K mesh?
+- Do `all_to_all_dispatch/combine` use internal cycling semaphore state (like async CCLs) or are they stateless (like synchronous `all_reduce`)?
+- If they are not fully trace-compatible, is it possible to trace the non-CCL portion of `TTNNQwenExperts.forward()` (SparseMatmul + Remap + FillPad) and leave the CCL calls outside the trace boundary?
+- What is the minimum change to `TTNNQwen3MoE.forward()` needed to enable tracing around `all_to_all_dispatch/combine`?
+
+---
+
 ## Multi-Token Prediction (MTP) on TT Hardware
 **Date:** 2026-04-21
 **Status:** Completed
