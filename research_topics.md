@@ -436,3 +436,39 @@ This file tracks research topics that the Architect needs to investigate for mak
 - What are the packaging constraints for the compiled nanobind extensions — how should `.so` files be bundled in the wheel, what RPATHs or `auditwheel` fixes are needed, and how should MLIR dialect Python bindings be included?
 - How should the `sim`-only (no hardware) installation mode be exposed — as a separate package, an extras_require group (`pip install ttl[sim]`), or a build-time flag?
 
+---
+
+## Qwen3.6-35B-A3B Weight Compatibility with Qwen3.5-35B-A3B TTNN Modules
+**Date:** 2026-04-21
+**Status:** Pending
+**Why Needed:** Qwen3.6-35B-A3B uses the same `Qwen3_5MoeForConditionalGeneration` architecture class and `qwen3_5_moe` model type as Qwen3.5-35B-A3B, but the weights are separately trained. Need to confirm that all existing TTNN modules (TTNNQwen3FullAttention, TTNNQwen3LinearAttention, TTNNQwen3MoE, etc.) load and execute correctly with Qwen3.6 weights without any shape mismatches or dtype issues.
+**Questions:**
+- Are there any weight tensor shape differences between Qwen3.6-35B-A3B and Qwen3.5-35B-A3B that would cause loading failures in existing TTNN modules?
+- Does the explicit `partial_rotary_factor: 0.25` at the top level (vs only in `rope_parameters`) change how HuggingFace resolves the rotary dimension, potentially affecting TTNNRotaryPositionEmbedding?
+- Does the `bos_token_id: 248044` addition in Qwen3.6 config affect tokenizer behavior or generation loop initialization?
+- Does the Multi-Token Prediction head (`mtp_num_hidden_layers: 1`) add extra weight keys that could interfere with `AutoModelForCausalLM.from_pretrained` loading?
+
+---
+
+## M-RoPE (Multimodal RoPE) Implementation on TTNN
+**Date:** 2026-04-21
+**Status:** Pending
+**Why Needed:** Qwen3.6-35B-A3B uses Multimodal RoPE (M-RoPE) with interleaved sections [11, 11, 10] for vision/video inputs. The current TTNNRotaryPositionEmbedding handles standard RoPE and partial RoPE but may not support M-RoPE's per-modality position ID assignment. Understanding M-RoPE is needed for future multimodal bring-up beyond text-only inference.
+**Questions:**
+- How does M-RoPE differ from standard RoPE for text-only inputs — does it reduce to standard RoPE when no vision/video tokens are present, or does the interleaved section structure always apply?
+- What are the M-RoPE section dimensions [11, 11, 10] — do they partition the rotary_dim=64 into three sub-groups (temporal, height, width), and how are position IDs assigned per sub-group?
+- Can the existing TTNNRotaryPositionEmbedding be extended to support M-RoPE by pre-computing per-modality cos/sin tables, or does it require a fundamentally different implementation?
+- What is the performance cost of M-RoPE vs standard RoPE on TTNN — does the per-section position indexing introduce additional memory accesses or kernel launches?
+
+---
+
+## Multi-Token Prediction (MTP) on TT Hardware
+**Date:** 2026-04-21
+**Status:** Pending
+**Why Needed:** Qwen3.6-35B-A3B has `mtp_num_hidden_layers: 1`, indicating a Multi-Token Prediction head that can predict multiple future tokens simultaneously. Need to understand whether MTP is active during standard autoregressive generation or is training-only, and whether implementing MTP on TT hardware could improve decode throughput via speculative decoding.
+**Questions:**
+- Does the MTP head participate in standard `model.generate()` calls in HuggingFace Transformers, or is it only used during training and can be safely ignored for inference?
+- If MTP is inference-active, what is the computational structure — does it share the backbone hidden states and only add a lightweight prediction head, or does it require additional forward passes?
+- Could MTP be used as a speculative decoding mechanism on TT hardware — predict N tokens speculatively, then verify in a single forward pass — and what would the throughput improvement be?
+- What are the weight shapes and computation cost of the MTP head (`mtp_num_hidden_layers: 1`) relative to the main model, and would it fit in L1 or require DRAM placement?
+
