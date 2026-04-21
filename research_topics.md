@@ -481,23 +481,6 @@ This file tracks research topics that the Architect needs to investigate for mak
 - Can the existing TTNNRotaryPositionEmbedding be extended to support M-RoPE by pre-computing per-modality cos/sin tables, or does it require a fundamentally different implementation?
 - What is the performance cost of M-RoPE vs standard RoPE on TTNN — does the per-section position indexing introduce additional memory accesses or kernel launches?
 
----
-
-## ttnn.all_to_all_dispatch and all_to_all_combine Trace Compatibility on T3K
-**Date:** 2026-04-21
-**Status:** Completed
-**Guide:** TBD
-**Why Needed:** Tracy profiling of TTNNQwenExperts showed `AllToAllDispatchDeviceOperation` (38 µs) and `AllToAllCombineDeviceOperation` (355 µs) as significant costs in the MoE expert pipeline. Adding `@trace_enabled` to `TTNNQwen3MoE` requires these CCL ops to be trace-compatible. Existing research covers `reduce_scatter_minimal_async`, `all_gather_async`, and `all_reduce`, but not `all_to_all_dispatch/combine`.
-**Questions:**
-- Are `ttnn.all_to_all_dispatch` and `ttnn.all_to_all_combine` compatible with `ttnn.begin_trace_capture` / `ttnn.execute_trace` on a T3K mesh?
-- Do `all_to_all_dispatch/combine` use internal cycling semaphore state (like async CCLs) or are they stateless (like synchronous `all_reduce`)?
-- If they are not fully trace-compatible, is it possible to trace the non-CCL portion of `TTNNQwenExperts.forward()` (SparseMatmul + Remap + FillPad) and leave the CCL calls outside the trace boundary?
-- What is the minimum change to `TTNNQwen3MoE.forward()` needed to enable tracing around `all_to_all_dispatch/combine`?
-**Findings:**
-- `ttnn.all_to_all_dispatch` and `ttnn.all_to_all_combine` ARE fully trace-compatible on T3K. Empirically confirmed: adding `@trace_enabled` to `TTNNQwen3MoE` (which internally calls both ops via `TTNNQwenExperts`) produced a 51× wall-clock speedup (881s → 17.3s for 128-token generation) with all correctness tests passing (PCC 0.999886 capture, 0.999886 replay on decode; 0.999572 on prefill; 5-step multi-step all > 0.999).
-- Structurally, `all_to_all_dispatch/combine` use `GlobalSemaphore` objects created on program-cache-miss and stored in `shared_variables`. Unlike async CCLs (`reduce_scatter_minimal_async`, `all_gather_async`), they do NOT use a host-side cycling counter (`get_and_cycle_*`). Semaphore addresses are fixed per cache entry and written via `override_runtime_arguments` on every call — identical pattern to synchronous `all_reduce` which is already confirmed trace-compatible. Device kernels self-reset semaphore values to 0 at end of each call, so no external pre-replay reset is needed.
-- No `pre_trace_execute` semaphore-reset hook is required for `TTNNQwen3MoE`.
-- The same conclusion applies to any module wrapping `all_to_all_dispatch/combine` with static decode-mode shapes.
 
 ---
 
