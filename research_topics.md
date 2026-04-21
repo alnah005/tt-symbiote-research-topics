@@ -440,7 +440,8 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ## Qwen3.6-35B-A3B Weight Compatibility with Qwen3.5-35B-A3B TTNN Modules
 **Date:** 2026-04-21
-**Status:** Pending
+**Status:** Completed
+**Guide:** `guides/qwen36_35b_a3b_weight_compatibility_with_qwen35_35b_a3b_ttnn_modules/`
 **Why Needed:** Qwen3.6-35B-A3B uses the same `Qwen3_5MoeForConditionalGeneration` architecture class and `qwen3_5_moe` model type as Qwen3.5-35B-A3B, but the weights are separately trained. Need to confirm that all existing TTNN modules (TTNNQwen3FullAttention, TTNNQwen3LinearAttention, TTNNQwen3MoE, etc.) load and execute correctly with Qwen3.6 weights without any shape mismatches or dtype issues.
 **Questions:**
 - Are there any weight tensor shape differences between Qwen3.6-35B-A3B and Qwen3.5-35B-A3B that would cause loading failures in existing TTNN modules?
@@ -452,7 +453,8 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ## M-RoPE (Multimodal RoPE) Implementation on TTNN
 **Date:** 2026-04-21
-**Status:** Pending
+**Status:** Completed
+**Guide:** `guides/m_rope_multimodal_rope_implementation_on_ttnn/`
 **Why Needed:** Qwen3.6-35B-A3B uses Multimodal RoPE (M-RoPE) with interleaved sections [11, 11, 10] for vision/video inputs. The current TTNNRotaryPositionEmbedding handles standard RoPE and partial RoPE but may not support M-RoPE's per-modality position ID assignment. Understanding M-RoPE is needed for future multimodal bring-up beyond text-only inference.
 **Questions:**
 - How does M-RoPE differ from standard RoPE for text-only inputs — does it reduce to standard RoPE when no vision/video tokens are present, or does the interleaved section structure always apply?
@@ -464,7 +466,8 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ## Multi-Token Prediction (MTP) on TT Hardware
 **Date:** 2026-04-21
-**Status:** Pending
+**Status:** Completed
+**Guide:** `guides/multi_token_prediction_mtp_on_tt_hardware/`
 **Why Needed:** Qwen3.6-35B-A3B has `mtp_num_hidden_layers: 1`, indicating a Multi-Token Prediction head that can predict multiple future tokens simultaneously. Need to understand whether MTP is active during standard autoregressive generation or is training-only, and whether implementing MTP on TT hardware could improve decode throughput via speculative decoding.
 **Questions:**
 - Does the MTP head participate in standard `model.generate()` calls in HuggingFace Transformers, or is it only used during training and can be safely ignored for inference?
