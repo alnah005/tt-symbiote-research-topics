@@ -421,6 +421,25 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ---
 
+## Qwen3.6-35B-A3B Architecture and Innovations
+**Date:** 2026-04-21
+**Status:** Completed
+**Guide:** `guides/qwen36_35b_a3b_architecture_and_innovations/`
+**Why Needed:** Qwen3.6-35B-A3B is the latest release in the Qwen series and a direct successor to Qwen3.5-35B-A3B. Understanding its architecture, key innovations, and differences from Qwen3.5 is essential for evaluating whether the existing Qwen3.5 TTNN implementation needs changes, what new optimizations are possible, and how the model's hybrid Gated DeltaNet + MoE architecture has evolved. The model uses the same `Qwen3_5MoeForConditionalGeneration` architecture class but introduces post-training improvements focused on agentic coding and thinking preservation.
+**Questions:**
+- What is the complete architecture of Qwen3.6-35B-A3B — the hybrid 10×(3×Gated DeltaNet + 1×Gated Attention) layout, 256-expert MoE with top-8+1 shared routing, and how do these components interact in a single forward pass?
+- How does Gated DeltaNet work in detail — what are the mathematical operations (delta rule state update, gating mechanism, conv1d local mixing), what are the QK/V head asymmetries (16 QK heads vs 32 V heads, 128-dim), and how does this compare to standard linear attention variants (RetNet, GLA, Mamba)?
+- What are the exact architectural differences between Qwen3.6-35B-A3B and Qwen3.5-35B-A3B at the config/weight level — are there any changes to layer count, hidden dimensions, expert configuration, attention parameters, or vision encoder, or is the architecture identical with only post-training differences?
+- What is the "Thinking Preservation" feature introduced in Qwen3.6 — how does retaining reasoning context from historical messages work mechanically, does it require architectural changes or is it purely a prompting/inference-time technique, and what are the implications for KV cache management?
+- How does the partial rotary embedding (25% of head_dim = 64 dims with RoPE, 75% without) work in the Gated Attention layers, and what is the motivation for applying RoPE to only a quarter of the dimensions compared to full rotary in standard transformers?
+- What is the M-RoPE (multimodal rotary position embedding) scheme with sections [11, 11, 10] — how does it encode spatial and temporal positions for vision/video tokens, and how does it interact with the text-only RoPE during mixed-modality inference?
+- What are the key benchmark improvements from Qwen3.5 to Qwen3.6, specifically in agentic coding (SWE-bench, Terminal-Bench, SkillsBench, NL2Repo), and what post-training techniques (RL, data, scaffolding) drove these improvements?
+- How does the Multi-Token Prediction (MTP) training objective work in Qwen3.6 — what is the `mtp_num_hidden_layers=1` configuration, how does it relate to speculative decoding at inference time, and what accuracy/throughput tradeoffs does it introduce?
+- How does Qwen3.6's MoE configuration (256 experts, 8 routed + 1 shared, intermediate dim 512) compare to other recent MoE models (DeepSeek-V3, Gemma4-26B-A4B), and what are the implications of using many small experts vs fewer large experts for hardware utilization on accelerators?
+- What are the vision encoder specifications — the 27-layer ViT with patch size 16, spatial merge 2, temporal patch 2 — and how does it compare to the Qwen3.5 vision encoder and other recent multimodal model vision encoders (Gemma4, LLaVA)?
+
+---
+
 ## TT-Lang Full pip install Support
 **Date:** 2026-04-09
 **Status:** Completed
