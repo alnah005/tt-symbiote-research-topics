@@ -510,3 +510,34 @@ This file tracks research topics that the Architect needs to investigate for mak
 - Could MTP be used as a speculative decoding mechanism on TT hardware — predict N tokens speculatively, then verify in a single forward pass — and what would the throughput improvement be?
 - What are the weight shapes and computation cost of the MTP head (`mtp_num_hidden_layers: 1`) relative to the main model, and would it fit in L1 or require DRAM placement?
 
+---
+
+## Removing synchronize_device from _maybe_all_gather in Hybrid Attention Modules
+**Date:** 2026-04-22
+**Status:** Pending
+**Guide:** `guides/removing_synchronize_device_from_maybe_all_gather/`
+**Why Needed:** Both `TTNNQwen3FullAttention` and `TTNNQwen3LinearAttention` call `ttnn.synchronize_device()` inside `_maybe_all_gather`, which is a host-blocking synchronization point. This prevents the full attention stack (and any LayerStack containing it) from being captured under Metal Trace, because trace capture requires a fully async device command stream with no host readback. Removing or replacing this synchronize_device call is a prerequisite for enabling end-to-end trace capture across the entire hybrid DeltaNet + full-attention decoder stack.
+**Questions:**
+- Why does `_maybe_all_gather` call `ttnn.synchronize_device()` — is it working around a race condition in the all_gather result, ensuring a prior async op completes, or something else?
+- Is `ttnn.synchronize_device()` strictly necessary here, or can the synchronization be achieved via a lighter-weight mechanism (e.g., a device-side semaphore, event, or by relying on TTNN's implicit command queue ordering)?
+- What is the async CCL pattern used in tt-transformers for all_gather operations inside traced regions, and can it be adopted for `_maybe_all_gather`?
+- Are there other modules in tt-symbiote that call `ttnn.synchronize_device()` inside their forward pass that would also block full-stack trace capture?
+- What is the latency cost of `ttnn.synchronize_device()` in `_maybe_all_gather` at decode batch=1 on T3K, and what throughput improvement would be gained by removing it?
+- After removing `synchronize_device`, what validation is needed to confirm there are no race conditions in the resulting async all_gather → downstream compute pipeline?
+
+---
+
+## Pure TTNN DeltaNet Decode Step Without Host Readback
+**Date:** 2026-04-22
+**Status:** Pending
+**Guide:** `guides/pure_ttnn_deltanet_decode_step/`
+**Why Needed:** `TTNNQwen3LinearAttention` (the DeltaNet decode block) currently calls a PyTorch recurrence kernel on the host CPU during the state update step. This host readback breaks the device command stream and prevents Metal Trace from capturing the linear attention layer. Replacing this with a pure TTNN implementation that stays on-device is the second prerequisite (alongside removing `synchronize_device`) for full-stack trace capture across the entire Qwen3.6-35B-A3B decoder.
+**Questions:**
+- What exactly does the PyTorch recurrence kernel in `TTNNQwen3LinearAttention` compute — what is the mathematical recurrence (delta rule: `S_t = S_{t-1} * (1 - beta_t * k_t^T) + v_t * k_t^T`), and what tensors are read from / written to the device during host execution?
+- Does TTNN have primitives that can express the DeltaNet recurrence without host readback — specifically outer product accumulation, element-wise state gating, and in-place state update for a rank-2 state matrix?
+- What is the existing `gdn_full_fused_inplace` kernel (referenced in the Qwen3.5-27B Blackhole implementation) — can it be reused or adapted for the T3K Wormhole architecture?
+- What are the tensor shape and memory layout requirements for the DeltaNet state matrix on T3K (hidden_size=2048, head_dim=128, 16 QK heads) — does it fit in L1 per device, or must it be DRAM-resident?
+- What is the host-CPU roundtrip latency for the current PyTorch recurrence kernel at decode batch=1, and what throughput gain is expected from a pure on-device implementation?
+- Are there existing TTNN or tt-metal kernels for scan/recurrence operations (e.g., parallel prefix scan, selective scan from Mamba) that could be adapted for the DeltaNet state update?
+- What accuracy (PCC) is acceptable for a TTNN recurrence kernel relative to the reference PyTorch implementation, and how sensitive is overall model output quality to small errors in the state matrix update?
+
