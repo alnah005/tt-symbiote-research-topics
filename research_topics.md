@@ -484,6 +484,21 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ---
 
+## dots.ocr on TT Hardware: Architecture, TTNN Port, and Relationship to Qwen 2.5 VL
+**Date:** 2026-04-22
+**Status:** Completed
+**Guide:** `guides/dots_ocr_on_tt_hardware/`
+**Why Needed:** `rednote-hilab/dots.ocr` is a 1.7B multimodal document parser (SOTA on OmniDocBench) with an in-progress TTNN port at `tenstorrent/tt-metal` branch `ign/dots_ocr`. The port lives in `models/demos/dots_ocr/` and reuses tt_transformers infrastructure, making it directly relevant to tt_symbiote. Understanding the architecture, the current state of the port, what is and is not on TTNN yet, and the T3K topology constraints will determine how much work remains to make it production-ready in tt_symbiote.
+**Questions:**
+- What is the exact architecture of dots.ocr — how does its `DotsOCRForCausalLM` (28-layer Qwen2-style decoder, hidden_size=1536, GQA 12Q/2KV) relate to Qwen 2.5 VL at the config and weight level, and what are the key differences from the full Qwen 2.5 VL model family?
+- What is the current state of the `ign/dots_ocr` TTNN port — which components run on device (TTNN patch merger, text decoder via tt_transformers) vs. on host (42-layer ViT via HF PyTorch), what is the accuracy (PCC targets), and what is the measured decode throughput?
+- What is the hybrid vision strategy — why is the 42-layer ViT kept on host rather than ported to TTNN, what would it take to port the `DotsVisionTransformer` fully to TTNN, and how does this compare to the Qwen 2.5 VL and Qwen3.6 vision encoder porting approaches?
+- How does the T3K topology constraint arise from the GQA configuration — why does `num_key_value_heads=2` limit tensor parallelism to TP≤2 even on an 8-device mesh, and how does the submesh approach (`create_submesh` over a full `open_mesh_device`) handle this?
+- What is the relationship between dots.ocr's vision encoder (42-layer ViT, patch_size=14, spatial_merge_size=2, hidden_size=1536) and the Qwen 2.5 VL vision encoder — are they architecturally identical or derived from a common base, and can the TTNN code from `qwen25_vl` (patch merger already ported) be reused directly?
+- What are the remaining implementation gaps in `ign/dots_ocr` before the demo is production-ready — what do the commit messages ("removing qwen reference", "PC decode", "prefill at 0.98", "partial mesh support") indicate about what has and has not been stabilized?
+
+---
+
 ## Multi-Token Prediction (MTP) on TT Hardware
 **Date:** 2026-04-21
 **Status:** Completed
