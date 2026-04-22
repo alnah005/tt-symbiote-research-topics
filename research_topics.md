@@ -527,6 +527,20 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ---
 
+## Partial Rotary Embedding Numerical Correctness for Non-Tile-Aligned rotary_dim in TTNN
+**Date:** 2026-04-22
+**Status:** Pending
+**Guide:** `guides/partial_rotary_non_tile_aligned_numerics/`
+**Why Needed:** `TTNNRotaryPositionEmbedding` in `rope.py` pads cos/sin with zeros when `rotary_dim % 32 != 0` (non-tile-aligned). Testing with `rotary_dim=48, head_dim=128` produces PCC ~0.71 vs PyTorch reference even in warm-up (no trace), indicating a numerical bug independent of tracing. Need to understand whether the zero-padding scheme is mathematically correct for `ttnn.experimental.rotary_embedding`, or whether the only safe option is to enforce tile-alignment.
+**Questions:**
+- What does `ttnn.experimental.rotary_embedding` expect for cos/sin shapes — does it require `rotary_dim` to exactly match the non-padded dimension, or does it accept zero-padded cos/sin and apply rotation only to the first `rotary_dim` elements?
+- When `cos/sin` is zero-padded from dim 48 → 64 and `ttnn.experimental.rotary_embedding` is called with `head_dim=128`, does the rotate_half pairing correctly skip the padded zeros, or does it pair real elements (indices 16–47) with zero positions (indices 48–63), corrupting the output?
+- Is there a trace-safe alternative to `ttnn.pad` with fill_value for this case — e.g., concat with a pre-allocated zeros buffer — and does it fix the numerical issue as well as the write-during-trace issue?
+- Should `TTNNRotaryPositionEmbedding` enforce `rotary_dim % 32 == 0` as a precondition (raising an error for non-tile-aligned configs) rather than attempting to pad?
+- What model configurations in the current symbiote codebase actually use non-tile-aligned rotary_dim values — is this path exercised in production, or is it dead code for current supported models?
+
+---
+
 ## Pure TTNN DeltaNet Decode Step Without Host Readback
 **Date:** 2026-04-22
 **Status:** Pending
