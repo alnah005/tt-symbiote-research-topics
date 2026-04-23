@@ -555,3 +555,17 @@ This file tracks research topics that the Architect needs to investigate for mak
 - Are there existing TTNN or tt-metal kernels for scan/recurrence operations (e.g., parallel prefix scan, selective scan from Mamba) that could be adapted for the DeltaNet state update?
 - What accuracy (PCC) is acceptable for a TTNN recurrence kernel relative to the reference PyTorch implementation, and how sensitive is overall model output quality to small errors in the state matrix update?
 
+
+---
+
+## Trace-safe pre-replication of position embeddings in TTNNQwen3FullAttention
+**Date:** 2026-04-23
+**Status:** Pending
+**Guide:** `guides/trace_safe_cossin_prereplication/`
+**Why Needed:** The `_ensure_replicated` helper added to fix the rotary_embedding crash (cos/sin sharded across TP devices) calls `ttnn.from_torch`, which allocates new device buffers — a host operation incompatible with Metal Trace capture. For end-to-end traced decode, cos/sin must be pre-allocated as replicated buffers during warm-up and updated via `ttnn.copy` inside the traced region, matching the existing `_decode_cur_pos` pre-allocation pattern. This is a prerequisite for full end-to-end trace capture across the entire Qwen3.6-35B-A3B hybrid decoder stack.
+**Questions:**
+- What is the `_decode_cur_pos` pre-allocation pattern in `move_weights_to_device_impl`, and how can it be adapted for cos/sin position embeddings (which change every decode step)?
+- Does `TracedRun._alloc_kwarg_tensor` already pre-allocate cos/sin buffers, and if so, are they replicated or non-distributed (single-device)?
+- Can `ttnn.copy` from a replicated source to a pre-allocated replicated destination be used inside a trace to update cos/sin between decode steps without breaking trace replay?
+- What layout and memory config (DRAM vs L1, ROW_MAJOR vs TILE) is required for pre-allocated cos/sin buffers to be compatible with `ttnn.unsqueeze` and `ttnn.experimental.rotary_embedding` inside a trace?
+- After pre-replication, does the guard in `TTNNRotaryPositionEmbedding.forward` (checking `rotary_dim % 64 != 0`) still correctly detect wrongly-sharded inputs during warm-up?
