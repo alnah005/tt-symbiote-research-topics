@@ -652,3 +652,44 @@ This file tracks research topics that the Architect needs to investigate for mak
 - With input shape `(1, 1, num_heads * head_dim)` and weight `(head_dim,)`, does `ttnn.rms_norm` correctly apply norm independently to each head's `head_dim` elements (treating `(1, 1, num_heads)` as the batch)?
 - Is there a difference in behavior between `ttnn.rms_norm` and `ttnn.layer_norm` for 3D/4D inputs on Wormhole?
 - What is the TILE_LAYOUT constraint for 3D input — does `ttnn.rms_norm` require the innermost dimension to be a multiple of 32?
+
+---
+
+## Gemma4 Distributed Argmax: ttnn.argmax TILE_LAYOUT Input and ttnn.max Trace Safety
+**Date:** 2026-05-01
+**Status:** Pending
+**Guide:** `guides/gemma4_distributed_argmax_tile_layout/`
+**Why Needed:** `TTNNGemma4LMHeadSampling.forward` untilizes 262,144 logit elements (~800 μs) before calling `ttnn.argmax` because argmax requires ROW_MAJOR input. A distributed argmax (per-shard argmax on 8 devices, then gather 16 scalars for global selection) would eliminate the 262K AllGather (~600 μs) and the 262K Untilize (~800 μs), replacing them with ~30 μs of local ops + a 16-scalar AllGather. Two unknowns block this: (1) whether `ttnn.argmax` now accepts TILE_LAYOUT input natively, and (2) whether `ttnn.max` (reduce-max) is available and trace-safe for extracting the per-shard max value needed for global comparison.
+**Questions:**
+- Does `ttnn.argmax(dim=3, use_multicore=True)` accept TILE_LAYOUT input in the current TTNN version, eliminating the pre-argmax `ttnn.untilize` call?
+- If argmax accepts TILE_LAYOUT, what is the measured latency vs the current untilize+argmax chain for `[1, 1, 1, 262144]` logits?
+- Does `ttnn.max(tensor, dim=3)` (reduce-max) exist in TTNN and is it trace-safe (no host readback)?
+- Alternative: Can `ttnn.gather(logits_shard, local_argmax_idx)` be used to extract the max value at the argmax index, avoiding a separate max reduction and enabling the distributed argmax algorithm?
+- Is there a combined `ttnn.argmax` variant that returns both the argmax index AND the corresponding max value in one kernel pass?
+
+---
+
+## Gemma4 RoPE Kernel Bandwidth and paged_update_cache Input Layout
+**Date:** 2026-05-01
+**Status:** Pending
+**Guide:** `guides/gemma4_rope_bandwidth_and_kvcache_layout/`
+**Why Needed:** Two independent bottlenecks in `TTNNGemma4Attention._forward_decode_paged` are suspected to be underutilizing device bandwidth: (1) `RotaryEmbeddingDeviceOperation` runs at ~14 GB/s effective vs ~256 GB/s DRAM peak for `[1,32,32,256]` tensors (~35 μs each, 24 ops = 860 μs total), and (2) K/V tensors are moved to HEIGHT_SHARDED ROW_MAJOR L1 before `paged_update_cache` (lines 782–794 of gemma4_attention.py), triggering Untilize + TilizeWithValPadding + UntilizeWithUnpadding ops totaling ~2,913 μs combined. If `paged_update_cache` accepts TILE_LAYOUT DRAM input natively, the HEIGHT_SHARDED moves can be eliminated. If RoPE has a sharding-friendly config, bandwidth can be improved.
+**Questions:**
+- What is the expected effective bandwidth of `ttnn.experimental.rotary_embedding` for input `[1, 32, 32, 256]` DRAM TILE? Is 35 μs (14 GB/s) expected, or is this a regression?
+- Does `rotary_embedding` benefit from WIDTH_SHARDED or HEIGHT_SHARDED L1 input for the decode shape `[1, B, H, D]` with B=32?
+- Does `ttnn.experimental.paged_update_cache` accept TILE_LAYOUT DRAM input, or does it require HEIGHT_SHARDED ROW_MAJOR L1 (as currently set up in `_forward_decode_paged` lines 786–794)?
+- If `paged_update_cache` accepts TILE_LAYOUT, is the performance equal-to or better-than the HEIGHT_SHARDED path? (The kernel may be internally optimized for sharded inputs.)
+- What are the exact DRAM bandwidth and L1 usage characteristics of `paged_update_cache` for the Gemma4 31B KV shapes: K `[1, 32, 16, 256]` and V `[1, 32, 16, 256]` per layer?
+
+---
+
+## Gemma4 QKV Slice Decomposition: ttnn.split vs Sequential ttnn.slice
+**Date:** 2026-05-01
+**Status:** Pending
+**Guide:** `guides/gemma4_qkv_slice_decomposition/`
+**Why Needed:** `_project_qkv` in `gemma4_attention.py` (lines 407–410) uses 3 sequential `ttnn.slice` ops to split the fused QKV output into Q, K, V. These 18 slice ops across 6 layers contribute ~450 μs of the 1,894 μs total Slice category (3.30% of device time). If `ttnn.split` with a single kernel launch is available and faster than 3 sequential slices, kernel launch overhead is reduced. Additionally, understanding whether any of the remaining ~650 μs of Slice time comes from RoPE dim-2 shape restoration (post `ttnn.experimental.rotary_embedding` padding) is needed to confirm whether Step V2 (post-RoPE slice elimination) targets the right ops.
+**Questions:**
+- Does `ttnn.split(tensor, split_sizes=[q_size, kv_size, kv_size], dim=2)` exist in TTNN and return a tuple/list of views?
+- If `ttnn.split` exists, is it faster than 3 sequential `ttnn.slice` ops for the shapes `[32, 1, q_size+2*kv_size]` where q_size=8192 and kv_size=4096 (sliding) or kv_size=2048 (global)?
+- Does `ttnn.experimental.rotary_embedding` for input `[1, 32, 32, 256]` (decode, B=32) actually pad shape[2] to the next tile multiple, or is shape[2]=32 already tile-aligned and no padding occurs?
+- If RoPE does pad, how many of the 101 total Slice ops in the profiler are from post-RoPE dim-2 restoration vs QKV split vs other sources?
