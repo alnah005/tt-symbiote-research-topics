@@ -514,7 +514,7 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ## Removing synchronize_device from _maybe_all_gather in Hybrid Attention Modules
 **Date:** 2026-04-22
-**Status:** Completed
+**Status:** Pending
 **Guide:** `guides/removing_synchronize_device_from_maybe_all_gather/`
 **Why Needed:** Both `TTNNQwen3FullAttention` and `TTNNQwen3LinearAttention` call `ttnn.synchronize_device()` inside `_maybe_all_gather`, which is a host-blocking synchronization point. This prevents the full attention stack (and any LayerStack containing it) from being captured under Metal Trace, because trace capture requires a fully async device command stream with no host readback. Removing or replacing this synchronize_device call is a prerequisite for enabling end-to-end trace capture across the entire hybrid DeltaNet + full-attention decoder stack.
 **Questions:**
@@ -543,7 +543,7 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ## Pure TTNN DeltaNet Decode Step Without Host Readback
 **Date:** 2026-04-22
-**Status:** Completed
+**Status:** Pending
 **Guide:** `guides/pure_ttnn_deltanet_decode_step/`
 **Why Needed:** `TTNNQwen3LinearAttention` (the DeltaNet decode block) currently calls a PyTorch recurrence kernel on the host CPU during the state update step. This host readback breaks the device command stream and prevents Metal Trace from capturing the linear attention layer. Replacing this with a pure TTNN implementation that stays on-device is the second prerequisite (alongside removing `synchronize_device`) for full-stack trace capture across the entire Qwen3.6-35B-A3B decoder.
 **Questions:**
@@ -588,121 +588,3 @@ This file tracks research topics that the Architect needs to investigate for mak
 - Which TT-DiT components can be directly reused as-is in TT-Symbiote (e.g. importing TT-DiT modules) vs. which need to be reimplemented as TTNNModule subclasses — considering TT-DiT's `Module` class is not a subclass of `TTNNModule` and has a different weight lifecycle, device management, and forward signature?
 - How does TT-DiT handle tracing (`utils/tracing.py`) and performance profiling — does it use `ttnn.begin_trace_capture`/`end_trace_capture`/`execute_trace` patterns similar to tt-transformers, and how would traced DiT execution integrate with TT-Symbiote's `trace_enabled` infrastructure?
 - What is the recommended porting priority — which of the 6 supported models (SD3.5, Flux1, Motif, Mochi, Wan2.2, Qwen-Image) would be the best first candidate for TT-Symbiote integration based on architectural complexity, performance maturity, and reuse of existing TT-Symbiote modules (e.g. T5/CLIP encoders already partially supported)?
-
----
-
-## Gemma4 Decode Matmul DRAM-Sharded Program Config on T3K
-**Date:** 2026-05-01
-**Status:** Pending
-**Guide:** `guides/gemma4_decode_matmul_dram_sharded_program_config/`
-**Why Needed:** All Gemma4 decode matmuls run with `in0_block_w=1` (TTNN auto-tuner conservative default for narrow-M decode shapes). Setting `MatmulMultiCoreReuseMultiCastDRAMShardedProgramConfig` with `in0_block_w=7` (for K=21 tiles) or `in0_block_w=4` (for K=32/84 tiles) is blocked by an unconfirmed compatibility question: T3K tensor-parallel shards `in0` as col-sharded across 8 devices (per-device shape `[32, 672]`), and it is unknown whether the DRAM-sharded program config requires DRAM interleaved `in0` or supports col-sharded inputs.
-**Questions:**
-- Does `MatmulMultiCoreReuseMultiCastDRAMShardedProgramConfig` accept col-sharded `in0` on T3K, or does it require DRAM interleaved (standard DRAM_MEMORY_CONFIG)?
-- What are the exact L1 budget constraints (per-core tile circular buffer sizes) for BF16 inputs with `in0_block_w=7, per_core_N=2` on Wormhole?
-- What is the measured throughput improvement for `in0_block_w=7` vs `in0_block_w=1` on the Gemma4 decode shapes `[32,672]×[672,32768]` (lm_head) and `[32,672]×[672,2048]` (qkv_proj) on T3K?
-- If DRAM-sharded config is incompatible with col-sharded inputs, what is the correct fallback (`MatmulMultiCoreReuseMultiCast1DProgramConfig`) and what `in0_block_w` values are valid?
-
----
-
-## Gemma4 Decode nlp_concat_heads_decode Behavior and Post-SDPA Reshape
-**Date:** 2026-05-01
-**Status:** Pending
-**Guide:** `guides/gemma4_decode_nlp_concat_heads_reshape/`
-**Why Needed:** `nlp_concat_heads_decode` is called in `TTNNGemma4Attention._forward_decode_paged` to reshape SDPA output from `[1, B, H, D]` to `[B, 1, H*D]`. Profiler shows 500–919 μs per layer for the subsequent reshape (6 layers × ~700 μs average = ~4.2 ms total). The fix is to bypass `nlp_concat_heads_decode` and use a direct DRAM TILE reshape — but this is only correct if `nlp_concat_heads_decode` is a pure reshape with no head reordering. This must be confirmed before the bypass is implemented.
-**Questions:**
-- Does `ttnn.experimental.nlp_concat_heads_decode` perform any head dimension reordering (permutation), or is it a pure reshape from `[1, B, H, D]` → `[B, 1, H*D]` with no data movement beyond logical shape?
-- What output memory config does `nlp_concat_heads_decode` produce — always HEIGHT_SHARDED L1 (which triggers the expensive downstream reshape), or is the output config controllable via a parameter?
-- If the kernel performs head reordering, can the same reordering be expressed as a `ttnn.permute` followed by a free DRAM TILE reshape, avoiding the L1-sharded intermediate?
-- Is `H*D = 32*256 = 8,192` (sliding layers) and `32*512 = 16,384` (global layers) guaranteed to produce a tile-aligned free DRAM reshape when going from 4D `[1,B,H,D]` to 3D `[B,1,H*D]`?
-
----
-
-## T3K num_links=2 Ring CCL Trace Safety and Physical Link Verification
-**Date:** 2026-05-01
-**Status:** Pending
-**Guide:** `guides/t3k_num_links2_ring_ccl_trace_safety/`
-**Why Needed:** All Gemma4 CCL ops (AllGather + ReduceScatter = 29.74% of decode device time) use `num_links=1`. T3K hardware may support `num_links=2` for Ring topology, potentially delivering ~1.4x CCL throughput improvement (~4,875 μs savings). The completed guide "Async CCL Semaphore Behavior Under Trace Replay" addresses `num_links=1` Ring; it does NOT confirm whether T3K has 2 physical links per chip pair on cluster_axis=1, and does NOT confirm `num_links=2` Ring is trace-safe.
-**Questions:**
-- Does T3K's 1×8 mesh have exactly 2 physical Ethernet links between each pair of adjacent chips on cluster_axis=1, making `num_links=2` the hardware maximum?
-- Does `ttnn.all_gather(num_links=2, topology=Ring)` use 1 semaphore handle with double-buffering (trace-safe) or 2 separate semaphore handles that would require reset between trace captures?
-- What is the measured latency improvement for AllGather with `num_links=1→2` for the Gemma4 payload sizes: ~8 scalars (norm stats AllGather) and ~5376 elements (hidden state AllGather in all-reduce decomposition)?
-- Is `ttnn.reduce_scatter(num_links=2, topology=Ring)` also trace-safe on T3K, or does it have different semaphore behavior than AllGather?
-
----
-
-## Batched RMS Norm AllGather API Compatibility
-**Date:** 2026-05-01
-**Status:** Pending
-**Guide:** `guides/batched_rms_norm_allgather_api/`
-**Why Needed:** `TTNNDistributedRMSNorm` makes 12 independent AllGather calls per decode step (2 norms × 6 layers, each transferring ~8 scalars at ~40 μs each). Batching two consecutive norm AllGathers into one (concat stats → single AllGather → split) would halve this to 6 AllGathers, saving ~500–1,000 μs. The API requires that `ttnn.rms_norm_pre_all_gather` output can be concatenated before AllGather and `ttnn.rms_norm_post_all_gather` can accept a slice of the gathered result — neither is confirmed.
-**Questions:**
-- Does `ttnn.rms_norm_pre_all_gather` return a stat tensor (partial sum of squares, 1 scalar per device) that is compatible with `ttnn.concat` before the AllGather, and what is the expected shape/dtype?
-- Does `ttnn.rms_norm_post_all_gather` accept a stats tensor that is a `ttnn.slice` of a larger concatenated-then-gathered tensor, or does it require the stats tensor to be exactly the shape output by `rms_norm_pre_all_gather`?
-- Are there any device-side state requirements or implicit semaphore dependencies between `rms_norm_pre_all_gather` and `rms_norm_post_all_gather` that prevent inserting `ttnn.concat`, `ttnn.all_gather`, and `ttnn.slice` operations between them under Metal Trace capture?
-
----
-
-## ttnn.rms_norm 3D and 4D Input Support for Per-Head Normalization
-**Date:** 2026-05-01
-**Status:** Pending
-**Guide:** `guides/ttnn_rms_norm_3d_4d_input_support/`
-**Why Needed:** Gemma4's `_apply_per_head_norm` in `gemma4_attention.py` calls `ttnn.reshape` twice per per-head norm call (flatten to 2D → norm → unflatten), generating 36 reshape device ops across 6 layers × 3 norms × 2 reshapes. If `ttnn.rms_norm` accepts 3D input `(B, S, H*D)` with `normalized_shape=(head_dim,)` and applies norm independently per head, these 36 reshape ops can be eliminated (~4,680 μs savings for prefill; partial benefit for decode). Currently unconfirmed whether `ttnn.rms_norm` supports arbitrary batch dimensions.
-**Questions:**
-- Does `ttnn.rms_norm` support input with more than 2 dimensions, treating all leading dimensions as batch and normalizing over the last N dimensions specified by `normalized_shape`?
-- With input shape `(1, 1, num_heads * head_dim)` and weight `(head_dim,)`, does `ttnn.rms_norm` correctly apply norm independently to each head's `head_dim` elements (treating `(1, 1, num_heads)` as the batch)?
-- Is there a difference in behavior between `ttnn.rms_norm` and `ttnn.layer_norm` for 3D/4D inputs on Wormhole?
-- What is the TILE_LAYOUT constraint for 3D input — does `ttnn.rms_norm` require the innermost dimension to be a multiple of 32?
-
----
-
-## Gemma4 Distributed Argmax: ttnn.argmax TILE_LAYOUT Input and ttnn.max Trace Safety
-**Date:** 2026-05-01
-**Status:** Pending
-**Guide:** `guides/gemma4_distributed_argmax_tile_layout/`
-**Why Needed:** `TTNNGemma4LMHeadSampling.forward` untilizes 262,144 logit elements (~800 μs) before calling `ttnn.argmax` because argmax requires ROW_MAJOR input. A distributed argmax (per-shard argmax on 8 devices, then gather 16 scalars for global selection) would eliminate the 262K AllGather (~600 μs) and the 262K Untilize (~800 μs), replacing them with ~30 μs of local ops + a 16-scalar AllGather. Two unknowns block this: (1) whether `ttnn.argmax` now accepts TILE_LAYOUT input natively, and (2) whether `ttnn.max` (reduce-max) is available and trace-safe for extracting the per-shard max value needed for global comparison.
-**Questions:**
-- Does `ttnn.argmax(dim=3, use_multicore=True)` accept TILE_LAYOUT input in the current TTNN version, eliminating the pre-argmax `ttnn.untilize` call?
-- If argmax accepts TILE_LAYOUT, what is the measured latency vs the current untilize+argmax chain for `[1, 1, 1, 262144]` logits?
-- Does `ttnn.max(tensor, dim=3)` (reduce-max) exist in TTNN and is it trace-safe (no host readback)?
-- Alternative: Can `ttnn.gather(logits_shard, local_argmax_idx)` be used to extract the max value at the argmax index, avoiding a separate max reduction and enabling the distributed argmax algorithm?
-- Is there a combined `ttnn.argmax` variant that returns both the argmax index AND the corresponding max value in one kernel pass?
-
----
-
-## Gemma4 RoPE Kernel Bandwidth and paged_update_cache Input Layout
-**Date:** 2026-05-01
-**Status:** Pending
-**Guide:** `guides/gemma4_rope_bandwidth_and_kvcache_layout/`
-**Why Needed:** Two independent bottlenecks in `TTNNGemma4Attention._forward_decode_paged` are suspected to be underutilizing device bandwidth: (1) `RotaryEmbeddingDeviceOperation` runs at ~14 GB/s effective vs ~256 GB/s DRAM peak for `[1,32,32,256]` tensors (~35 μs each, 24 ops = 860 μs total), and (2) K/V tensors are moved to HEIGHT_SHARDED ROW_MAJOR L1 before `paged_update_cache` (lines 782–794 of gemma4_attention.py), triggering Untilize + TilizeWithValPadding + UntilizeWithUnpadding ops totaling ~2,913 μs combined. If `paged_update_cache` accepts TILE_LAYOUT DRAM input natively, the HEIGHT_SHARDED moves can be eliminated. If RoPE has a sharding-friendly config, bandwidth can be improved.
-**Questions:**
-- What is the expected effective bandwidth of `ttnn.experimental.rotary_embedding` for input `[1, 32, 32, 256]` DRAM TILE? Is 35 μs (14 GB/s) expected, or is this a regression?
-- Does `rotary_embedding` benefit from WIDTH_SHARDED or HEIGHT_SHARDED L1 input for the decode shape `[1, B, H, D]` with B=32?
-- Does `ttnn.experimental.paged_update_cache` accept TILE_LAYOUT DRAM input, or does it require HEIGHT_SHARDED ROW_MAJOR L1 (as currently set up in `_forward_decode_paged` lines 786–794)?
-- If `paged_update_cache` accepts TILE_LAYOUT, is the performance equal-to or better-than the HEIGHT_SHARDED path? (The kernel may be internally optimized for sharded inputs.)
-- What are the exact DRAM bandwidth and L1 usage characteristics of `paged_update_cache` for the Gemma4 31B KV shapes: K `[1, 32, 16, 256]` and V `[1, 32, 16, 256]` per layer?
-
----
-
-## paged_update_cache DRAM-interleaved Input Support
-**Date:** 2026-05-02
-**Status:** Pending
-**Guide:** `guides/paged_update_cache_dram_input/`
-**Why Needed:** Empirical investigation confirmed that `ttnn.experimental.paged_update_cache` has a hard `TT_FATAL(input_tensor.is_sharded())` at line 160 of `paged_update_cache_device_operation.cpp`, requiring HEIGHT_SHARDED input. This means two `ttnn.to_memory_config` calls (DRAM TILE → HEIGHT_SHARDED L1) per decode step cannot be eliminated at the Python layer. Combined K/V shard conversion cost is ~1,166 µs Untilize + ~1,168 µs Tilize per attention module profile run (lines 793–794 of `gemma4_attention.py`), totaling ~7 ms per full decode pass across 6 layers. `paged_fill_cache` (prefill path) already accepts DRAM-interleaved input (line 35–38 of `paged_fill_cache_device_operation.cpp`), confirming the pattern is feasible. Adding a DRAM-interleaved reader path to `paged_update_cache` could eliminate these copies.
-**Questions:**
-- Can `paged_update_cache_device_operation.cpp` be extended with a new program factory branch that accepts DRAM-interleaved TILE input, similar to how `paged_fill_cache` accepts DRAM-interleaved input?
-- What is the estimated implementation complexity of adding a DRAM-interleaved reader path to `paged_update_cache`? (How many program factory changes, new reader kernels, etc.)
-- Would the DRAM-interleaved path have equal or better performance compared to the current HEIGHT_SHARDED path for the Gemma4 31B KV shapes `[1, 32, 16, 256]` (sliding) and `[1, 32, 4, 512]` (global)?
-- Are there other TTNN kernel users of `paged_update_cache` that would benefit from DRAM-interleaved input support, making this worth the engineering investment?
-
----
-
-## Gemma4 QKV Slice Decomposition: ttnn.split vs Sequential ttnn.slice
-**Date:** 2026-05-01
-**Status:** Pending
-**Guide:** `guides/gemma4_qkv_slice_decomposition/`
-**Why Needed:** `_project_qkv` in `gemma4_attention.py` (lines 407–410) uses 3 sequential `ttnn.slice` ops to split the fused QKV output into Q, K, V. These 18 slice ops across 6 layers contribute ~450 μs of the 1,894 μs total Slice category (3.30% of device time). If `ttnn.split` with a single kernel launch is available and faster than 3 sequential slices, kernel launch overhead is reduced. Additionally, understanding whether any of the remaining ~650 μs of Slice time comes from RoPE dim-2 shape restoration (post `ttnn.experimental.rotary_embedding` padding) is needed to confirm whether Step V2 (post-RoPE slice elimination) targets the right ops.
-**Questions:**
-- Does `ttnn.split(tensor, split_sizes=[q_size, kv_size, kv_size], dim=2)` exist in TTNN and return a tuple/list of views?
-- If `ttnn.split` exists, is it faster than 3 sequential `ttnn.slice` ops for the shapes `[32, 1, q_size+2*kv_size]` where q_size=8192 and kv_size=4096 (sliding) or kv_size=2048 (global)?
-- Does `ttnn.experimental.rotary_embedding` for input `[1, 32, 32, 256]` (decode, B=32) actually pad shape[2] to the next tile multiple, or is shape[2]=32 already tile-aligned and no padding occurs?
-- If RoPE does pad, how many of the 101 total Slice ops in the profiler are from post-RoPE dim-2 restoration vs QKV split vs other sources?
