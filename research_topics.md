@@ -683,6 +683,19 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ---
 
+## paged_update_cache DRAM-interleaved Input Support
+**Date:** 2026-05-02
+**Status:** Pending
+**Guide:** `guides/paged_update_cache_dram_input/`
+**Why Needed:** Empirical investigation confirmed that `ttnn.experimental.paged_update_cache` has a hard `TT_FATAL(input_tensor.is_sharded())` at line 160 of `paged_update_cache_device_operation.cpp`, requiring HEIGHT_SHARDED input. This means two `ttnn.to_memory_config` calls (DRAM TILE → HEIGHT_SHARDED L1) per decode step cannot be eliminated at the Python layer. Combined K/V shard conversion cost is ~1,166 µs Untilize + ~1,168 µs Tilize per attention module profile run (lines 793–794 of `gemma4_attention.py`), totaling ~7 ms per full decode pass across 6 layers. `paged_fill_cache` (prefill path) already accepts DRAM-interleaved input (line 35–38 of `paged_fill_cache_device_operation.cpp`), confirming the pattern is feasible. Adding a DRAM-interleaved reader path to `paged_update_cache` could eliminate these copies.
+**Questions:**
+- Can `paged_update_cache_device_operation.cpp` be extended with a new program factory branch that accepts DRAM-interleaved TILE input, similar to how `paged_fill_cache` accepts DRAM-interleaved input?
+- What is the estimated implementation complexity of adding a DRAM-interleaved reader path to `paged_update_cache`? (How many program factory changes, new reader kernels, etc.)
+- Would the DRAM-interleaved path have equal or better performance compared to the current HEIGHT_SHARDED path for the Gemma4 31B KV shapes `[1, 32, 16, 256]` (sliding) and `[1, 32, 4, 512]` (global)?
+- Are there other TTNN kernel users of `paged_update_cache` that would benefit from DRAM-interleaved input support, making this worth the engineering investment?
+
+---
+
 ## Gemma4 QKV Slice Decomposition: ttnn.split vs Sequential ttnn.slice
 **Date:** 2026-05-01
 **Status:** Pending
