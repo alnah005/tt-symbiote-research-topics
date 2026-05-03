@@ -603,3 +603,106 @@ This file tracks research topics that the Architect needs to investigate for mak
 - What future tools, features, or infrastructure improvements could reduce hang frequency or make hangs easier to debug — automatic hang detection with root cause classification, device-side heartbeat monitoring, automatic state snapshots before reset, deterministic replay of the command stream leading to a hang, and better error propagation from firmware to the Python layer?
 - How can the need for chip resets via `tt-smi` or system reboots be reduced — graceful error recovery mechanisms, partial device reset (single core/tensix vs full chip), firmware-level watchdog with automatic recovery, and techniques for making workloads more resilient to transient hardware errors?
 - What are the differences in hang behavior and debugging across Tenstorrent chip generations (Grayskull, Wormhole, Blackhole) and system configurations (single chip, T3K, Galaxy) — are certain hang categories specific to multi-chip configurations or specific architectures?
+
+---
+
+## nlp_create_qkv_heads Compatibility with Gemma4 Fused QKV Layout
+**Date:** 2026-05-03
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** The QKV reshape+permute chain in `_project_qkv()` (`gemma4_attention.py` lines 406–422) is the single largest measured cost in isolated attention modules — Reshape = 44.73% of `attention_sliding` device time and 43.57% of `attention_global` device time. `ttnn.experimental.nlp_create_qkv_heads` (used in tt-transformers) fuses slice+reshape+permute into a single kernel. If it supports Gemma4's heterogeneous GQA configurations (32Q/16KV/256dim sliding, 32Q/4KV/512dim global), it could collapse ~9 shape ops per prefill forward (3 slices + 3 reshapes + 3 permutes) into a single dispatch. For decode: 6 reshapes reduced to ~2–3. Critical risk: Gemma4 global layers use `v_weight = k_weight.clone()` (`gemma4_attention.py` line ~153), giving a 3-way unequal head split (32Q + 4K + 4V) that must be handled correctly.
+**Questions:**
+- Does `ttnn.experimental.nlp_create_qkv_heads` accept Q_heads=32, K_heads=4/16, V_heads=4/16 (GQA with unequal splits) and head_dim=512/256?
+- Does it correctly handle the K=V shared projection case in global attention?
+- What input tensor layout requirements must be met for the fused op?
+- What is the measured device-time reduction in `attention_sliding` and `attention_global` after replacing the reshape+permute chain?
+
+---
+
+## Partial RoPE Integration into TTNNGemma4Attention for Global Attention Layers
+**Date:** 2026-05-03
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** `test_gemma4_profile_partial_rope.py` confirms PARTIAL_DECODE at 2.91 ms/iter vs FULL_CHUNK_DECODE at 4.72 ms/iter — a 1.6x speedup for global attention decode. The production code in `TTNNGemma4Attention` still uses the full-chunk split RoPE path (`rope.py` lines 140–146: 4 `rotary_embedding_llama` calls + 8 Slice + 2 Concat). Integration would eliminate the Slice+Concat overhead (15.54% of rope module time) and reduce RoPE kernel calls from 4 to 1 per global attention forward. Scope: 10 global layers of 60 total.
+**Questions:**
+- Is the partial_rope path fully trace-compatible (no dynamic allocations, no host readbacks)?
+- What is the exact measured device-time saving per global decoder layer when switching to partial_rope in the production attention path?
+- With 10 global layers, what is the total per-decode-step latency saving end-to-end?
+- Does partial_rope maintain required numerical accuracy (PCC target) for Q and K rotations?
+
+---
+
+## TTNNGemma4DistributedRMSNorm AllGather Topology and Link Count Optimization
+**Date:** 2026-05-03
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** AllGather is 48.97% of `distributed_rmsnorm` device time (8,593 us). The Gemma4 subclass (`gemma4_normalization.py` line ~64) uses `ttnn.Topology.Linear` while the base class (`normalization.py`) uses `ttnn.Topology.Ring`. This fires 4 times per decoder layer × 60 layers = 240 times per full forward pass. With a tiny variance-stats payload (one partial scalar per device), fixed per-hop latency dominates; Ring (parallel hops) is likely faster than Linear (7 sequential hops). Whether the Linear choice is intentional or a legacy holdover is unknown.
+**Questions:**
+- What is the measured AllGather latency for the variance-stats payload with Linear vs Ring topology on T3K?
+- Can `num_links=2` be used for this AllGather without correctness issues?
+- Is the `ttnn.Topology.Linear` in the Gemma4 subclass intentional, and what is the justification vs the base class's Ring default?
+- What is the total impact across 240 AllGather calls per full decode pass?
+
+---
+
+## Fused GeGLU (gate × gelu(up)) TTNN Kernel for Gemma4 MLP
+**Date:** 2026-05-03
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** After `fused_gate_up_proj` produces `[B, S, 43008]`, the MLP code issues 4 ops: 2x Slice (`gemma4_mlp.py` lines 92–93) + gelu (line 97) + multiply (line 100). Combined: Slice 4.28% + Unary 2.12% + BinaryNg 3.20% = 9.6% of MLP device time (~5,100 us per isolated MLP forward). A fused GeGLU kernel would eliminate 2 intermediate Slice materializations and merge 3 kernel launches into 1. Applies to all 60 decoder layers.
+**Questions:**
+- Is there an existing TTNN op or program config that fuses slice+gelu+multiply for the GeGLU sequence (in `ttnn.transformer`, `ttnn.experimental`, or a custom activation module)?
+- What is the performance difference between the 4-op chain and a fused implementation for `[B, S, 43008]` input on Wormhole B0?
+- Would the fused kernel accept col-sharded MLP input (after all_reduce) directly?
+
+---
+
+## Trace-Safe ttnn.all_reduce to Eliminate Decomposed ReduceScatter+AllGather Overhead
+**Date:** 2026-05-03
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** `TTNNLinearIColShardedWAllReduced.forward()` (`linear.py` lines 166–184) decomposes `ttnn.all_reduce` into `reduce_scatter + all_gather` for Metal Trace compatibility (code comment at lines 168–169). The final AllGather accounts for 14.27% of linear device time and ~20% of MLP device time — it has zero compute value. Every QKV projection and every gate+up projection across 60 decoder layers pays this overhead: 120 total AllGather ops per full decode pass.
+**Questions:**
+- Has `ttnn.all_reduce` been updated with pre-allocated intermediates to make it trace-safe?
+- What is the measured latency of `ttnn.all_reduce` vs decomposed `reduce_scatter+all_gather` for output sizes 21504 (QKV) and 43008 (gate+up) on T3K?
+- Can an intermediate buffer be passed explicitly to `ttnn.all_reduce` as a pre-allocated static buffer to enable trace capture without the two-phase decomposition?
+- What is the total per-decode-step savings if the AllGather is eliminated from 120 ops?
+
+---
+
+## DRAM-Sharded Weight Placement for Bandwidth-Bound Batch=1 Decode Matmul in Gemma4
+**Date:** 2026-05-03
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** Matmul is 59.28% of `linear` device time and 49% of `mlp` device time at batch=1 decode, DRAM-bandwidth-bound. The weight matrix per device must be streamed from DRAM every token. Current placement: `DRAM_MEMORY_CONFIG` (dram_interleaved). In sliding decoder layers (50 of 60), Matmul is now the #1 device-time op after reshape reduction — making this the highest-priority hardware-level optimization. Current program_config uses no custom sharding.
+**Questions:**
+- What program_config maximizes weight streaming throughput for `[1, 1, 672]` × `[672, 21504]` at batch=1 on Wormhole B0?
+- Would DRAM_SHARDED vs dram_interleaved reduce the ~26,000 us Matmul device time?
+- Would bfloat8_b weights for QKV and gate+up projections cause unacceptable accuracy degradation (PCC vs bfloat16)?
+- Does FPU utilization analysis confirm the bandwidth-bound hypothesis (expected: FPU < 10%)?
+
+---
+
+## AllGather/ReduceScatter num_links and Topology Tuning on T3K for Gemma4 Payloads
+**Date:** 2026-05-03
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** All collectives in `linear.py` use `num_links=1, topology=Ring`. T3K has 2 Ethernet links per device. At decoder-layer level, AllGather (14.79%) + ReduceScatter (13.06%) = 27.85% of `decoder_layer_v2` device time. Payload sizes: 21504 elements (QKV all_reduce), 43008 elements (gate+up all_reduce), 672 elements (4x RMSNorm all_gather).
+**Questions:**
+- What is the measured latency for reduce_scatter and all_gather with `num_links=1` vs `num_links=2` for the Gemma4 payload sizes on T3K Ring topology?
+- Is `num_links=2` compatible with Metal Trace?
+- What is the minimum payload size at which `num_links=2` outperforms `num_links=1` on T3K?
+- For the tiny RMSNorm AllGather (variance stats), does Linear or Ring perform better, and does increasing num_links help at this payload size?
+
+---
+
+## Tracy Device Profiler Intermittent CSV Failure on T3K
+**Date:** 2026-05-03
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** `decoder_layer_sliding` and `partial_rope` profiling fail intermittently with "cpp_device_perf_report.csv not found" despite tests running successfully. This creates a profiling reliability gap — two key Gemma4 modules cannot be profiled consistently. The workaround (`decoder_layer_v2` as a substitute for sliding) works but is fragile.
+**Questions:**
+- What is the exact sequence of events causing the CSV to be absent after a successful test run? Is it a Tracy reader race, early `ReadDeviceProfiler()` flush, or chip state issue?
+- Is there a deterministic reproduction path?
+- Would `ttnn.synchronize_device()` before the Tracy CSV export phase prevent the race?
+- Is there a minimum drain time after `tt-smi -r` that eliminates the failure reliably?
