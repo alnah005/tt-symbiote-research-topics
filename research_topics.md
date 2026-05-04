@@ -617,6 +617,15 @@ This file tracks research topics that the Architect needs to investigate for mak
 - What input tensor layout requirements must be met for the fused op?
 - What is the measured device-time reduction in `attention_sliding` and `attention_global` after replacing the reshape+permute chain?
 
+**Findings (partial, Phase 0a synthetic-shape PCC gate, session 2026-05-04):**
+- **Q1 (head split / head_dim 256 & 512):** YES. `ttnn.experimental.nlp_create_qkv_heads` (prefill, interleaved DRAM, bf16, TILE) accepts Gemma4 sliding (nQ=32, nKV=16, head_dim=256) and global (nQ=32, nKV=4, head_dim=512) on T3K with `transpose_k_heads=False`, `memory_config=DRAM_MEMORY_CONFIG`. PCC vs the current `_project_qkv` slice→reshape→permute reference = **1.000000** for Q, K, and V. Empirically refutes the prior `head_dim ≤ 128` claim from `PLAN_gemma4_decode_perf_final.md:129`. Source confirms no validator upper bound: `nlp_create_qkv_heads.cpp:31` infers head_dim from `padded_shape[3]/(num_q_heads + 2*num_kv_heads)`; `nlp_create_qkv_heads_program_factory.cpp:62` loops `q_out_w_tiles = head_dim/TILE_WIDTH` (=8 for 256, =16 for 512) without an upper-bound check.
+- **Q1 (decode):** `ttnn.experimental.nlp_create_qkv_heads_decode` also passes at head_dim=256 and 512 with batch=1 (sliding and global) using HEIGHT_SHARDED `(y=1,x=1)` core grid, shard `(round_up(num_kv_heads,32)=32, head_dim)`, then `sharded_to_interleaved → L1` for read-back. PCC = **1.000000** for Q, K, V across both head configs. Decode op constraints honored: `num_q_heads=32` (at the boundary, `≤ 32`), bf16 (not bf8_b), `input_shape[3] % TILE_WIDTH == 0`.
+- **Q2 (K=V sharing):** verified safe by construction. `gemma4_attention.py:153` materializes `v_weight = k_weight.clone()` at weight-build time, so the fused projection's V band is bit-identical to its K band. The op is unaware of K=V sharing — it sees a regular GQA tensor. The Phase 0a global cases asserted `(V_band == K_band).all()` on the host input and PCC=1.0 holds on the device output. Different post-op `v_norm` vs `k_norm` then breaks the symmetry, matching legacy semantics.
+- **Q3 (input layout):** `[B, 1, S, fused]` rank-4 TILE for prefill (rank-3 → rank-4 reshape required since `qkv_proj` returns rank-3); `[1, 1, B, fused]` rank-4 TILE for decode. dtype bf16 or fp32 (not bf8_b for decode). DRAM_INTERLEAVED or WIDTH_SHARDED L1 input accepted. Output for prefill is INTERLEAVED, for decode is HEIGHT_SHARDED `(round_up(num_kv_heads,32), head_dim)` per device. The decode HEIGHT_SHARDED layout exactly matches the existing reshard at `gemma4_attention.py:768–780`, so that block becomes redundant once decode is wired up (deferred to Phase 3 cleanup).
+- **Q4 (perf delta in `attention_sliding` / `attention_global`):** TBD — pending Phase 0b/1 production wiring + Tracy profile re-run.
+
+**Reproduction:** `MESH_DEVICE=T3K pytest --timeout=0 models/experimental/tt_symbiote/tests/test_gemma4.py::test_gemma4_nlp_qkv_smoke -s -v` exercises 4 parametrized cases (`prefill_sliding`, `prefill_global`, `decode_sliding`, `decode_global`).
+
 ---
 
 ## Partial RoPE Integration into TTNNGemma4Attention for Global Attention Layers
@@ -706,3 +715,57 @@ This file tracks research topics that the Architect needs to investigate for mak
 - Is there a deterministic reproduction path?
 - Would `ttnn.synchronize_device()` before the Tracy CSV export phase prevent the race?
 - Is there a minimum drain time after `tt-smi -r` that eliminates the failure reliably?
+
+---
+
+## Empirical head_dim Envelope of nlp_create_qkv_heads(_decode) on Wormhole
+**Date:** 2026-05-04
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** `ttnn.experimental.nlp_create_qkv_heads` and `nlp_create_qkv_heads_decode` are the canonical fused replacements for the slice+reshape+permute QKV-head chain in transformer attention. Upstream tests (`tests/tt_eager/python_api_testing/unit_testing/misc/test_nlp_create_qkv_heads.py`) exercise head_dim ≤ 128 only. A prior Gemma4 plan (`PLAN_gemma4_decode_perf_final.md:129`) claimed `head_dim ≤ 128` was a hard kernel limit, but inspection of the C++ source (`nlp_create_qkv_heads.cpp:31` infers head_dim from input shape; `program_factory.cpp:62` loops tiles without an upper-bound check) shows no validator actually enforces this. Phase 0a empirical validation on T3K confirmed head_dim 256 and 512 work at PCC=1.0 for both prefill and decode variants on Gemma4 head configs (32Q/16KV and 32Q/4KV). A complete empirical envelope across head_dim, dtype, and layout is needed to unblock any future model with non-standard head_dim, prevent rediscovering this for each model port, and document the exact constraints.
+**Questions:**
+- What is the maximum head_dim that produces correct output on Wormhole B0 / T3K for `nlp_create_qkv_heads` (interleaved prefill, sharded prefill) and `nlp_create_qkv_heads_decode` (HEIGHT_SHARDED output)?
+- Test matrix: head_dim ∈ {64, 96, 128, 192, 256, 384, 512, 1024} × dtype ∈ {bf16, bf8_b, fp32} × layout ∈ {DRAM_INTERLEAVED, WIDTH_SHARDED L1, sharded prefill program-factory variant}. Which combinations PCC vs torch reference, which fail, and how do they fail (validator reject vs silent miscompute vs hang)?
+- Which of `nlp_create_qkv_heads_segformer`, `nlp_create_qkv_heads_falcon7b`, `create_qkv_heads_from_separate_tensors` have different head_dim envelopes, and is there a decision tree for picking the right variant for a new model?
+- For decode, does the `num_q_heads ≤ 32` cap interact with head_dim (e.g. is correctness sensitive at the 32-head boundary for large head_dim)?
+
+---
+
+## Resharding Cost vs. Fused-Op Win for Decode QKV-Head Creation
+**Date:** 2026-05-04
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** `nlp_create_qkv_heads_decode` requires WIDTH_SHARDED L1 or INTERLEAVED input and emits HEIGHT_SHARDED output. Per-head RMSNorm doesn't accept HEIGHT_SHARDED inputs (documented at `models/common/modules/attention/attention_1d.py:618`), so the fused-decode path implies a `sharded_to_interleaved → norm → re-shard` round trip around the per-head norm — adding two `to_memory_config` ops to the path. Whether the fused decode op is a net win after accounting for this depends on (num_q_heads, num_kv_heads, head_dim, batch). For Gemma4 the legacy decode path is already hand-optimized to 6 reshapes (`gemma4_attention.py:402–417`), and the fused-decode op may not net-beat the existing 6-reshape path even though it net-beats the 9-op prefill path. A reusable decision rule across GQA configs would prevent re-deriving this trade-off per model.
+**Questions:**
+- For each of the four (num_q_heads, num_kv_heads, head_dim, batch) regimes spanning current production models — Llama-3 (32/8/128, B≤32), Mistral (32/8/128), Qwen3 (variable), Gemma4 (32/16/256 sliding; 32/4/512 global, B=1) — is `to_memory_config(WIDTH_SHARDED L1) + nlp_create_qkv_heads_decode + sharded_to_interleaved + norm + re-shard` a net win over the legacy slice + 6-reshape path?
+- What is the breakeven point on batch and head_dim where the reshard overhead is dominated by the fused-op savings?
+- Does the answer change if the upstream `qkv_proj` is modified to emit WIDTH_SHARDED L1 natively (eliminating one reshard)?
+- Is there a way to bypass the HEIGHT_SHARDED output mem-config requirement (e.g. via `output_tensors` argument) and have the fused decode op emit interleaved directly, eliminating the post-op reshard?
+
+---
+
+## Trace-Capture Compatibility of nlp_create_qkv_heads(_decode) and Other Fused TM Ops
+**Date:** 2026-05-04
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** Symbiote's decode path runs under Metal Trace (warmup phase 2 in `test_gemma4.py:237–251`). Operations that perform host readbacks, non-deterministic allocations, or shape-dependent control flow at runtime cannot be trace-captured safely. `ttnn.all_reduce` famously had to be decomposed into `reduce_scatter + all_gather` for trace safety (see `linear.py:166–184` comment). We need a reusable checklist of trace-capture properties for fused TM ops (`nlp_create_qkv_heads`, `nlp_create_qkv_heads_decode`, `create_qkv_heads_from_separate_tensors`, `nlp_concat_heads`, `all_reduce_create_qkv_heads`) so that adopters don't rediscover trace-incompatibilities deep into integration. The checklist should also generalize to other fused-kernel ops (RoPE, GeGLU, RMSNorm).
+**Questions:**
+- Does `nlp_create_qkv_heads` allocate any intermediate device buffers whose addresses are non-deterministic across trace replay?
+- Does `nlp_create_qkv_heads_decode` with `batch_offset` or `slice_size` parameters interact correctly with trace replay (these may introduce shape-dependent control flow)?
+- What is the canonical pre-flight check for "is this op trace-safe" — is there a single API or runtime mode that surfaces incompatibilities without requiring full integration?
+- Does `all_reduce_create_qkv_heads` (which fuses CCL with head creation) require the same `reduce_scatter+all_gather` decomposition workaround under trace, or is it natively trace-safe?
+- For each currently-trace-unsafe op in `models/experimental/tt_symbiote/`, what's the upstream issue tracking trace-safety, and which Symbiote modules are affected?
+
+---
+
+## Layout Convention Mismatch Between nlp_create_qkv_heads (Prefill) and _decode Variants
+**Date:** 2026-05-04
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** The prefill variant `ttnn.experimental.nlp_create_qkv_heads` expects input `[B, 1, S, fused_dim]` (batch in dim-0, sequence in dim-2). The decode variant `nlp_create_qkv_heads_decode` expects input `[1, 1, B, fused_dim]` (batch in dim-2, with B padded to 32). This means production models that share a `qkv_proj` between prefill and decode must do a different `ttnn.reshape` per path, and the upstream `qkv_proj` cannot emit a single layout that's natively compatible with both ops. Every model author re-derives the layout shim and the rank-3 → rank-4 reshape; the cost is small but compounds with bugs and inconsistency. A documented preferred upstream layout — or a thin TTNN wrapper that abstracts the difference — would prevent recurring bugs across model ports.
+**Questions:**
+- Is there a documented reason for the convention difference (e.g. kernel program-factory layout requirement vs historical accident)?
+- Is there an existing TTNN utility that wraps both ops behind a single Python interface (`create_qkv_heads(input, num_heads, ..., is_decode)`) that hides the layout shim?
+- What is the preferred upstream `qkv_proj` output layout that minimizes shim cost on both paths — rank-3 `[B, S, fused]`, rank-4 prefill-style `[B, 1, S, fused]`, rank-4 decode-style `[1, 1, B, fused]`, or width-sharded L1?
+- Does the rank-3 → rank-4 `ttnn.reshape` always degrade to a metadata-only `ReshapeViewDeviceOperation` (free) or can it fall back to a real reshape kernel under certain memory configs?
+- Would a single fused projection op that emits `[B, num_heads, S, head_dim]` directly (combining matmul + create_qkv_heads) be feasible, eliminating both the shim and the all-reduce → reshape path?
