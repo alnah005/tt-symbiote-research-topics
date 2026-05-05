@@ -863,3 +863,32 @@ This file tracks research topics that the Architect needs to investigate for mak
 - Is the `TorchTTNNTensor.__torch_dispatch__` mishandling of lm_head matmul a fundamental layout/sharding constraint, or is it a fixable bug that would make Pass 4 unnecessary?
 - For trace-mode tests: does Pass 4 introduce trace-capture incompatibilities (e.g. dynamic softcap scaling, host readbacks) that the bypass pattern avoids? Should trace-mode tests prefer one over the other?
 - Is there a runtime check that fires when `model_ttnn(**inputs).logits` is read without Pass 4 having been applied? E.g. an assertion in `TorchTTNNTensor.__torch_dispatch__` that "lm_head shape is suspicious — did you forget Pass 4?"
+
+---
+
+## fp32_dest_acc_en Application Contract for tt-symbiote `_build_full_model` Fixtures
+**Date:** 2026-05-05
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** TT-Symbiote tests build a full TTNN model via a `_build_full_model(mesh_device)` fixture that walks the HF model, replacing layers in 3-4 passes (decoder layers → RMSNorms → embeddings → optionally `ForCausalLM`). The canonical fixture in `test_gemma4.py` (lines 188-219) ALSO recursively applies a fp32 compute-kernel-config to every TTNN linear after replacement: `MathFidelity.HiFi4` + `fp32_dest_acc_en=True` + `packer_l1_acc=True` via a `_set_fp32_recursive` walker. Without this, TTNN linears default to HiFi2 + bf16 dest accumulation + no packer L1 acc, which produces ~50pp lower cumulative E2E PCC across 60 layers vs CPU bf16 reference — empirically observed in Step 3 of `PLAN_bfloat8_qkv_step3.md` where the bf16 baseline (no `_set_fp32_recursive`) scored PCC 0.4688 vs the 0.97 gate. The fp32 walker is **load-bearing** for any test that compares against a CPU bf16 reference, but it's not declared as a public contract — every model port (Llama, Qwen, Mistral, Gemma4) re-derives it independently, and bespoke test fixtures (e.g. `test_gemma4_generation.py`) often forget to apply it. A documented contract would prevent recurring debugging cycles where "test PCC is in the gutter" turns out to be missing fp32 accumulation, not a real model bug.
+**Questions:**
+- Is `_set_fp32_recursive` (or equivalent fp32_dest_acc_en + HiFi4 + packer_l1_acc on every TTNN linear) considered MANDATORY for any TT-Symbiote test that asserts cumulative PCC vs a CPU bf16 reference, or is it optional / model-specific?
+- For each Symbiote model port (Llama-3, Qwen3, Mistral, Gemma4), what is the canonical compute-kernel-config recipe for production-quality bf16 forward, and where is it documented?
+- Should `TTNNLinear.from_torch` default to fp32 dest accumulation, with HiFi2 / bf16 acc as an opt-in for perf-tuned production paths? What's the historical reason for the current default?
+- Is there a runtime check (or a debug mode) that fires when a TTNN linear is invoked with HiFi2 + bf16 acc on a path that hasn't been validated for that fidelity? E.g. an assertion that "this linear was preprocessed with `dtype=bf16` but the compute_kernel_config is missing fp32 acc — did you forget `_set_fp32_recursive`?"
+- For weight-quantization steps (bf8_b weights), is fp32 dest acc still mandatory, or can we relax to bf16 dest acc since the weights themselves carry less precision? What's the cumulative E2E PCC delta of "bf8 weights + fp32 acc" vs "bf8 weights + bf16 acc"?
+- What's the canonical Pass 4 (`TTNN<Model>ForCausalLM`) registration pattern, and is it always needed in a `_build_full_model` fixture even for tests that don't read `outputs.logits`?
+
+---
+
+## ConcatMesh2dToTensor vs ConcatMeshToTensor for Distributed Hidden-State Extraction on 2-D Mesh Devices
+**Date:** 2026-05-05
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** TT-Symbiote production code (`gemma4_text.py:599-601` in `TTNNGemma4ForCausalLM.forward`) extracts the post-final-RMSNorm `last_hidden_state` from a T3K mesh device using `ttnn.to_torch(t, mesh_composer=ttnn.ConcatMesh2dToTensor(mesh_device, mesh_device.shape, (0, -1)))`. Test fixtures sometimes use the simpler `ttnn.ConcatMeshToTensor(device, dim=-1)` — and on T3K (1×8 mesh) this CAN produce a different tensor depending on the source's mesh layout (replicated vs sharded vs col-parallel-replicated-row). For a fully-replicated tensor the two composers can be made equivalent by slicing `[..., :HIDDEN_SIZE]`, but for distributed RMSNorm output (which is the actual layout of `last_hidden_state` on the 2-D fabric) the simpler 1-D composer can mis-extract — observed empirically in Step 3 of `PLAN_bfloat8_qkv_step3.md` where the test's `ConcatMeshToTensor(dim=-1)` produced a (1, 32, 5376) tensor with the right shape but wrong content (PCC 0.47 vs 0.97 expected). A documented contract on which composer to use for which mesh layout would prevent this class of silent test corruption across model ports.
+**Questions:**
+- For each canonical TT-Symbiote mesh layout (1-D row-only, 1-D col-only, 2-D fabric replicated, 2-D fabric col-sharded-row-replicated, 2-D fabric row-sharded-col-replicated, fully replicated), what is the correct `ttnn.to_torch(t, mesh_composer=...)` invocation to recover the original logical tensor?
+- Specifically for `last_hidden_state` emitted by `TTNNDistributedRMSNorm` on a T3K (1×8) mesh: is `ConcatMesh2dToTensor((0,-1))` truly canonical, or is `ConcatMeshToTensor(dim=-1)` + slice `[..., :HIDDEN_SIZE]` also correct?
+- Why does the production code at `gemma4_text.py:599-601` use the 2-D composer when the device is 1×8 (effectively 1-D)? Is the 2-D composer always preferred even on 1-D meshes, and the 1-D composer is a footgun that should be deprecated?
+- Is there an `inspect_mesh_layout(t) -> dict` utility that returns "this tensor is replicated on dim 0, col-sharded on dim 1, fully replicated on dim 2" so test authors can pick the right composer programmatically?
+- For tests that bypass the outer `ForCausalLM` wrapper and call `model_ttnn.model.language_model(**inputs)` directly, what is the canonical extraction pattern for `last_hidden_state` — replicate Pass 4's composer call, or use a dedicated test-side helper?
