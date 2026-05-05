@@ -789,3 +789,49 @@ This file tracks research topics that the Architect needs to investigate for mak
 - What is the preferred upstream `qkv_proj` output layout that minimizes shim cost on both paths — rank-3 `[B, S, fused]`, rank-4 prefill-style `[B, 1, S, fused]`, rank-4 decode-style `[1, 1, B, fused]`, or width-sharded L1?
 - Does the rank-3 → rank-4 `ttnn.reshape` always degrade to a metadata-only `ReshapeViewDeviceOperation` (free) or can it fall back to a real reshape kernel under certain memory configs?
 - Would a single fused projection op that emits `[B, num_heads, S, head_dim]` directly (combining matmul + create_qkv_heads) be feasible, eliminating both the shim and the all-reduce → reshape path?
+
+---
+
+## Bfloat8 Weight Conversion Pattern Library for tt-symbiote Dense Linear Subclasses
+**Date:** 2026-05-05
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** Converting dense linear weights from `bfloat16` to `bfloat8_b` in tt-symbiote models is a recurring task across every bandwidth-bound batch=1 decode integration (Llama, Qwen, Gemma4, etc.). The existing `TTNNLinearLLama*` family bakes a specific pattern (`@trace_disabled` class decorator + `@deallocate_weights_after` on `forward`) that is **incompatible** with `@trace_enabled` decoder modules — direct reuse breaks trace capture in production decoders. Each new model port (e.g. Gemma4-31B per `PLAN_bfloat8_qkv_step3.md`) re-derives the "drop the decorators, force matmul output dtype, override `move_weights_to_device_impl`" recipe by hand, with risk of subtle drift. A reusable pattern library — either a base class or a documented checklist — would make every future bf8_b weight conversion mechanical instead of bespoke. The library should also document when the matmul output dtype must be forced (e.g. `nlp_create_qkv_heads_decode` requires bf16 input) versus when it can flow through naturally.
+**Questions:**
+- For each Symbiote linear-class family (`TTNNLinearIColShardedWAllReduced`, `TTNNLinearIColShardedWRowSharded`, `TTNNLinearIRowShardedWColSharded`, `TTNNLinearIReplicatedWColSharded`, plain `TTNNLinear`), what is the canonical bf8_b weight variant — class name, `move_weights_to_device_impl` body, `forward` body, decorators?
+- Should bf8_b variants be a shared mixin (e.g. `BFP8WeightMixin.move_weights_to_device_impl` + `BFP8OutputMixin.forward`) or model-specific subclasses (current pattern in master plan §7.1, §8.1)?
+- What is the canonical decision tree for "must I force matmul output dtype to bf16"? Known forcing constraints: `nlp_create_qkv_heads_decode` (bf16 only), softmax (bf16), `nlp_concat_heads` (?), `ttnn.tanh` ULP risk in lm_head decode argmax. Any others?
+- Does `preprocess_linear_weight(dtype=ttnn.bfloat8_b, ...)` interact correctly with every Symbiote sharding mode (col-sharded out, row-sharded in, replicated, distributed RMSNorm γ)? Are there shapes/strides where shared-exponent-per-tile breaks an alignment assumption?
+- Is there a way to opt a single linear instance into bf8_b via a `from_torch(..., weight_dtype=ttnn.bfloat8_b)` keyword instead of requiring a sister class? Would the keyword approach play well with `@trace_enabled` lifecycle (i.e. weights baked at `move_weights_to_device` time, not per-call)?
+- For `TTNNLinearIColShardedWAllReduced` specifically, the all-reduce decomposes to `reduce_scatter + all_gather` for trace safety. Does forcing the matmul output to bf16 (instead of inheriting bf8_b weight dtype) change the bandwidth math of the reduce_scatter step on T3K?
+- Pattern-library scope: should it cover only weight-only quantization (bf16 → bf8_b weights, bf16 activations), or also activation quantization (`activation_dtype=ttnn.bfloat8_b` on inputs), or both?
+
+---
+
+## Trace-Capture Compatibility of bf8_b Weight Variants Under @deallocate_weights_after
+**Date:** 2026-05-05
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** The `@deallocate_weights_after` decorator on `TTNNLinearLLama*.forward` (`linear.py:231`) is incompatible with `@trace_enabled` decoder modules: under trace capture the decoder's forward runs once during warmup and is then replayed many times per token; deallocating weights after the first call leaves replay reading freed memory. Master plan §10 risk #1 documents the resolution (drop both decorators on the new bf8_b subclass), but there's no formal research finding documenting *why* the decorator exists, *which* lifecycle invariants it preserves, and *what* the replacement strategy should be for trace-enabled bf8_b classes. Without this, every new model port re-derives the trade-off and may accidentally re-introduce the decorator (or its equivalent eager-dealloc pattern) by copy-paste. A clear public contract on weight lifecycle in trace mode would prevent recurring bugs.
+**Questions:**
+- What invariant does `@deallocate_weights_after` enforce on `TTNNLinearLLama*` classes? Is it (a) a memory-budget hack for very large layers, (b) a correctness requirement for a specific allocator interaction, (c) a hold-over from pre-trace lifecycle, or (d) something else?
+- Under `@trace_enabled`, what is the canonical weight-lifecycle pattern? Are weights pinned for the entire decoder life, or is there a way to release them between tokens?
+- Is there a tt-metal-side runtime check that fires when a deallocated weight buffer is read by a replayed trace, or does this fail silently as garbage data (matching the silent-corruption pattern at `research_topics.md:765`)?
+- For bf8_b weight subclasses targeting `@trace_enabled` decoders, what is the canonical replacement for `@deallocate_weights_after` if memory pressure becomes an issue? Is there a `@release_after_warmup` decorator, or must we manually `ttnn.deallocate(self.tt_weight)` post-warmup and rely on trace-captured pointers?
+- How does `move_weights_to_device_impl` interact with trace warmup? Are weights guaranteed materialized before trace capture starts, or can lazy materialization race with capture?
+- Is the "drop both decorators" recipe in master plan §10 risk #1 sufficient, or are there secondary effects (e.g. `__del__` ordering, mesh-mapper lifetime, `tt_weight_host` ref count) that must also be preserved?
+
+---
+
+## Fused QKV K=V Cloning + bf8_b Shared-Exponent Symmetry Guarantee
+**Date:** 2026-05-05
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** Gemma4-31B-IT global attention (10 of 60 layers) uses `num_kv_heads = num_v_heads = 4` but the model card / HF config materializes only `k_proj`; `v_proj` is set by `v_weight = k_weight.clone()` at `gemma4_attention.py:134` before `torch.cat([q, k, v], dim=0)` produces a single fused weight tensor. When this fused tensor is later quantized via `preprocess_linear_weight(dtype=ttnn.bfloat8_b, ...)`, each 32×32 tile gets a single shared exponent. The intuitive concern is that K-band and V-band rows are independently quantized and might land in different tiles, causing K-norm vs V-norm symmetry to drift — which would degrade attention even though the bf16 reference has K=V exactly. By construction, however, K and V occupy *adjacent* row-bands of a single tensor with bit-identical content, so the row-major tile decomposition assigns them identical shared exponents in matched tiles; the symmetry is preserved exactly. Master plan §10 risk #3 asserts this without proof. A formal verification (or counterexample) would (a) make the K=V cloning idiom safe for future bf8_b model ports, (b) tell us whether this requires care for non-row-major tile layouts or for sharded weights where K/V might land on different devices, and (c) generalize to any fused projection where multiple downstream consumers share a weight band.
+**Questions:**
+- For a fused tensor `[Q_rows | K_rows | V_rows]` with `V_rows = K_rows.clone()` quantized via row-major 32×32 tile decomposition with per-tile shared exponent, is K-band vs V-band symmetry guaranteed bit-exact? Does this depend on whether `(num_kv_heads * head_dim)` is divisible by 32 (so K-band starts on a tile boundary)?
+- Gemma4 global has `num_kv_heads * head_dim = 4 * 512 = 2048`, divisible by 32 (= 64 tiles per band). Does this divisibility hold for every K=V-cloned production model? What happens if it doesn't?
+- Does the answer change under T3K column-parallel sharding (`weight_dim=-2` after host-side transpose), where the fused weight is split across 8 devices? If a single device sees only a subset of the K-band and V-band, do those subsets still tile-align?
+- For `TTNNLinearIColShardedWAllReduced` the host-side preprocess does `weight.T.contiguous()` before sharding; does this transpose preserve the K-V row-band adjacency, or does it land K and V in different tiles?
+- Generalization: if a future model uses MLA (multi-head latent attention) with weight-sharing between K and V via low-rank decomposition (instead of clone), does the same shared-exponent symmetry guarantee hold?
+- Is there a runtime/static check that can verify "every tile in the K-band has the same shared exponent as its corresponding tile in the V-band" after `preprocess_linear_weight(dtype=ttnn.bfloat8_b)`? This would catch any future regression where the tile-decomposition algorithm changes or sharding shifts the K/V boundary.
