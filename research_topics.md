@@ -892,3 +892,55 @@ This file tracks research topics that the Architect needs to investigate for mak
 - Why does the production code at `gemma4_text.py:599-601` use the 2-D composer when the device is 1×8 (effectively 1-D)? Is the 2-D composer always preferred even on 1-D meshes, and the 1-D composer is a footgun that should be deprecated?
 - Is there an `inspect_mesh_layout(t) -> dict` utility that returns "this tensor is replicated on dim 0, col-sharded on dim 1, fully replicated on dim 2" so test authors can pick the right composer programmatically?
 - For tests that bypass the outer `ForCausalLM` wrapper and call `model_ttnn.model.language_model(**inputs)` directly, what is the canonical extraction pattern for `last_hidden_state` — replicate Pass 4's composer call, or use a dedicated test-side helper?
+
+---
+
+## QB2 FabricConfig and CCL Topology for 4-Device Blackhole P300c
+**Date:** 2026-05-06
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** `test_gemma4.py` opens a 1×4 QB2 mesh with `FabricConfig.FABRIC_1D_RING`. All CCL ops (reduce_scatter, all_gather in linear.py and normalization.py) use `topology=ttnn.Topology.Ring, cluster_axis=1`. On Wormhole T3K (1×8) this is validated in production. On Blackhole p300c (4 chips, 1×4 mesh), it is unknown whether FABRIC_1D_RING is supported for 4 chips, whether Ring topology requires an even number of links, and whether `num_links=1` is the correct setting. If FABRIC_1D_RING is unsupported on a 4-chip BH config, the test will hang or error before any matmul runs.
+**Questions:**
+- Is `ttnn.FabricConfig.FABRIC_1D_RING` a valid choice for a 1×4 mesh of 4× Blackhole p300c chips on tt-quietbox?
+- What is the recommended FabricConfig for a 4-chip Blackhole mesh: `FABRIC_1D_RING`, `FABRIC_1D`, or `DISABLED`?
+- Are `reduce_scatter` and `all_gather` with `topology=Ring, num_links=1, cluster_axis=1` correct for a 1×4 BH mesh, or does Blackhole require `num_links=2` or a different topology?
+- Is there a CI test that exercises CCL ops on QB2 / tt-quietbox that can serve as a reference?
+
+---
+
+## Blackhole P300c Compute Grid Shape for TTNN Kernel Config
+**Date:** 2026-05-06
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** `TTNNGemma4GlobalAttention.move_weights_to_device_impl` hardcodes `SDPAProgramConfig(compute_with_storage_grid_size=(8, 4))`, tuned for Wormhole B0's 8×8 Tensix grid where (8,4)=32 cores matches 32 global Q heads. The plan for QB2 replaces this with a dynamic `device.compute_with_storage_grid_size()` call, but the actual BH p300c grid shape is unknown. If BH's grid is smaller than (8,4) or has different topology, the dynamic query may still produce an invalid config for paged_sdpa_decode.
+**Questions:**
+- What does `mesh_device.compute_with_storage_grid_size()` return for a single Blackhole p300c chip (i.e. one device in the 1×4 mesh)?
+- Is the Blackhole p300c Tensix grid 8×8, 8×10, 10×12, or different?
+- For `paged_sdpa_decode` with 32 Q heads and a head_dim of 512 (global attention), what is the recommended `compute_with_storage_grid_size` for Blackhole?
+- Is `compute_with_storage_grid_size=None` a safe fallback for Blackhole that lets TTNN auto-select?
+
+---
+
+## paged_sdpa_decode and paged_fill_cache Kernel Availability on Blackhole
+**Date:** 2026-05-06
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** `TTNNGemma4Attention._forward_decode_paged` uses `ttnn.experimental.paged_sdpa_decode` and `TTNNGemma4PagedAttentionKVCache.update` calls `paged_fill_cache`. These kernels were validated on Wormhole B0 (T3K). Whether they are compiled and tested for Blackhole p300c in the current tt-metal build is unknown. If either kernel is Wormhole-only, the test will fail with a kernel-not-found error after the full 62 GB model load.
+**Questions:**
+- Are `ttnn.experimental.paged_sdpa_decode` and `ttnn.experimental.paged_fill_cache` compiled for Blackhole targets in the current tt-metal build?
+- Is there a CI test that exercises paged attention on Blackhole that can serve as reference?
+- If paged_sdpa_decode is not available on Blackhole, is `TT_GEMMA4_CPU_SDPA=1` a viable temporary workaround (noting it bypasses decode SDPA only, not prefill)?
+- What is the minimum tt-metal version / build flag required to enable BH paged attention kernels?
+
+---
+
+## Blackhole HiFi4 + fp32_dest_acc_en Numerical Compatibility vs Wormhole B0
+**Date:** 2026-05-06
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** `test_gemma4.py` sets `fp32_dest_acc_en=True, packer_l1_acc=True, math_fidelity=HiFi4` on all linear modules. On Wormhole B0, this produces matmul outputs with sufficient precision for the test assertion `len(generated_text.strip()) > 0`. On Blackhole, the SrcB operand in BH matmuls may be promoted to TF32 (rather than BF16), changing the effective numerical path. It is unknown whether HiFi4 + fp32_dest_acc produces equivalent precision on BH, or whether an alternative fidelity setting is needed to achieve correct generation.
+**Questions:**
+- On Blackhole p300c, does `math_fidelity=HiFi4` with `fp32_dest_acc_en=True` produce numerically equivalent results to the Wormhole B0 path?
+- Is the SrcB TF32 promotion that occurs on some BH matmul configurations relevant for `TTNNLinearGemma4IColShardedWAllReduced` (bf8_b weights) or `TTNNLinearGemma4IColShardedWRowSharded` (bf8_b weights) on BH?
+- Is there a recommended compute_kernel_config recipe for Blackhole that matches Wormhole B0's HiFi4 + fp32 precision behavior?
+- What is the expected E2E PCC delta between T3K BF16 reference and QB2 forward for Gemma4 with the current kernel config?
