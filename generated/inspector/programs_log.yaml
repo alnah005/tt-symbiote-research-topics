@@ -1,0 +1,37 @@
+- program_created:
+    id: 0
+    timestamp_ns: 1778280198196038999
+- program_compile_started:
+    id: 0
+    timestamp_ns: 1778280198196721885
+- program_kernel_compile_finished:
+    id: 0
+    timestamp_ns: 1778280198202479701
+    duration_ns: 5757816
+    watcher_kernel_id: 3
+    name: cq_dispatch_subordinate
+    path: /home/salnahari/.cache/tt-metal-cache/14338071646888927444/kernels/cq_dispatch_subordinate/6868888002577736650/
+    source: tt_metal/impl/dispatch/kernels/cq_dispatch_subordinate.cpp
+- program_kernel_compile_finished:
+    id: 0
+    timestamp_ns: 1778280198203746294
+    duration_ns: 7024409
+    watcher_kernel_id: 2
+    name: cq_dispatch
+    path: /home/salnahari/.cache/tt-metal-cache/14338071646888927444/kernels/cq_dispatch/1203545189831249074/
+    source: tt_metal/impl/dispatch/kernels/cq_dispatch.cpp
+- program_kernel_compile_finished:
+    id: 0
+    timestamp_ns: 1778280198203805684
+    duration_ns: 7083799
+    watcher_kernel_id: 1
+    name: cq_prefetch
+    path: /home/salnahari/.cache/tt-metal-cache/14338071646888927444/kernels/cq_prefetch/4832081068247033056/
+    source: tt_metal/impl/dispatch/kernels/cq_prefetch.cpp
+- program_compile_finished:
+    id: 0
+    timestamp_ns: 1778280198205544113
+    duration_ns: 8822228
+- program_destroyed:
+    id: 0
+    timestamp_ns: 1778280198229138106

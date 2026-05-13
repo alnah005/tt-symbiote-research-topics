@@ -35,18 +35,6 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ---
 
-## T3K Mesh Device Optimizations
-**Date:** 2026-03-16
-**Status:** Completed
-**Guide:** `guides/t3k_mesh_device_optimizations/`
-**Why Needed:** TTNNQwen3MoE runs on T3K (1x8 mesh) and needs device-specific optimizations for expert parallelism.
-**Questions:**
-- What are the optimal num_links settings for all_to_all operations on T3K?
-- How should memory configs (L1 vs DRAM) be chosen for decode vs prefill?
-- What are the bandwidth characteristics between T3K devices?
-
----
-
 ## Expert Parallelism Strategies
 **Date:** 2026-03-16
 **Status:** Completed
@@ -56,30 +44,6 @@ This file tracks research topics that the Architect needs to investigate for mak
 - How does all_to_all_dispatch/combine compare to alternative expert routing schemes?
 - What is the optimal expert-to-device assignment for 256 experts on 8 devices?
 - How should routing weights be processed to minimize overhead?
-
----
-
-## Weight Quantization for MoE Experts
-**Date:** 2026-03-17
-**Status:** Completed
-**Guide:** `guides/weight_quantization_for_moe_experts/`
-**Why Needed:** DeepSeek-V3 uses bfloat4_b/bfloat8_b weight quantization for experts, but Qwen uses full bfloat16. Need to evaluate quantization trade-offs.
-**Questions:**
-- What accuracy loss is expected from bfloat4_b vs bfloat8_b vs bfloat16 for expert weights?
-- How does weight quantization affect compute throughput on Wormhole?
-- Which projections (gate/up/down) are most sensitive to quantization?
-
----
-
-## Compute Kernel Configuration for MoE
-**Date:** 2026-03-17
-**Status:** Completed
-**Guide:** `guides/compute_kernel_configuration_for_moe/`
-**Why Needed:** DeepSeek-V3 uses COMPUTE_KERNEL_CONFIG_LOFI with packer_l1_acc, but Qwen MoE doesn't specify compute kernel configs. Need to optimize.
-**Questions:**
-- What is the performance difference between LoFi, HiFi2, and HiFi4 for MoE expert matmuls?
-- How does packer_l1_acc affect throughput for expert computations?
-- What is the accuracy trade-off for using math_approx_mode?
 
 ---
 
@@ -104,18 +68,6 @@ This file tracks research topics that the Architect needs to investigate for mak
 - What does the paged_sdpa_decode kernel expect for GQA (4 KV heads to 16 Q heads)?
 - Is there a mismatch in how cur_pos is interpreted?
 - Are there any known issues with TTNN paged attention?
-
----
-
-## Tracy Profiling and MoE Forward Pass Analysis
-**Date:** 2026-03-17
-**Status:** Completed
-**Guide:** `guides/tracy_profiling_and_moe_forward_pass_analysis/`
-**Why Needed:** Need op-level breakdown of MoE forward pass to identify bottlenecks and understand where the 16ms gap occurs.
-**Questions:**
-- Have you captured a Tracy trace or op-level breakdown of the MoE forward pass?
-- What operations occur between expert dispatch and combine?
-- Does the 16ms gap scale with sequence length?
 
 ---
 
@@ -214,40 +166,6 @@ This file tracks research topics that the Architect needs to investigate for mak
 
 ---
 
-## TTNNBailingMoEAttention Performance Optimization on T3K
-**Date:** 2026-03-26
-**Status:** Completed
-**Guide:** `guides/ttnn_bailing_moe_attention_performance_optimization_on_t3k/`
-**Why Needed:** `TTNNBailingMoEAttention` is the attention layer for the Ling (BailingMoeV2) model on T3K and contains several performance-sensitive paths — fused QKV projection, paged SDPA decode, HEIGHT_SHARDED RoPE, and a host-roundtrip tensor replication step — whose combined latency contribution is not yet understood.
-**Questions:**
-- `TTNNBailingMoEAttention` uses a fused QKV projection (`TTNNLinearIColShardedWAllReduced`: 1 matmul + 1 all_reduce) replacing 3 separate matmuls + 5 CCL ops — what are the actual latency savings on T3K's 1×8 mesh, and is `num_links=1` in `_maybe_all_gather` optimal for the hidden size?
-- `_to_replicated` round-trips the all-gathered QKV tensor through host CPU to satisfy paged-attention kernel topology requirements — what is the host-transfer overhead at decode batch=1, and is there a device-side alternative?
-- The decode path places Q, K, V into HEIGHT_SHARDED L1 before RoPE then re-shards K/V again before `paged_update_on_device` — how many memory-config transitions occur per decode step, and which dominates overhead?
-- `paged_sdpa_decode` is invoked with `q_chunk_size=0, k_chunk_size=0` — what does chunk size 0 mean for the paged SDPA kernel, and are these correct for the Ling model's GQA configuration (16 Q heads, 4 KV heads, head_dim=128)?
-- The SDPA compute kernel uses `HiFi4` with `fp32_dest_acc_en=True` and `packer_l1_acc=True` — is HiFi4 with fp32 accumulation necessary for attention correctness, or would HiFi2 improve throughput without measurable accuracy loss?
-- When `use_qk_norm=True`, Q and K are moved to L1, reshaped, normalized via `TTNNRMSNorm`, then reshaped back — what is the latency of this QK norm path relative to the fused QKV matmul, and is the L1 move avoidable?
-- `partial_rotary_factor < 1.0` forces `TTNNRotaryPositionEmbedding` (non-distributed) — what is the performance cost of non-distributed RoPE on T3K, and is there a way to use the distributed kernel with partial rotary without padding cos/sin to full head_dim?
-- What is the best way to profile the full `TTNNBailingMoEAttention` forward at op-level granularity on T3K to identify the single biggest decode bottleneck?
-
----
-
-## TTNNMoE Performance Optimization on T3K
-**Date:** 2026-03-26
-**Status:** Completed
-**Guide:** `guides/ttnn_moe_performance_optimization_on_t3k/`
-**Why Needed:** Running MoE on T3K is currently the most time-consuming operation, making it a critical bottleneck to address for overall model throughput.
-**Questions:**
-- `TTNNMoE.forward` runs all-gather (Linear topology, num_links=1) before routing and reduce-scatter (Ring topology, chunks_per_sync=10, num_workers_per_link=2) after experts — what are the actual latency costs of each CCL op, and are the current topology/link/buffer settings optimal for T3K's 1×8 mesh?
-- `TTNNExperts.forward` pads tokens to SPARSITY_BLOCK_SIZE=32 then runs `all_to_all_dispatch` → `moe_expert_token_remap` → 3× `sparse_matmul` → `all_to_all_combine` — which of these steps dominates latency at batch=1 decode?
-- The `sparse_matmul` program config uses `in0_block_w=min(4, hidden_tiles)` and `per_core_M=1` — are these optimal for the hidden/intermediate sizes in GLM-4-MoE and Bailing, or should they be tuned per model?
-- Expert matmuls use `HiFi2` math fidelity while the gate routing linear uses `HiFi4` — is HiFi2 sufficient for expert computation, and would LoFi improve throughput without accuracy loss?
-- After `all_to_all_combine`, expert outputs are weighted by broadcasting `topk_experts_weights` then permuting — is this weight application a meaningful overhead, and is there a cheaper alternative?
-- `TTNNGlm4MoeMoE` still runs experts on CPU via `Glm4MoeNaiveMoeHybrid` — how does its latency compare to `TTNNMoE`/`TTNNExperts`, and is there any remaining code path that silently falls back to CPU during inference?
-- The router in `TTNNMoERouterDecode` uses a 3-pass BF16 centering trick for precision — what is the latency cost versus a simpler single-pass topk, and is the precision benefit measurable in output quality?
-- What is the best way to profile the full `TTNNMoE` forward at op-level granularity on T3K to identify the single biggest bottleneck?
-
----
-
 ## Deploying a TT Symbiote Model on tt-inference-server
 **Date:** 2026-03-27
 **Status:** Completed
@@ -290,40 +208,6 @@ This file tracks research topics that the Architect needs to investigate for mak
 - Does `ttnn.all_reduce` use any internal semaphore state that could conflict with trace replay?
 - Are there any known limitations or requirements for using `ttnn.all_reduce` inside a traced region?
 
-
----
-
-## Gated Delta Net and Gated Attention on T3K
-**Date:** 2026-03-27
-**Status:** Completed
-**Guide:** `guides/gated_delta_net_and_gated_attention_on_t3k/`
-**Why Needed:** Qwen-Coder-Next and Qwen3.5 models introduce Gated Delta Net (a linear-recurrent attention variant) alongside standard Gated Attention. Understanding the mathematical foundations and compute/memory characteristics of these operations is required before mapping them onto the T3K 1×8 mesh.
-**Questions:**
-- What is the Gated Delta Net mechanism — what are the core mathematical operations (delta rule update, gating, state matrix), and how does it differ from standard softmax attention and other linear attention variants (e.g. RetNet, Mamba, GLA)?
-- What is the Gated Attention mechanism used in these models — how does the gating interact with the standard QKV projection and SDPA, and what tensor shapes does it introduce relative to vanilla multi-head attention?
-- What are the data dependencies and recurrence structure in Gated Delta Net — is the state update strictly sequential per token, or can it be parallelized across the sequence dimension (e.g. via parallel scan)?
-- What TTNN primitive operations would be needed to implement a single Gated Delta Net step for decode (batch=1, single token) and for prefill (full sequence), and what are the expected tensor shapes at each step?
-- How does the hidden state size and gating dimensionality of Gated Delta Net compare to the KV cache size of standard attention for the same model — what are the memory footprint implications on T3K L1 and DRAM?
-- For the recurrent decode step of Gated Delta Net, is the bottleneck compute-bound (state matrix multiply) or bandwidth-bound (state read/write), and how does this map to Wormhole's compute-to-bandwidth ratio?
-- How should the Gated Delta Net state matrix be sharded across the 8 devices of T3K — what parallelism strategy minimizes CCL overhead while keeping per-device memory within budget?
-- Are there existing TTNN kernels or tt-transformers primitives that can express the Gated Delta Net and Gated Attention forward passes, or are new custom kernels required?
-
----
-
-## Windowed Attention: Foundations and T3K Mapping
-**Date:** 2026-03-27
-**Status:** Completed
-**Guide:** `guides/windowed_attention_foundations_and_t3k_mapping/`
-**Why Needed:** Some models (e.g. Qwen3.5, Mistral) use windowed (sliding window) attention to bound KV cache size and reduce attention complexity. Understanding the mathematical foundations and compute/memory characteristics is required before mapping windowed attention onto the T3K 1×8 mesh.
-**Questions:**
-- What is windowed (sliding window) attention — what are the core mathematical operations, what is the window size parameter, and how does it differ from full causal attention in terms of which tokens each query attends to?
-- How does windowed attention interact with KV cache management during decode — does each new token evict old KV entries, and what is the resulting KV cache size relative to full attention?
-- What are the data dependencies and memory access patterns in windowed attention during prefill vs decode — can the window be expressed as a masked full-attention kernel, or does it require a specialized kernel?
-- What TTNN primitive operations would be needed to implement windowed attention for decode and prefill, and what tensor shapes does the window constraint introduce?
-- How does windowed attention interact with paged KV cache implementations — can paged_sdpa_decode be used with a window constraint, or does the paging scheme need to be aware of the window boundary?
-- For the T3K 1×8 mesh, how should the windowed KV cache be sharded across devices — is the window applied per-device or is the full window replicated, and what are the CCL implications for cross-device attention?
-- Is windowed attention compute-bound or bandwidth-bound on Wormhole for typical window sizes (e.g. 4096, 8192 tokens) and batch=1 decode, and how does this compare to full attention at the same sequence position?
-- Are there existing TTNN kernels or tt-transformers primitives that already support windowed or masked attention patterns, or would a new kernel/program config be required?
 
 ---
 

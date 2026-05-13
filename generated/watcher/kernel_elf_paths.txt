@@ -1,0 +1,4 @@
+0: blank
+3: /home/salnahari/.cache/tt-metal-cache/14338071646888927444/kernels/cq_dispatch_subordinate/6868888002577736650//ncrisc/ncrisc.elf
+2: /home/salnahari/.cache/tt-metal-cache/14338071646888927444/kernels/cq_dispatch/1203545189831249074//brisc/brisc.elf
+1: /home/salnahari/.cache/tt-metal-cache/14338071646888927444/kernels/cq_prefetch/4832081068247033056//brisc/brisc.elf

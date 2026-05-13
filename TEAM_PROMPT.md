@@ -175,7 +175,7 @@ After receiving the Architect's response, the Team Lead MUST verify:
 - `unset TT_VISIBLE_DEVICES` before running tests
 - `tt-smi -r` to reset chips before each test run
 - `pytest --timeout=0` to prevent timeouts
-- `MESH_DEVICE=T3K` for T3K mesh device tests
+- `MESH_DEVICE=QB2` for QB2 mesh device tests
 - tt-symbiote by default shards the output of all TTNN modules on the last demension (check run_config.py). Expect to add an all gather if shape mismatches.
 - No need to run CPU mode (it's trivial and works)
 
