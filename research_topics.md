@@ -828,3 +828,55 @@ This file tracks research topics that the Architect needs to investigate for mak
 - Is the SrcB TF32 promotion that occurs on some BH matmul configurations relevant for `TTNNLinearGemma4IColShardedWAllReduced` (bf8_b weights) or `TTNNLinearGemma4IColShardedWRowSharded` (bf8_b weights) on BH?
 - Is there a recommended compute_kernel_config recipe for Blackhole that matches Wormhole B0's HiFi4 + fp32 precision behavior?
 - What is the expected E2E PCC delta between T3K BF16 reference and QB2 forward for Gemma4 with the current kernel config?
+
+---
+
+## blaze.ops.sdpa.SDPADecode q_memory_config / output_memory_config API on Multi-Device MeshDevice
+**Date:** 2026-05-15
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** The blaze_nn port of Qwen3-Embedding-0.6B (`examples_blaze_nn/qwen3_embedding_0_6b/modules/attention.py:111-119` and `modules/model.py:187-195`) calls `SDPADecode.q_memory_config(..., device=device, ...)` and `SDPADecode.output_memory_config(..., device=device, ...)` where `device` is either an explicitly-passed handle or `q_roped.device()`. On a (1,4) MeshDevice these return a MeshDevice handle. It is unknown whether `SDPADecode`'s static memory-config helpers accept a MeshDevice handle directly (and dispatch the per-chip grid query internally), or whether they expect a single `Device` and require the caller to unwrap via `mesh_device.get_devices()[0]`. This is a hard prerequisite for any blaze_nn forward pass running replicated DP on a (1,N) mesh — a silent crash here blocks Phase A.
+**Questions:**
+- Does `blaze.ops.sdpa.SDPADecode.q_memory_config(device=mesh_device, ...)` accept a MeshDevice and return the correct per-chip MemoryConfig?
+- Same question for `SDPADecode.output_memory_config(device=mesh_device, ...)`.
+- If MeshDevice is rejected, what is the canonical unwrap pattern for use inside `Qwen3Attention._bridge_q_for_sdpa` and `Qwen3EmbeddingModel.init_attn_out_buffers` so the address baked into the compiled program remains valid for replicated execution?
+- Does the same question apply to any other blaze.ops static memory-config helpers (`Linear.weight_memory_config`, `RoPE.*`, etc.)?
+
+---
+
+## ttnn.kv_cache.update_cache_for_token_ Semantics on Replicated MeshDevice K/V Caches
+**Date:** 2026-05-15
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** The blaze_nn port's `Qwen3EmbeddingModel.init_kv_caches` allocates per-layer K and V caches via `ttnn.from_torch` on a MeshDevice (currently without an explicit `mesh_mapper=`, must be fixed to `ReplicateTensorToMesh`). At decode-step time, `ttnn.kv_cache.update_cache_for_token_(cache, k_or_v_for_cache, cur_pos)` is called per-token to mutate the cache in place. When `cache` is a 4-chip-replicated tensor and `k_or_v_for_cache` is also replicated (each chip computed an identical local copy), it is unknown whether the in-place write is broadcast to all 4 chip-local caches, or whether only one chip's cache is updated. If the latter, chips 1..3 have stale K/V after token 1 and any DP-replicated decode-loop silently diverges from chip 0 starting at token 2.
+**Questions:**
+- Does `ttnn.kv_cache.update_cache_for_token_` operate per-shard on a replicated MeshDevice tensor, so all 4 chip-local caches receive the same update?
+- If not, what is the canonical pattern — wrap with `ttnn.get_device_tensors(...)` and loop, or use a different update API that is mesh-aware?
+- What is the expected behavior of `cur_pos` (a Python int) vs `cur_pos_tensor` (an on-device int32 tensor with `cluster_axis` semantics) on a (1,N) mesh?
+- Does the same concern apply to `ttnn.experimental.paged_fill_cache` for the paged decode path on Blackhole?
+
+---
+
+## Replicated MeshDevice Tensor buffer_address() Stability Across Devices
+**Date:** 2026-05-15
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** Several blaze_nn ops bake a tensor's device address as a compile-time argument: `TokenEmbedding` bakes `weight_buffer_address`, `RoPE` bakes `cos_tensor_address`/`sin_tensor_address`/`position_ids_tensor_address`. When the underlying tensor is replicated across a (1,N) MeshDevice via `ReplicateTensorToMesh`, each chip-local replica has its own buffer at a per-chip address. It is unknown whether `int(tensor.buffer_address())` returns (a) the device-0 address (in which case chips 1..N would read garbage or crash if blaze emits the same baked address into every per-device program), or (b) a value that blaze re-resolves per-device at program-emit time. This affects every op that bakes an address (embedding, rope, possibly others) on any DP-replicated mesh execution.
+**Questions:**
+- For a tensor created via `ttnn.from_torch(..., mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device))`, what does `tensor.buffer_address()` return?
+- When the blaze compiler emits a per-device program from an op with a baked-address CT arg, does it (a) reuse the same int across all per-device programs, (b) re-resolve per-device, or (c) fail with an explicit error?
+- If (a), what is the contract — must the caller pass a list-of-addresses CT arg, or wrap with `get_device_tensors` and emit one op per device, or refactor the op to route the tensor as a runtime graph input instead of a baked CT arg?
+- Are the existing blaze ops (`embedding`, `rope`) safe under `ReplicateTensorToMesh` on a (1,N) mesh, or do they need refactoring?
+
+---
+
+## Last-Token Pooling Extraction Recipe for Embedding Models on Replicated DP MeshDevice
+**Date:** 2026-05-15
+**Status:** Pending
+**Guide:** TBD
+**Why Needed:** Qwen3-Embedding-0.6B (and other embedding-class models) pool the final hidden state of the last input token and L2-normalize to produce the sentence embedding. When run as Replicate-DP on a (1,N) MeshDevice (each chip independently produces a copy of the same hidden state), there are multiple ways to extract a single CPU torch tensor from the ttnn mesh tensor: `ttnn.get_device_tensors(t)[0]`, `ttnn.to_torch(t, mesh_composer=ttnn.ConcatMesh2dToTensor(...))` with a slice, or `ttnn.ListMeshToTensor(...)`. Each has different correctness/performance trade-offs and the canonical pattern is not documented. The Pending topic `ConcatMesh2dToTensor vs ConcatMeshToTensor` (line 768) covers part of this; this topic is specifically the embedding-output extraction case.
+**Questions:**
+- What is the canonical extraction recipe for a fully-replicated `[B, S, D]` hidden-state tensor on a (1,N) MeshDevice?
+- Is `ttnn.get_device_tensors(t)[0]` the simplest/correct primitive, or does it have subtle semantics that diverge from `to_torch + ConcatMesh2dToTensor + slice`?
+- For an embedding model, where is the most efficient place in the pipeline to extract — after the final `norm`, or after a device-side `embedding_pool` op that does last-token pluck + L2 normalize on device?
+- Are there known correctness pitfalls (e.g. silent shape mismatches when composer dims are wrong) that have been observed during T3K/QB2 embedding-model bringup?
